@@ -1,0 +1,30 @@
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "diffs": {
+    "wrap": "word",
+    "view": "auto"
+  },
+  "session": {
+    "sidebar": "auto",
+    "scrollbar": false,
+    "thinking": "show",
+    "verbosity": "medium"
+  },
+  "animations": true,
+  "prompt": {
+    "paste": "full",
+    "image_preview": true
+  },
+  "leader": {
+    "timeout": 2000
+  },
+  "attention": {
+    "notifications": true,
+    "sound": true,
+    "volume": 0.5
+  },
+  "debug": {
+    "devtools": true,
+    "turn_tokens": true
+  }
+}

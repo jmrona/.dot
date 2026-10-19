@@ -1,0 +1,338 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+const root = new URL('../', import.meta.url)
+const config = JSON.parse(readFileSync(new URL('../opencode.json', import.meta.url), 'utf8'))
+const files = [
+  'skills/_shared/subagent-dispatch.md',
+  'skills/brainstorming-standard/SKILL.md',
+  'skills/brainstorming-skip/SKILL.md',
+  'skills/brainstorming-committee/SKILL.md',
+  'skills/brainstorming-committee/committee-member-prompt.md',
+  'skills/subagent-driven-development/SKILL.md',
+  'skills/subagent-driven-development/implementer-prompt.md',
+  'skills/subagent-driven-development/reviewer-prompt.md',
+  'skills/fast-path-implementation/SKILL.md',
+  'skills/fast-path-implementation/fast-path-reviewer-prompt.md',
+  'skills/requesting-code-review/SKILL.md',
+  'skills/design-review/SKILL.md',
+  'skills/design-review/design-reviewer-prompt.md',
+  'skills/debugging/SKILL.md',
+  'skills/debugging/investigator-prompt.md',
+  'skills/dispatching-parallel-agents/SKILL.md',
+  'rules/common/model-routing.md',
+]
+
+function read(path) {
+  return readFileSync(new URL(path, root), 'utf8')
+}
+
+function allInstructions() {
+  return files.map((path) => [path, read(path)])
+}
+
+test('defines the approved role-to-alias map and verifies native availability', () => {
+  const dispatch = read('skills/_shared/subagent-dispatch.md')
+
+  assert.match(dispatch, /bounded implementation[\s\S]*openai\/easy/i)
+  assert.match(dispatch, /routine(?: lookup| discovery)?[\s\S]*openai\/easy/i)
+  assert.match(dispatch, /planning[\s\S]*design[\s\S]*decomposition[\s\S]*openai\/hard/i)
+  assert.match(dispatch, /every independent implementation or specification review[\s\S]*openai\/hard/i)
+  assert.match(dispatch, /known difficult[\s\S]*openai\/hard/i)
+  assert.match(dispatch, /current (?:visible )?agent catalogue/i)
+  assert.match(dispatch, /opencode\.models/)
+  assert.match(dispatch, /BLOCKED/)
+  assert.match(dispatch, /NEEDS_CONTEXT/)
+  assert.match(dispatch, /do not omit the role or alias/i)
+
+  for (const role of [
+    ['stack-specialist', 'openai/easy'],
+    ['utility', 'openai/easy'],
+    ['stack-planner', 'openai/hard'],
+    ['architect-reviewer', 'openai/hard'],
+    ['qa-expert', 'openai/hard'],
+    ['code-reviewer', 'openai/hard'],
+    ['complex-worker', 'openai/hard'],
+  ]) {
+    assert.ok(dispatch.includes(`| \`${role[0]}\` | \`${role[1]}\` |`), `${role[0]} uses ${role[1]}`)
+  }
+})
+
+test('removes legacy model tiers and obsolete dispatch APIs from workflow instructions', () => {
+  for (const [path, source] of allInstructions()) {
+    assert.doesNotMatch(source, /opencode models\b/i, `${path} avoids the obsolete CLI`)
+    assert.doesNotMatch(source, /subagent_type\s*:|task_id\s*:/, `${path} avoids legacy fields`)
+    assert.doesNotMatch(source, /\btask\s*\(/, `${path} avoids the legacy task API`)
+    assert.doesNotMatch(source, /general-purpose/, `${path} avoids old generic-agent examples`)
+    assert.doesNotMatch(
+      source,
+      /Low-cost default tier|Standard escalation tier|High-capability tier|cheapest capable model/i,
+      `${path} does not use the vendor/tier ladder`,
+    )
+  }
+
+  const dispatch = read('skills/_shared/subagent-dispatch.md')
+  assert.match(dispatch, /generic fallback[\s\S]*explicitly authori[sz]es that fallback and its required alias/i)
+  assert.match(dispatch, /required role[\s\S]*BLOCKED/i)
+})
+
+test('keeps upstream model IDs out of workflow instructions', () => {
+  const modelIds = Object.values(config.providers.openai.models).map((model) => model.modelID)
+
+  for (const [path, source] of allInstructions()) {
+    for (const modelId of modelIds) {
+      assert.equal(source.includes(modelId), false, `${path} does not duplicate the configured model ID`)
+    }
+  }
+})
+
+test('routes every independent review to a hard reviewer including the fast path', () => {
+  const routing = read('rules/common/model-routing.md')
+  const requestReview = read('skills/requesting-code-review/SKILL.md')
+  const designReview = read('skills/design-review/SKILL.md')
+  const designPrompt = read('skills/design-review/design-reviewer-prompt.md')
+  const fastPath = read('skills/fast-path-implementation/SKILL.md')
+  const fastPrompt = read('skills/fast-path-implementation/fast-path-reviewer-prompt.md')
+
+  assert.match(routing, /implementation or specification review[\s\S]*code-reviewer[\s\S]*openai\/hard/i)
+  assert.match(routing, /architect-reviewer.{0,30}openai\/hard.{0,60}design or architecture reviews/i)
+  assert.match(requestReview, /code-reviewer[\s\S]*openai\/hard/i)
+  assert.match(designReview, /architect-reviewer[\s\S]*openai\/hard/i)
+  assert.match(designPrompt, /architect-reviewer[\s\S]*openai\/hard/i)
+  assert.match(fastPath, /reviewer[\s\S]*openai\/hard/i)
+  assert.match(fastPrompt, /reviewer[\s\S]*openai\/hard/i)
+})
+
+test('keeps substantive brainstorming and decomposition with the parent and stack planner', () => {
+  const standard = read('skills/brainstorming-standard/SKILL.md')
+  const skip = read('skills/brainstorming-skip/SKILL.md')
+  const committee = read('skills/brainstorming-committee/SKILL.md')
+  const committeePrompt = read('skills/brainstorming-committee/committee-member-prompt.md')
+  const development = read('skills/subagent-driven-development/SKILL.md')
+
+  for (const source of [standard, skip, committee, committeePrompt, development]) {
+    assert.match(source, /stack-planner/)
+    assert.match(source, /openai\/hard/)
+  }
+
+  assert.match(standard, /one question per message/i)
+  assert.match(standard, /parent[\s\S]*question/i)
+  assert.match(standard, /design work[\s\S]*alternatives/i)
+  assert.match(standard, /explicit final approval/i)
+  assert.match(skip, /capture.{0,30}verbatim/i)
+  assert.match(skip, /substantive judgement[\s\S]*stack-planner/i)
+  assert.match(skip, /explicit approval/i)
+  assert.match(committee, /stack-planner/)
+  assert.match(committee, /architect-reviewer/)
+  assert.match(committee, /qa-expert/)
+  assert.match(committeePrompt, /native(?: OpenCode V2)? subagent/i)
+  assert.match(committeePrompt, /Pragmatist[\s\S]*stack-planner/)
+  assert.match(development, /decomposition[\s\S]*stack-planner[\s\S]*openai\/hard/i)
+  assert.match(development, /workflow COMPLEX[\s\S]*not model difficulty/i)
+})
+
+test('preserves approved bounded implementation, TDD, review, and approval gates', () => {
+  const development = read('skills/subagent-driven-development/SKILL.md')
+  const implementer = read('skills/subagent-driven-development/implementer-prompt.md')
+  const standard = read('skills/brainstorming-standard/SKILL.md')
+  const skip = read('skills/brainstorming-skip/SKILL.md')
+  const committee = read('skills/brainstorming-committee/SKILL.md')
+
+  assert.match(development, /six-criterion complexity triage/i)
+  assert.match(development, /bounded implementation[\s\S]*stack-specialist[\s\S]*openai\/easy/i)
+  assert.match(development, /complex-worker[\s\S]*openai\/hard/i)
+  assert.match(development, /per-task pipeline/i)
+  assert.match(development, /final feature-level review/i)
+  assert.match(implementer, /approved task/i)
+  assert.match(implementer, /must not (?:re-run|run).{0,40}(?:brainstorming|orchestrat)/i)
+  assert.match(implementer, /NEEDS_CONTEXT/)
+  assert.match(implementer, /self-review/i)
+  assert.match(standard, /design-review/)
+  assert.match(standard, /Completion Gate/)
+  assert.match(skip, /Completion Gate/)
+  assert.match(committee, /consensus/i)
+  assert.match(committee, /design-review/)
+  assert.match(committee, /Completion Gate/)
+})
+
+test('uses native child fields and prevents nested orchestration or human questions', () => {
+  const dispatch = read('skills/_shared/subagent-dispatch.md')
+  const prompts = [
+    read('skills/brainstorming-committee/committee-member-prompt.md'),
+    read('skills/subagent-driven-development/implementer-prompt.md'),
+    read('skills/subagent-driven-development/reviewer-prompt.md'),
+    read('skills/fast-path-implementation/fast-path-reviewer-prompt.md'),
+    read('skills/design-review/design-reviewer-prompt.md'),
+    read('skills/debugging/investigator-prompt.md'),
+  ].join('\n')
+
+  assert.match(dispatch, /native(?: OpenCode V2)? subagent interface/i)
+  assert.match(prompts, /subagent\(\{/)
+  for (const field of ['agent', 'description', 'prompt']) {
+    assert.match(dispatch, new RegExp(`\\b${field}\\b`))
+    assert.match(prompts, new RegExp(`\\b${field}\\b`))
+  }
+  assert.match(dispatch, /`sessionID` field is optional[\s\S]*ID returned by a prior call/i)
+  assert.match(dispatch, /`background` is optional/i)
+  assert.match(prompts, /dispatch nested agents|launch nested (?:reviewers|agents)/i)
+  assert.match(prompts, /not ask the human|not ask the user/i)
+  assert.match(dispatch, /children do not ask the human[\s\S]*launch nested agents or orchestration workflows/i)
+})
+
+test('keeps debugging evidence gates and annotates parallel tasks with explicit role aliases', () => {
+  const debugging = read('skills/debugging/SKILL.md')
+  const investigator = read('skills/debugging/investigator-prompt.md')
+  const parallel = read('skills/dispatching-parallel-agents/SKILL.md')
+
+  assert.match(debugging, /reproduc/i)
+  assert.match(debugging, /root cause/i)
+  assert.match(debugging, /explicit approval/i)
+  assert.match(debugging, /stack-specialist[\s\S]*openai\/easy/i)
+  assert.match(debugging, /complex-worker[\s\S]*openai\/hard/i)
+  assert.match(investigator, /(?:does not|do not).{0,30}orchestrat/i)
+  assert.match(investigator, /NEEDS_CONTEXT/)
+  assert.match(parallel, /each task.{0,80}(?:role|agent).{0,80}alias/i)
+  assert.match(parallel, /openai\/easy/)
+  assert.match(parallel, /openai\/hard/)
+  assert.doesNotMatch(parallel, /Low-cost default tier|cheapest/i)
+})
+test('omits parent session IDs from new calls and backgrounds only independent work', () => {
+  const dispatch = read('skills/_shared/subagent-dispatch.md')
+  const routing = read('rules/common/model-routing.md')
+  const committeeSkill = read('skills/brainstorming-committee/SKILL.md')
+  const parallelSkill = read('skills/dispatching-parallel-agents/SKILL.md')
+  const templates = [
+    read('skills/brainstorming-committee/committee-member-prompt.md'),
+    read('skills/subagent-driven-development/implementer-prompt.md'),
+    read('skills/subagent-driven-development/reviewer-prompt.md'),
+    read('skills/fast-path-implementation/fast-path-reviewer-prompt.md'),
+    read('skills/design-review/design-reviewer-prompt.md'),
+  ]
+  const calls = templates.flatMap((source) => [...source.matchAll(/subagent\(\{[\s\S]*?\}\)/g)].map((match) => match[0]))
+  assert.ok(calls.length > 0, 'templates show native subagent calls')
+
+  for (const call of calls) {
+    assert.match(call, /agent:/)
+    assert.match(call, /description:/)
+    assert.match(call, /prompt:/)
+    assert.doesNotMatch(call, /sessionID\s*:/)
+    assert.doesNotMatch(call, /parent session ID/i)
+  }
+
+  assert.match(dispatch, /`sessionID` field is optional[\s\S]*ID returned by a prior call[\s\S]*same child in the same role/i)
+  assert.match(dispatch, /never pass the parent session ID/i)
+  assert.match(routing, /`sessionID` is optional[\s\S]*continue that same child/i)
+  assert.match(committeeSkill, /background: true[\s\S]*completion notifications/i)
+  assert.match(parallelSkill, /completion notifications/i)
+  assert.ok(calls.some((call) => /background:\s*false/.test(call)), 'dependent calls stay foreground')
+  assert.ok(calls.some((call) => /background:\s*true/.test(call)), 'independent calls run in background')
+  assert.match(parallelSkill, /background: true[\s\S]*independent tasks/i)
+})
+
+test('delegates committee agenda and summary authorship to the hard planner', () => {
+  const committee = read('skills/brainstorming-committee/SKILL.md')
+
+  assert.match(committee, /agenda[\s\S]*`stack-planner` on `openai\/hard`/i)
+  assert.match(committee, /substantive agenda development[\s\S]*stack-planner/i)
+  assert.match(committee, /final design summary authorship[\s\S]*`stack-planner` on `openai\/hard`/i)
+  assert.match(committee, /recorded committee consensus[\s\S]*stack-planner/i)
+  assert.match(committee, /parent.{0,80}(?:scope-check|checks the summary against scope)/i)
+  assert.match(committee, /Administer the vote and consensus process[\s\S]*The parent administers the process/i)
+  assert.match(committee, /parent presents[\s\S]*explicit approval/i)
+})
+
+test('routes difficult debugging analysis to the hard worker in every interaction mode', () => {
+  const debugging = read('skills/debugging/SKILL.md')
+
+  assert.doesNotMatch(debugging, /Autonomous mode is the only mode in which investigator subagents run/i)
+  assert.match(debugging, /every interaction mode[\s\S]*complex-worker[\s\S]*openai\/hard/i)
+  assert.match(debugging, /Collaborative and Guided[\s\S]*complex-worker[\s\S]*openai\/hard/i)
+  assert.match(debugging, /simple, routine evidence collection[\s\S]*stack-specialist[\s\S]*openai\/easy/i)
+  assert.match(debugging, /parent retains.{0,80}(?:questions|explanations|approval)/i)
+  assert.match(debugging, /parallel investigation.{0,80}(?:optional|Autonomous)/i)
+  assert.match(debugging, /Investigation Budget[\s\S]*three cycles maximum/i)
+})
+
+test('delegates substantive design-review revisions to the hard planner', () => {
+  const review = read('skills/design-review/SKILL.md')
+
+  assert.match(review, /substantive.{0,40}revision[\s\S]*stack-planner[\s\S]*openai\/hard/i)
+  assert.match(review, /reviewer findings,[\s\S]*approved context/i)
+  assert.match(review, /mechanical wording or formatting[\s\S]*parent/i)
+  assert.match(review, /substantive changes[\s\S]*user/i)
+  assert.match(review, /Maximum three reviewer dispatches/i)
+  assert.match(review, /Calibration[\s\S]*real problems/i)
+  assert.match(review, /Completion Gate[\s\S]*most recent reviewer dispatch/i)
+  assert.doesNotMatch(review, /adds a dead-letter queue/i)
+})
+
+test('routes every design question and section through the stack planner verbatim', () => {
+  const standard = read('skills/brainstorming-standard/SKILL.md')
+  const routing = read('rules/common/model-routing.md')
+
+  assert.ok(standard.includes('Relay each planner question to the user verbatim'), 'parent relays planner questions verbatim')
+  assert.ok(
+    standard.includes('**MUST NOT** write, reword, or add a design question yourself'),
+    'parent does not author design questions',
+  )
+  assert.ok(standard.includes('continuing it with its `sessionID`'), 'user answers return to the same planner')
+  assert.ok(
+    standard.includes('Do not draft, reword, or decide design content yourself'),
+    'parent does not draft design content',
+  )
+  assert.ok(
+    routing.includes('relays planner questions and design sections to the human verbatim'),
+    'routing rule relays planner output verbatim',
+  )
+  assert.ok(standard.includes('Present each one verbatim'), 'parent presents planner sections verbatim')
+  assert.ok(
+    standard.includes("Return the user's feedback to the same planner with its `sessionID`"),
+    'section feedback returns to the same planner',
+  )
+  assert.ok(
+    standard.includes('`stack-planner` drafts the 2-3 alternatives'),
+    'planner drafts the alternatives and sections',
+  )
+  assert.ok(
+    standard.includes('continue the same `stack-planner` with its `sessionID`'),
+    'same planner authors the consolidated summary',
+  )
+  assert.ok(standard.includes('return one design question per turn'), 'planner returns one question per turn')
+  assert.ok(
+    standard.includes('Keep the `sessionID` that the call returns'),
+    'parent keeps the planner sessionID',
+  )
+  assert.ok(
+    standard.includes('Move to step 4 only when the planner reports that no question remains'),
+    'planner decides when clarification ends',
+  )
+})
+
+test('routes a picked-up ticket through the brainstorming router before implementation', () => {
+  const workOnTicket = read('skills/work-on-ticket/SKILL.md')
+  const policyExample = read('rules/common/skills-policy.md')
+    .split('\n')
+    .find((line) => line.includes('"Work on #42"'))
+  const sddTicketLines = read('skills/subagent-driven-development/SKILL.md')
+    .split('\n')
+    .filter((line) => line.includes('work-on-ticket'))
+  const workflow = read('rules/common/workflow.md')
+
+  assert.ok(
+    workOnTicket.indexOf('label: "Looks good, proceed"') < workOnTicket.indexOf('skill: "brainstorming"'),
+    'router runs only after the user confirms the scope',
+  )
+  assert.ok(
+    workOnTicket.includes('**MUST NOT** invoke `subagent-driven-development` directly'),
+    'ticket pickup never skips the design step',
+  )
+  assert.doesNotMatch(workOnTicket, /skill:\s*"subagent-driven-development"/, 'no direct implementation handoff')
+  assert.match(policyExample, /`brainstorming`/, 'policy routes tickets through the router')
+  assert.doesNotMatch(policyExample, /subagent-driven-development/, 'policy does not send tickets straight to implementation')
+  assert.ok(sddTicketLines.length > 0, 'implementation skill still names work-on-ticket')
+  for (const line of sddTicketLines) {
+    assert.match(line, /brainstorming/, 'implementation skill reaches work-on-ticket only through the router')
+  }
+  assert.match(workflow, /ticket pickup[^.]*`brainstorming` router/, 'approved-design rule keeps the router')
+})

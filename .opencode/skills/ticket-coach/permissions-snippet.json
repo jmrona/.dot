@@ -1,0 +1,19 @@
+{
+	"_comment": "Merge this into your opencode.json. The data directory sits outside the project worktree, so OpenCode treats it as external_directory (default: ask) and would otherwise prompt on every session read/write. A bare external_directory allow is enough on its own — edit and read already default to allow inside an allowed external directory; the explicit entries below are only for clarity.",
+	"permission": {
+		"external_directory": {
+			"~/.config/opencode/data/ticket-coach/**": "allow",
+			"~/.config/opencode/data/cognitive-profile/**": "allow"
+		},
+		"edit": {
+			"~/.config/opencode/data/ticket-coach/**": "allow",
+			"~/.config/opencode/data/cognitive-profile/coaching-notes.jsonl": "allow",
+			"~/.config/opencode/data/cognitive-profile/drift-log.jsonl": "allow"
+		},
+		"read": {
+			"~/.config/opencode/data/ticket-coach/**": "allow",
+			"~/.config/opencode/data/cognitive-profile/coaching-notes.jsonl": "allow",
+			"~/.config/opencode/data/cognitive-profile/drift-log.jsonl": "allow"
+		}
+	}
+}

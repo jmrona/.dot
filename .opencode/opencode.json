@@ -1,0 +1,191 @@
+{
+	"$schema": "https://opencode.ai/config.json",
+	"instructions": [
+		"/Users/jose.romero/.config/opencode/rules/common/ambiguity.md",
+		"/Users/jose.romero/.config/opencode/rules/common/code-organisation.md",
+		"/Users/jose.romero/.config/opencode/rules/common/code-review.md",
+		"/Users/jose.romero/.config/opencode/rules/common/coding-style.md",
+		"/Users/jose.romero/.config/opencode/rules/common/consistency.md",
+		"/Users/jose.romero/.config/opencode/rules/common/debugging.md",
+		"/Users/jose.romero/.config/opencode/rules/common/documentation.md",
+		"/Users/jose.romero/.config/opencode/rules/common/errors.md",
+		"/Users/jose.romero/.config/opencode/rules/common/git.md",
+		"/Users/jose.romero/.config/opencode/rules/common/language.md",
+		"/Users/jose.romero/.config/opencode/rules/common/model-routing.md",
+		"/Users/jose.romero/.config/opencode/rules/common/performance.md",
+		"/Users/jose.romero/.config/opencode/rules/common/prose-style.md",
+		"/Users/jose.romero/.config/opencode/rules/common/security.md",
+		"/Users/jose.romero/.config/opencode/rules/common/skills-policy.md",
+		"/Users/jose.romero/.config/opencode/rules/common/subagents.md",
+		"/Users/jose.romero/.config/opencode/rules/common/testing.md",
+		"/Users/jose.romero/.config/opencode/rules/common/verification.md",
+		"/Users/jose.romero/.config/opencode/rules/common/workflow.md",
+		"/Users/jose.romero/.config/opencode/rules/go/coding-style.md",
+		"/Users/jose.romero/.config/opencode/rules/go/testing.md",
+		"/Users/jose.romero/.config/opencode/rules/go/tooling.md",
+		"/Users/jose.romero/.config/opencode/rules/javascript/coding-style.md",
+		"/Users/jose.romero/.config/opencode/rules/javascript/testing.md",
+		"/Users/jose.romero/.config/opencode/rules/javascript/tooling.md",
+		"/Users/jose.romero/.config/opencode/rules/php/coding-style.md",
+		"/Users/jose.romero/.config/opencode/rules/php/testing.md",
+		"/Users/jose.romero/.config/opencode/rules/php/tooling.md",
+		"/Users/jose.romero/.config/opencode/rules/python/coding-style.md",
+		"/Users/jose.romero/.config/opencode/rules/python/testing.md",
+		"/Users/jose.romero/.config/opencode/rules/python/tooling.md",
+		"/Users/jose.romero/.config/opencode/rules/rust/coding-style.md",
+		"/Users/jose.romero/.config/opencode/rules/rust/testing.md",
+		"/Users/jose.romero/.config/opencode/rules/rust/tooling.md",
+		"/Users/jose.romero/.config/opencode/rules/typescript/coding-style.md",
+		"/Users/jose.romero/.config/opencode/rules/typescript/testing.md",
+		"/Users/jose.romero/.config/opencode/rules/typescript/tooling.md"
+	],
+	"model": "openai/easy",
+	"agents": {
+		"build": { "model": "openai/easy" },
+		"general": { "model": "openai/easy" },
+		"explore": { "model": "openai/easy" },
+		"plan": { "model": "openai/hard" },
+		"title": {
+			"model": "openai/easy",
+			"system": "Generate a one-line session title as [context]: sentence. Keep plain text only: no Markdown, no quotation marks, no trailing punctuation. Do not invent details. Do not include secrets, credentials, personal data, or email addresses. Keep it concise and factual."
+		}
+	},
+	"providers": {
+		"openai": {
+			"models": {
+				"easy": {
+					"modelID": "gpt-6-luna",
+					"name": "Routine work",
+					"family": "gpt-luna",
+					"package": "@opencode/ai/providers/openai",
+					"settings": {
+						"reasoningEffort": "high",
+						"reasoningSummary": "auto",
+						"include": ["reasoning.encrypted_content"]
+					},
+					"cost": [
+						{
+							"input": 0.1,
+							"output": 0.5,
+							"cache": { "read": 0.01, "write": 0.125 }
+						},
+						{
+							"tier": { "type": "context", "size": 272000 },
+							"input": 0.2,
+							"output": 0.75,
+							"cache": { "read": 0.02, "write": 0.25 }
+						}
+					],
+					"limit": { "context": 1050000, "input": 922000, "output": 128000 },
+					"capabilities": {
+						"tools": true,
+						"input": ["text", "image", "pdf"],
+						"output": ["text"],
+						"reasoning": { "supported": true, "effort": ["high"] }
+					}
+				},
+				"hard": {
+					"modelID": "gpt-6.1-sol",
+					"name": "Planning and review",
+					"family": "gpt-sol",
+					"package": "@opencode/ai/providers/openai",
+					"settings": {
+						"reasoningEffort": "high",
+						"reasoningSummary": "auto",
+						"include": ["reasoning.encrypted_content"]
+					},
+					"cost": [
+						{
+							"input": 2,
+							"output": 10,
+							"cache": { "read": 0.1, "write": 2.5 }
+						},
+						{
+							"tier": { "type": "context", "size": 272000 },
+							"input": 4,
+							"output": 15,
+							"cache": { "read": 0.2, "write": 5 }
+						}
+					],
+					"limit": { "context": 1050000, "input": 922000, "output": 128000 },
+					"capabilities": {
+						"tools": true,
+						"input": ["text", "image", "pdf"],
+						"output": ["text"],
+						"reasoning": { "supported": true, "effort": ["high"] }
+					}
+				}
+			}
+		},
+		"llama.cpp": {
+			"package": "aisdk:@ai-sdk/openai-compatible",
+			"name": "LM Studio",
+			"settings": {
+				"baseURL": "http://localhost:1234/v1"
+			},
+			"models": {
+				"google/gemma-4-e4b": {
+					"name": "Gemma 4 E4B 131k",
+					"limit": {
+						"context": 131072,
+						"output": 8192
+					}
+				},
+				"qwen/qwen3.6-35b-a3b": {
+					"name": "Qwen 3.6 35B",
+					"limit": {
+						"context": 262144,
+						"output": 4096
+					}
+				},
+				"qwen/qwythos-9b-claude-mythos-5-1m": {
+					"name": "Qwen Mythos 5 1M"
+				}
+			}
+		}
+	},
+	"mcp": {
+		"playwright": {
+			"type": "local",
+			"command": ["npx", "@playwright/mcp@latest"],
+			"enabled": true
+		},
+		"codebase-memory-mcp": {
+			"enabled": true,
+			"type": "local",
+			"command": ["/Users/jose.romero/.local/bin/codebase-memory-mcp"]
+		}
+	},
+	"references": {
+		"opencode-config": {
+			"path": "~/.config/opencode",
+			"description": "Global opencode agents, skills, and rule files"
+		}
+	},
+	"permission": {
+		"external_directory": {
+			"~/.config/opencode/data/cognitive-profile/**": "allow",
+			"~/.config/opencode/data/ticket-coach/**": "allow",
+			"~/.config/opencode/skills/**": "allow",
+			"~/.config/opencode/rules/**": "allow"
+		},
+		"edit": {
+			"~/.config/opencode/data/cognitive-profile/profile.json": "allow",
+			"~/.config/opencode/data/cognitive-profile/drift-log.jsonl": "allow",
+			"~/.config/opencode/data/cognitive-profile/coaching-notes.jsonl": "allow",
+			"~/.config/opencode/data/cognitive-profile/onboarding-preference.json": "allow",
+			"~/.config/opencode/data/ticket-coach/**": "allow",
+			"~/.config/opencode/skills/**": "ask",
+			"~/.config/opencode/rules/**": "ask"
+		},
+		"read": {
+			"~/.config/opencode/data/cognitive-profile/profile.json": "allow",
+			"~/.config/opencode/data/cognitive-profile/drift-log.jsonl": "allow",
+			"~/.config/opencode/data/cognitive-profile/coaching-notes.jsonl": "allow",
+			"~/.config/opencode/data/cognitive-profile/onboarding-preference.json": "allow",
+			"~/.config/opencode/data/ticket-coach/**": "allow",
+			"~/.config/opencode/skills/**": "allow",
+			"~/.config/opencode/rules/**": "allow"
+		}
+	}
+}

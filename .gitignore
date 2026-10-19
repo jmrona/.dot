@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+.opencode/service.json
+.opencode/data/
+.opencode/vendor/
+.opencode/package-lock.json
+.opencode/bun.lock
+.opencode/.claude/settings.local.json
+.opencode/*update-check.json

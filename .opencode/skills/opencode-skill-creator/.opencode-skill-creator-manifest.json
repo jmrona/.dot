@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "packageVersion": "0.3.5",
+  "files": {
+    "references/schemas.md": "26435ab9ae57532670e4e8cebca684331c40deddd8ad9cdbcc09e522e5dc901e",
+    "agents/grader.md": "34617bbcf1f13e966056c4962f145976d0420050a60405210eb3005fd32f9ede",
+    "agents/comparator.md": "fe1fc9787c495d864c5d6eada47396478572325fde1b33a96d78bf4b849b7a3e",
+    "agents/analyzer.md": "bf68f4cac5a56c673a928c2e6d619586c5b93ea364026ab37547772cb45a663a",
+    "templates/eval-review.html": "ce477dcc74dc1c0d1d3352646a79167b5a63634e936b1019160025065974e452"
+  }
+}
