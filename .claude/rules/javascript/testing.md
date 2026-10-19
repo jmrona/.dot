@@ -1,8 +1,11 @@
 ---
 paths:
   - "**/*.test.js"
+  - "**/*.test.jsx"
   - "**/*.spec.js"
+  - "**/*.spec.jsx"
   - "**/tests/**/*.js"
+  - "**/tests/**/*.jsx"
   - "**/jest.config.js"
   - "**/vitest.config.js"
 ---

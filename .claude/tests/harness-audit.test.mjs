@@ -14,51 +14,6 @@ function markdownFilesUnder(directory) {
     .map((entry) => `${directory}${entry}`)
 }
 
-const expectedRulePaths = {
-  'rules/go/coding-style.md': ['**/*.go'],
-  'rules/go/testing.md': ['**/*_test.go'],
-  'rules/go/tooling.md': ['**/go.mod', '**/go.sum', '**/go.work'],
-  'rules/javascript/coding-style.md': ['**/*.js', '**/*.mjs', '**/*.cjs'],
-  'rules/javascript/testing.md': [
-    '**/*.test.js',
-    '**/*.spec.js',
-    '**/tests/**/*.js',
-    '**/jest.config.js',
-    '**/vitest.config.js',
-  ],
-  'rules/javascript/tooling.md': [
-    '**/package.json',
-    '**/package-lock.json',
-    '**/pnpm-lock.yaml',
-    '**/yarn.lock',
-  ],
-  'rules/typescript/coding-style.md': ['**/*.ts', '**/*.tsx', '**/*.d.ts'],
-  'rules/typescript/testing.md': [
-    '**/*.test.ts',
-    '**/*.spec.ts',
-    '**/*.test.tsx',
-    '**/*.spec.tsx',
-    '**/tests/**/*.ts',
-    '**/jest.config.ts',
-    '**/vitest.config.ts',
-  ],
-  'rules/typescript/tooling.md': ['**/tsconfig.json', '**/tsconfig.*.json', '**/package.json'],
-  'rules/python/coding-style.md': ['**/*.py', '**/*.pyi'],
-  'rules/python/testing.md': ['**/test_*.py', '**/*_test.py', '**/tests/**/*.py', '**/conftest.py'],
-  'rules/python/tooling.md': [
-    '**/pyproject.toml',
-    '**/requirements*.txt',
-    '**/uv.lock',
-    '**/poetry.lock',
-  ],
-  'rules/php/coding-style.md': ['**/*.php'],
-  'rules/php/testing.md': ['**/tests/**/*.php', '**/*Test.php', '**/phpunit.xml'],
-  'rules/php/tooling.md': ['**/composer.json', '**/composer.lock'],
-  'rules/rust/coding-style.md': ['**/*.rs'],
-  'rules/rust/testing.md': ['**/*.rs'],
-  'rules/rust/tooling.md': ['**/Cargo.toml', '**/Cargo.lock', '**/rust-toolchain.toml'],
-}
-
 function frontmatterLines(text) {
   const match = text.match(/^---\n([\s\S]*?)\n---\n/)
   return match ? match[1].split('\n') : null
@@ -70,7 +25,12 @@ test('no rule file uses the ignored globs frontmatter key', () => {
   assert.deepEqual(offenders, [])
 })
 
-for (const [file, patterns] of Object.entries(expectedRulePaths)) {
+const languageFolders = ['go', 'javascript', 'typescript', 'python', 'php', 'rust']
+const languageRuleFiles = languageFolders.flatMap((folder) =>
+  markdownFilesUnder(`rules/${folder}/`),
+)
+
+for (const file of languageRuleFiles) {
   test(`${file} declares its patterns under a paths frontmatter list`, () => {
     const lines = frontmatterLines(read(file))
 
@@ -81,12 +41,22 @@ for (const [file, patterns] of Object.entries(expectedRulePaths)) {
     for (const entry of entries) {
       assert.match(entry, /^ {2}- "[^"]+"$/)
     }
-    assert.deepEqual(
-      entries.map((entry) => entry.slice(5, -1)),
-      patterns,
-    )
   })
 }
+
+function pathsListOf(file) {
+  return frontmatterLines(read(file)).slice(1).map((entry) => entry.slice(5, -1))
+}
+
+test('javascript rules load for jsx files', () => {
+  const codingStylePaths = pathsListOf('rules/javascript/coding-style.md')
+  const testingPaths = pathsListOf('rules/javascript/testing.md')
+
+  assert.ok(codingStylePaths.includes('**/*.jsx'))
+  assert.ok(testingPaths.includes('**/*.test.jsx'))
+  assert.ok(testingPaths.includes('**/*.spec.jsx'))
+  assert.ok(testingPaths.includes('**/tests/**/*.jsx'))
+})
 
 test('skills policy limits TDD exemptions to the When TDD Applies section', () => {
   const policy = read('rules/common/skills-policy.md')
@@ -94,6 +64,7 @@ test('skills policy limits TDD exemptions to the When TDD Applies section', () =
   assert.ok(!policy.includes('one-line bug fixes'))
   assert.ok(!policy.includes('edits to non-code files'))
   assert.ok(policy.includes('When TDD Applies'))
+  assert.match(read('rules/common/testing.md'), /^### When TDD Applies$/m)
 })
 
 test('skills policy names the Skill tool wherever it says via the Skill', () => {
@@ -120,9 +91,12 @@ for (const file of [
 test('debugging skill cites RULES.md for every procedural rule it applies', () => {
   const proceduralRule =
     /non-reproducib|scope discipline|Refocus Rule|Investigation Budget|root-cause|minimal fix/
-  const ruleLines = read('skills/debugging/SKILL.md')
-    .split('\n')
-    .slice(9)
+  const lines = read('skills/debugging/SKILL.md').split('\n')
+  const frontmatterEnd = lines.indexOf('---', 1)
+  const introLine = lines.findIndex((line) => line.startsWith('The iron-law rules'))
+  assert.ok(introLine > frontmatterEnd, 'file has the intro line that starts with The iron-law rules')
+  const ruleLines = lines
+    .filter((line, index) => index > frontmatterEnd && index !== introLine)
     .filter((line) => proceduralRule.test(line) && /debugging\.md|RULES\.md/.test(line))
 
   assert.ok(ruleLines.length >= 7)

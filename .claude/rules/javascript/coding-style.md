@@ -3,6 +3,7 @@ paths:
   - "**/*.js"
   - "**/*.mjs"
   - "**/*.cjs"
+  - "**/*.jsx"
 ---
 
 # JavaScript Coding Style
