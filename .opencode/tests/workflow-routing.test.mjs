@@ -336,3 +336,17 @@ test('routes a picked-up ticket through the brainstorming router before implemen
   }
   assert.match(workflow, /ticket pickup[^.]*`brainstorming` router/, 'approved-design rule keeps the router')
 })
+
+test('brainstorming modes hand off to implementation from plan mode without a manual agent switch', () => {
+  for (const path of [
+    'skills/brainstorming-standard/SKILL.md',
+    'skills/brainstorming-committee/SKILL.md',
+    'skills/brainstorming-skip/SKILL.md',
+  ]) {
+    const skill = read(path)
+
+    assert.match(skill, /invoke `subagent-driven-development` now, even if Plan mode is still active/, path)
+    assert.match(skill, /mode-switch plugin moves the session to Build/, path)
+    assert.match(skill, /Do not ask the user to switch agents unless the plugin reports that the switch failed/, path)
+  }
+})

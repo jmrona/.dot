@@ -26,5 +26,8 @@
   "debug": {
     "devtools": true,
     "turn_tokens": true
+  },
+  "experimental": {
+    "new-designs": true
   }
 }

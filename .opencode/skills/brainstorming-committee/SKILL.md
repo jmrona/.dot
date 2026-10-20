@@ -35,7 +35,7 @@ Before running the procedure below, you **MUST** read both files using the read 
 7. **Present the design to the user.** The parent presents the planner-authored summary, a brief note on decisions where the committee was split and the consensus reasoning, and any flagged risks. **MUST NOT** dump the deliberation transcripts. The parent obtains any required user decision and explicit approval; members and planner do not ask the human.
 8. **Invoke `design-review`** via `skill` against the consolidated summary. If the review surfaces issues that require new decisions (not just wording fixes), feed the affected decisions back into a targeted committee round, update the summary, and re-invoke `design-review`. If `design-review` escalates after three iterations, stop and ask the user how to proceed.
 9. **Get explicit final approval.** Present the reviewed summary and ask directly. "Looks fine" is not approval.
-10. **Decide the next step.** Use `question` to ask whether to create tickets or start implementation. The only permitted downstream skills are `create-tickets` and `subagent-driven-development`; invoke whichever the user picks via `skill`.
+10. **Decide the next step.** Use `question` to ask whether to create tickets or start implementation. The only permitted downstream skills are `create-tickets` and `subagent-driven-development`; invoke whichever the user picks via `skill`. If the user picks implementation, invoke `subagent-driven-development` now, even if Plan mode is still active. The mode-switch plugin moves the session to Build before the skill loads. Do not ask the user to switch agents unless the plugin reports that the switch failed.
 
 ## The Three Perspectives
 

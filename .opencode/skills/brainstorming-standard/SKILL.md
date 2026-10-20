@@ -23,7 +23,7 @@ For the rule that no implementation may begin until the user has approved a desi
 5. **Consolidate the design summary.** After the sections are approved, continue the same `stack-planner` with its `sessionID`. Have it author a single structured summary covering goal, architecture, components, interfaces, data flow, error handling, and testing strategy. It works from the full brief, context, answers, and approved sections. The parent checks that the summary is faithful and does not add unapproved requirements.
 6. **Invoke `design-review`.** The parent invokes the `design-review` skill against the consolidated summary. If `design-review` returns substantive change notes, surface them to the user before continuing. If `design-review` escalates after three iterations, stop and ask the user how to proceed.
 7. **Get explicit final approval.** Present the reviewed summary to the user and obtain explicit approval. Implicit signals ("looks fine", "sure") do not count; ask directly.
-8. **Decide the next step.** Use `question` to ask whether to create tickets or start implementation. The only permitted downstream skills are `create-tickets` and `subagent-driven-development`; invoke whichever the user picks via `skill`.
+8. **Decide the next step.** Use `question` to ask whether to create tickets or start implementation. The only permitted downstream skills are `create-tickets` and `subagent-driven-development`; invoke whichever the user picks via `skill`. If the user picks implementation, invoke `subagent-driven-development` now, even if Plan mode is still active. The mode-switch plugin moves the session to Build before the skill loads. Do not ask the user to switch agents unless the plugin reports that the switch failed.
 
 ## Working in Existing Codebases
 

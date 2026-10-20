@@ -51,7 +51,7 @@ For the rule that no implementation may begin until the user has approved a desi
      multiSelect: false
    ```
 
-6. **Hand off via `skill`.** Invoke `subagent-driven-development` or `create-tickets` per the user's choice. **MUST NOT** invoke any other skill from here.
+6. **Hand off via `skill`.** Invoke `subagent-driven-development` or `create-tickets` per the user's choice. If the user picks implementation, invoke `subagent-driven-development` now, even if Plan mode is still active. The mode-switch plugin moves the session to Build before the skill loads. Do not ask the user to switch agents unless the plugin reports that the switch failed. **MUST NOT** invoke any other skill from here.
 
 ## What Skip Mode Does Not Do
 
