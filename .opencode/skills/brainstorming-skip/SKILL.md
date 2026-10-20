@@ -37,7 +37,7 @@ For the rule that no implementation may begin until the user has approved a desi
 
    The `exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)` call IS the explicit approval step. The user accepts or rejects the design by approving or rejecting the plan.
 
-5. **Decide the next step.** After plan mode is exited and the design is approved, use `question` to ask whether to create tickets or start implementation:
+5. **Decide the next step.** After the design is approved, save it once with `write` to `/Users/jose.romero/.opencode/plan/<ticket>-<short-topic>.md`. Use the ticket key, or `no-ticket` if there is none. Use a new short topic for each design, so that an earlier plan is never overwritten. Do not write or edit that file before final approval, and do not edit it afterwards. The auto-compact plugin then compacts the session, and the compaction summary carries the plan path. Then use `question` to ask whether to create tickets or start implementation:
 
    ```
    question:

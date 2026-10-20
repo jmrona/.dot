@@ -21,7 +21,7 @@ The caller of this skill is responsible for having asked the commit preference q
 
 ### 1. Single Implementation Dispatch
 
-Dispatch one bounded `stack-specialist` implementer on `openai/easy` with every change as a single batch. Use `../subagent-driven-development/implementer-prompt.md` with the complete approved task scope and context. The parent uses the native subagent interface; the implementer does not restart design or orchestration.
+Dispatch one bounded `stack-specialist` implementer on `openai/easy` with every change as a single batch. Use `../subagent-driven-development/implementer-prompt.md` with the complete approved task scope and context. The parent uses the native subagent interface; the implementer does not restart design or orchestration. If the approved design was saved to a plan file under `/Users/jose.romero/.opencode/plan/`, give the implementer that path. Make it read the design from there, and paste only the task scope.
 
 ### 2. Single Combined Review
 

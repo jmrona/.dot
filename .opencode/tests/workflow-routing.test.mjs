@@ -371,3 +371,39 @@ test('retries rate-limited subagent calls with the same role before reporting bl
   assert.match(section, /(third|last) (failed )?retry[^.]*`BLOCKED`[^.]*\buser\b/i)
   assert.doesNotMatch(section, /rework/i)
 })
+
+test('brainstorming modes save the approved design once to a plan file before the next-step question', () => {
+  for (const path of [
+    'skills/brainstorming-standard/SKILL.md',
+    'skills/brainstorming-committee/SKILL.md',
+    'skills/brainstorming-skip/SKILL.md',
+  ]) {
+    const skill = read(path)
+    const step = skill.match(/\*\*Decide the next step\.\*\*([\s\S]*?)(?=\n\d+\. \*\*|\n## |$)/)?.[1] ?? ''
+    const saveIndex = step.indexOf('/Users/jose.romero/.opencode/plan/')
+
+    assert.ok(saveIndex >= 0, `${path} names the plan directory in the next-step step`)
+    assert.ok(step.indexOf('`write`') >= 0 && step.indexOf('`write`') < step.indexOf('question'), path)
+    assert.ok(saveIndex < step.indexOf('question'), `${path} saves the plan before the question`)
+    assert.match(step, /save (the approved design|it) once/, path)
+    assert.match(step, /before final approval/, path)
+    assert.match(step, /do not edit it afterwards/, path)
+  }
+
+  const skipStep = read('skills/brainstorming-skip/SKILL.md').match(/\*\*Decide the next step\.\*\*([\s\S]*?)(?=\n\d+\. \*\*|\n## |$)/)?.[1] ?? ''
+
+  assert.match(skipStep, /^\s*After the design is approved, save it once with `write`/)
+})
+
+test('implementation skills pass the plan file path to subagents instead of the design text', () => {
+  const sdd = read('skills/subagent-driven-development/SKILL.md')
+  const planSection = sdd.match(/## Plan File([\s\S]*?)(?=\n## |$)/)?.[1] ?? ''
+  const fastPath = read('skills/fast-path-implementation/SKILL.md')
+  const dispatchParagraph = fastPath.split('\n').find((line) => line.startsWith('Dispatch one bounded `stack-specialist` implementer')) ?? ''
+
+  assert.match(planSection, /\/Users\/jose\.romero\/\.opencode\/plan\//)
+  assert.match(planSection, /read the design from (that|the) file/i)
+  assert.match(planSection, /instead of pasting/)
+  assert.match(dispatchParagraph, /\/Users\/jose\.romero\/\.opencode\/plan\//)
+  assert.match(dispatchParagraph, /paste only the task scope/)
+})

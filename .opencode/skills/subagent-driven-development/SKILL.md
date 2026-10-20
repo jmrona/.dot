@@ -15,6 +15,10 @@ Before running the procedure below, you **MUST** read `../_shared/subagent-dispa
 
 You need an approved design (from the `brainstorming` router via any of its modes, including when `work-on-ticket` enters it, or from a committed specification) whose tasks are mostly independent of each other. If the work is tightly coupled or the design is incomplete, return to brainstorming instead of running this skill.
 
+## Plan File
+
+If the approved design was saved to a plan file under `/Users/jose.romero/.opencode/plan/`, read the design from that file. Give every subagent that path. Tell it to read the design from the file instead of pasting the design into the prompt. Still paste each task's own scope, context and acceptance criteria into its prompt.
+
 ## Process Overview
 
 1. Ask the commit preference (once, at the start of the session)
