@@ -350,3 +350,24 @@ test('brainstorming modes hand off to implementation from plan mode without a ma
     assert.match(skill, /Do not ask the user to switch agents unless the plugin reports that the switch failed/, path)
   }
 })
+
+test('retries rate-limited subagent calls with the same role before reporting blocked', () => {
+  const dispatch = read('skills/_shared/subagent-dispatch.md')
+  const headingIndex = dispatch.indexOf('## Rate-Limit Retries')
+
+  assert.ok(headingIndex >= 0, 'dispatch rules have a Rate-Limit Retries section')
+
+  const afterHeading = dispatch.slice(headingIndex + 3)
+  const nextHeadingIndex = afterHeading.indexOf('\n## ')
+  const section = nextHeadingIndex === -1 ? afterHeading : afterHeading.slice(0, nextHeadingIndex)
+
+  assert.match(section, /`provider\.rate-limit`/)
+  assert.match(section, /(wait|waits)[^.]*\b60 seconds/i)
+  assert.match(section, /up to (3|three) (times|retries)/i)
+  assert.match(section, /same role,? alias,? and prompt/i)
+  assert.match(section, /not a model escalation/i)
+  assert.match(section, /`sessionID`/)
+  assert.match(section, /full context/i)
+  assert.match(section, /(third|last) (failed )?retry[^.]*`BLOCKED`[^.]*\buser\b/i)
+  assert.doesNotMatch(section, /rework/i)
+})

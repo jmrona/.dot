@@ -34,7 +34,7 @@ When decomposing work or preparing parallel dispatches, annotate each task in ad
 
 For dependent sequential work, use foreground calls (`background: false` or omit it) and wait for each result. Use `background: true` only for independent work; wait for completion notifications before synthesis or dependent work and do not poll. Children do not ask the human questions, seek approval, or launch nested agents or orchestration workflows. They return concise questions and evidence to the parent. The parent resolves missing context and asks the human one decision question at a time when approval is needed. A child must not make an approval decision on the parent's behalf.
 
-If a worker discovers the task is more difficult than expected, it stops and reports the evidence to the parent. The parent may provide missing context, narrow the scope, or dispatch the approved difficult work to `complex-worker` on `openai/hard`. Do not blindly retry the same task. A missing-context report is `NEEDS_CONTEXT`, not a model-escalation retry.
+If a worker discovers the task is more difficult than expected, it stops and reports the evidence to the parent. The parent may provide missing context, narrow the scope, or dispatch the approved difficult work to `complex-worker` on `openai/hard`. Do not blindly retry the same task. The one exception is a rate-limit error, handled under "Rate-Limit Retries". A missing-context report is `NEEDS_CONTEXT`, not a model-escalation retry.
 
 When orchestrating subagents, you **MUST NOT**:
 
@@ -42,12 +42,20 @@ When orchestrating subagents, you **MUST NOT**:
 - Proceed to the next task while a review has unfixed issues
 - Accept "close enough" on spec compliance. If the reviewer found issues, the task is not done.
 - Let the implementer's self-review replace the external review. Both are required.
-- Force a worker to retry without changing the context, approved scope, or plan
+- Force a worker to retry without changing the context, approved scope, or plan, except after a rate-limit error as described under "Rate-Limit Retries"
 - Attempt to fix a subagent's output manually in the orchestrator context. Re-dispatch with a better context instead. Manual fixes pollute the orchestrator's context and defeat isolation.
 
 ## Answering Subagent Questions
 
 If a child returns a question, pause its work. Resolve it from the provided context or relay the decision question to the human yourself, then provide the answer before continuing. Do not guess, rush implementation, or let a child ask the human directly.
+
+## Rate-Limit Retries
+
+If a subagent call fails with a `provider.rate-limit` error, the provider is throttling tokens and the task itself is not at fault. The parent retries up to 3 times. Before each retry, the parent waits 60 seconds, for example with `sleep 60` in the shell. Each retry sends the same call again, with the same role, alias and prompt.
+
+If the child already has a `sessionID`, the retry resumes that session with the same `sessionID`. If that session no longer exists, the parent sends a new call with the full context.
+
+These retries are not a model escalation. If the third retry also fails, the parent stops with `BLOCKED` and tells the user, quoting the error.
 
 ## Escalation
 
