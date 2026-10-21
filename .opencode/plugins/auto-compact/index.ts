@@ -2,9 +2,12 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { loadAutoCompactConfig } from './config.ts'
+import { startThresholdWatcher, type ThresholdApi } from './threshold.ts'
 
 const PLAN_DIRECTORY = '/Users/jose.romero/.opencode/plan'
-const COMPACTION_CONFIRMATION_TIMEOUT_MS = 300_000
 
 export interface AutoCompactSession {
   readonly id: string
@@ -59,14 +62,14 @@ export interface AutoCompactOptions {
   readonly confirmationTimeoutMs: number
 }
 
-interface CompactionRun {
-  readonly planPath: string
-  readonly contentHash: string
-}
+type CompactionRun =
+  | { readonly kind: 'plan'; readonly planPath: string; readonly contentHash: string }
+  | { readonly kind: 'threshold'; readonly percent: number }
 
 interface AutoCompactState {
   readonly inFlightBySession: Map<string, CompactionRun>
   readonly hashesBySession: Map<string, Map<string, string>>
+  readonly noticedRuns: WeakSet<CompactionRun>
 }
 
 type CompactionOutcome =
@@ -79,6 +82,7 @@ export function createAutoCompact(options: AutoCompactOptions) {
   const state: AutoCompactState = {
     inFlightBySession: new Map<string, CompactionRun>(),
     hashesBySession: new Map<string, Map<string, string>>(),
+    noticedRuns: new WeakSet<CompactionRun>(),
   }
   return {
     async handleExecuteAfter(api: AutoCompactApi, input: ExecuteAfterInput): Promise<void> {
@@ -90,22 +94,37 @@ export function createAutoCompact(options: AutoCompactOptions) {
       if (content === undefined || state.inFlightBySession.has(input.sessionID)) {
         return
       }
-      const run: CompactionRun = { planPath, contentHash: hashOf(content) }
+      const run: CompactionRun = { kind: 'plan', planPath, contentHash: hashOf(content) }
       if (!rememberHash(state, input.sessionID, run)) {
         return
       }
       await startCompaction(api, input.sessionID, run, state, options.confirmationTimeoutMs)
     },
+    async startThresholdCompaction(
+      api: AutoCompactApi,
+      sessionID: string,
+      percent: number,
+    ): Promise<boolean> {
+      if (state.inFlightBySession.has(sessionID)) {
+        return false
+      }
+      const run: CompactionRun = { kind: 'threshold', percent }
+      await startCompaction(api, sessionID, run, state, options.confirmationTimeoutMs)
+      return true
+    },
+    isCompactionInFlight(sessionID: string): boolean {
+      return state.inFlightBySession.has(sessionID)
+    },
     async handleCompaction(input: CompactionInput): Promise<void> {
       const run = state.inFlightBySession.get(input.sessionID)
-      if (run === undefined) {
+      if (run === undefined || run.kind !== 'plan' || state.noticedRuns.has(run)) {
         return
       }
+      state.noticedRuns.add(run)
       input.messages.push({
         role: 'user',
         content: [{ type: 'text', text: compactionNoticeText(run.planPath) }],
       })
-      state.inFlightBySession.delete(input.sessionID)
     },
   }
 }
@@ -206,6 +225,9 @@ function rememberHash(state: AutoCompactState, sessionID: string, run: Compactio
 }
 
 function forgetRunHash(state: AutoCompactState, sessionID: string, run: CompactionRun): void {
+  if (run.kind !== 'plan') {
+    return
+  }
   const hashesForSession = state.hashesBySession.get(sessionID)
   if (hashesForSession?.get(run.planPath) === run.contentHash) {
     hashesForSession.delete(run.planPath)
@@ -231,7 +253,7 @@ async function startCompaction(
   } catch (error: unknown) {
     releaseInFlight(state, sessionID, run)
     forgetRunHash(state, sessionID, run)
-    await recordNotice(api, sessionID, compactionFailureText(run.planPath, error))
+    await recordNotice(api, sessionID, failureTextOf(run, error))
     return
   }
   void watchCompaction(api, sessionID, run, state, confirmationTimeoutMs)
@@ -275,20 +297,38 @@ async function settleCompaction(
     return
   }
   forgetRunHash(state, sessionID, run)
-  await recordNotice(api, sessionID, settlementText(run.planPath, outcome))
+  await recordNotice(api, sessionID, settlementText(run, outcome))
 }
 
 function settlementText(
-  planPath: string,
+  run: CompactionRun,
   outcome: Exclude<CompactionOutcome, { readonly kind: 'ended' }>,
 ): string {
   if (outcome.kind === 'failed') {
-    return compactionFailureText(planPath, outcome.error)
+    return failureTextOf(run, outcome.error)
   }
   if (outcome.kind === 'timedOut') {
-    return unconfirmedTimeoutText(planPath, outcome.confirmationTimeoutMs)
+    return timeoutTextOf(run, outcome.confirmationTimeoutMs)
   }
-  return unconfirmedErrorText(planPath, outcome.error)
+  return unconfirmedTextOf(run, outcome.error)
+}
+
+function failureTextOf(run: CompactionRun, error: unknown): string {
+  return run.kind === 'plan'
+    ? compactionFailureText(run.planPath, error)
+    : thresholdFailureText(run.percent, error)
+}
+
+function timeoutTextOf(run: CompactionRun, confirmationTimeoutMs: number): string {
+  return run.kind === 'plan'
+    ? unconfirmedTimeoutText(run.planPath, confirmationTimeoutMs)
+    : thresholdTimeoutText(run.percent, confirmationTimeoutMs)
+}
+
+function unconfirmedTextOf(run: CompactionRun, error: unknown): string {
+  return run.kind === 'plan'
+    ? unconfirmedErrorText(run.planPath, error)
+    : thresholdUnconfirmedText(run.percent, error)
 }
 
 async function nextCompactionOutcome(
@@ -351,6 +391,18 @@ function unconfirmedErrorText(planPath: string, error: unknown): string {
   return `Plan saved to ${planPath}, but the compaction could not be confirmed: ${errorMessage(error)}. Run /compact to compact the session manually.`
 }
 
+function thresholdFailureText(percent: number, error: unknown): string {
+  return `Context reached ${percent}% of the input limit, but the session could not be compacted: ${errorMessage(error)}. Run /compact to compact it manually.`
+}
+
+function thresholdTimeoutText(percent: number, confirmationTimeoutMs: number): string {
+  return `Context reached ${percent}% of the input limit, but the compaction could not be confirmed within ${confirmationTimeoutMs / 1000} seconds. Run /compact to compact the session manually.`
+}
+
+function thresholdUnconfirmedText(percent: number, error: unknown): string {
+  return `Context reached ${percent}% of the input limit, but the compaction could not be confirmed: ${errorMessage(error)}. Run /compact to compact the session manually.`
+}
+
 function hashOf(content: string): string {
   return createHash('sha256').update(content).digest('hex')
 }
@@ -359,22 +411,44 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+export interface SetupOptions {
+  readonly configPath: string
+  readonly log: (message: string) => void
+}
+
+export async function setupAutoCompact(api: ThresholdApi, options: SetupOptions): Promise<void> {
+  const config = await loadAutoCompactConfig(options.configPath, options.log)
+  const autoCompact = createAutoCompact({
+    planDirectory: PLAN_DIRECTORY,
+    homeDirectory: homedir(),
+    confirmationTimeoutMs: config.confirmationTimeoutMs,
+  })
+  if (config.compactOnPlanSave) {
+    await api.tool.hook('execute.after', (input) => autoCompact.handleExecuteAfter(api, input))
+  }
+  await api.session.hook('compaction', (input) => autoCompact.handleCompaction(input))
+  if (config.compactAtPercentOfInputLimit !== null) {
+    startThresholdWatcher({
+      api,
+      autoCompact,
+      percent: config.compactAtPercentOfInputLimit,
+      log: options.log,
+    })
+  }
+}
+
 interface AutoCompactPlugin {
   readonly id: string
-  readonly setup: (api: AutoCompactApi) => Promise<void>
+  readonly setup: (api: ThresholdApi) => Promise<void>
 }
 
 const autoCompactPlugin: AutoCompactPlugin = {
   id: 'auto-compact',
-  setup: async (api: AutoCompactApi): Promise<void> => {
-    const autoCompact = createAutoCompact({
-      planDirectory: PLAN_DIRECTORY,
-      homeDirectory: homedir(),
-      confirmationTimeoutMs: COMPACTION_CONFIRMATION_TIMEOUT_MS,
-    })
-    await api.tool.hook('execute.after', (input) => autoCompact.handleExecuteAfter(api, input))
-    await api.session.hook('compaction', (input) => autoCompact.handleCompaction(input))
-  },
+  setup: (api: ThresholdApi): Promise<void> =>
+    setupAutoCompact(api, {
+      configPath: fileURLToPath(new URL('./config.json', import.meta.url)),
+      log: console.error,
+    }),
 }
 
 export default autoCompactPlugin
