@@ -1,4 +1,10 @@
 import type { AutoCompactApi, AutoCompactEvent } from './index.ts'
+import {
+  type ModelLimit,
+  type StepTokens,
+  contextTokensOf,
+  inputLimitOf,
+} from './context-usage.ts'
 
 interface ModelReference {
   readonly id: string
@@ -6,14 +12,7 @@ interface ModelReference {
 }
 
 interface ModelEntry extends ModelReference {
-  readonly limit: { readonly context: number; readonly input?: number; readonly output: number }
-}
-
-interface StepTokens {
-  readonly input: number
-  readonly output: number
-  readonly reasoning: number
-  readonly cache: { readonly read: number; readonly write: number }
+  readonly limit: ModelLimit
 }
 
 type ThresholdEventData = AutoCompactEvent['data'] & {
@@ -40,7 +39,7 @@ export interface ThresholdDependencies {
     startThresholdCompaction(api: ThresholdApi, sessionID: string, percent: number): Promise<boolean>
     isCompactionInFlight(sessionID: string): boolean
   }
-  readonly percent: number
+  readonly percent: number | null
   readonly log: (message: string) => void
 }
 
@@ -48,24 +47,47 @@ type StreamEnding =
   | { readonly kind: 'ended' }
   | { readonly kind: 'failed'; readonly error: unknown }
 
-interface WatcherContext extends ThresholdDependencies {
+interface ThresholdHolder {
+  percent: number | null
+}
+
+interface WatcherContext extends Omit<ThresholdDependencies, 'percent'> {
+  readonly threshold: ThresholdHolder
   readonly signal: AbortSignal
   readonly modelBySession: Map<string, ModelReference>
   readonly disarmedSessions: Set<string>
   readonly rootBySession: Map<string, boolean>
 }
 
-export function startThresholdWatcher(deps: ThresholdDependencies): { stop(): void } {
+export interface ThresholdWatcher {
+  stop(): void
+  setPercent(percent: number | null): void
+  isRunning(): boolean
+}
+
+export function startThresholdWatcher(deps: ThresholdDependencies): ThresholdWatcher {
   const controller = new AbortController()
   const context: WatcherContext = {
-    ...deps,
+    api: deps.api,
+    autoCompact: deps.autoCompact,
+    log: deps.log,
+    threshold: { percent: deps.percent },
     signal: controller.signal,
     modelBySession: new Map<string, ModelReference>(),
     disarmedSessions: new Set<string>(),
     rootBySession: new Map<string, boolean>(),
   }
-  void watchWithOneRetry(context)
-  return { stop: () => controller.abort() }
+  let isWatching = true
+  void watchWithOneRetry(context).finally(() => {
+    isWatching = false
+  })
+  return {
+    stop: () => controller.abort(),
+    setPercent: (percent) => {
+      context.threshold.percent = percent
+    },
+    isRunning: () => isWatching && !controller.signal.aborted,
+  }
 }
 
 async function watchWithOneRetry(context: WatcherContext): Promise<void> {
@@ -86,7 +108,7 @@ function retryNotice(ending: StreamEnding): string {
 }
 
 function giveUpNotice(ending: StreamEnding): string {
-  return `auto-compact: the threshold watcher stream ${describeEnding(ending, ' again')}. The token threshold is inactive until opencode restarts.`
+  return `auto-compact: the threshold watcher stream ${describeEnding(ending, ' again')}. The token threshold is inactive until opencode restarts or /auto-compact sets it again.`
 }
 
 function describeEnding(ending: StreamEnding, suffix: string): string {
@@ -141,32 +163,33 @@ async function handleStepEnded(
   if (context.autoCompact.isCompactionInFlight(sessionID) || !(await isRoot(context, sessionID))) {
     return
   }
-  const limit = await inputLimitOf(context, sessionID)
-  if (limit === undefined) {
+  const limit = await inputLimitForSession(context, sessionID)
+  const percent = context.threshold.percent
+  if (limit === undefined || percent === null) {
     return
   }
-  if (contextTokensOf(tokens) < (limit * context.percent) / 100) {
+  if (contextTokensOf(tokens) < (limit * percent) / 100) {
     context.disarmedSessions.delete(sessionID)
     return
   }
   if (!context.disarmedSessions.has(sessionID)) {
-    await compactAndDisarm(context, sessionID)
+    await compactAndDisarm(context, sessionID, percent)
   }
 }
 
-async function compactAndDisarm(context: WatcherContext, sessionID: string): Promise<void> {
+async function compactAndDisarm(
+  context: WatcherContext,
+  sessionID: string,
+  percent: number,
+): Promise<void> {
   const started = await context.autoCompact.startThresholdCompaction(
     context.api,
     sessionID,
-    context.percent,
+    percent,
   )
   if (started) {
     context.disarmedSessions.add(sessionID)
   }
-}
-
-function contextTokensOf(tokens: StepTokens): number {
-  return tokens.input + tokens.output + tokens.reasoning + tokens.cache.read + tokens.cache.write
 }
 
 async function isRoot(context: WatcherContext, sessionID: string): Promise<boolean> {
@@ -184,7 +207,10 @@ async function isRoot(context: WatcherContext, sessionID: string): Promise<boole
   }
 }
 
-async function inputLimitOf(context: WatcherContext, sessionID: string): Promise<number | undefined> {
+async function inputLimitForSession(
+  context: WatcherContext,
+  sessionID: string,
+): Promise<number | undefined> {
   const model = context.modelBySession.get(sessionID)
   if (model === undefined) {
     return undefined
@@ -192,16 +218,8 @@ async function inputLimitOf(context: WatcherContext, sessionID: string): Promise
   try {
     const { data } = await context.api.model.list({})
     const entry = data.find((e) => e.id === model.id && e.providerID === model.providerID)
-    return entry === undefined ? undefined : positiveLimitOf(entry)
+    return entry === undefined ? undefined : inputLimitOf(entry.limit)
   } catch {
     return undefined
   }
-}
-
-function positiveLimitOf(entry: ModelEntry): number | undefined {
-  const { input, context } = entry.limit
-  if (typeof input === 'number' && input > 0) {
-    return input
-  }
-  return context > 0 ? context : undefined
 }

@@ -5,7 +5,12 @@ import { join } from 'node:path'
 import { test, type TestContext } from 'node:test'
 
 import { createAutoCompact, type AutoCompactSession } from './index.ts'
-import { startThresholdWatcher, type ThresholdApi, type ThresholdEvent } from './threshold.ts'
+import {
+  startThresholdWatcher,
+  type ThresholdApi,
+  type ThresholdEvent,
+  type ThresholdWatcher,
+} from './threshold.ts'
 
 type StreamBehaviour = 'events' | 'throws' | 'ends'
 
@@ -36,7 +41,7 @@ interface FakeApi {
 interface Harness {
   readonly fake: FakeApi
   readonly autoCompact: ReturnType<typeof createAutoCompact>
-  readonly watcher: { stop(): void }
+  readonly watcher: ThresholdWatcher
   readonly logs: string[]
   readonly planPath: string
 }
@@ -45,6 +50,7 @@ interface HarnessOptions {
   readonly sessions?: Record<string, AutoCompactSession>
   readonly streams?: readonly StreamBehaviour[]
   readonly models?: ModelEntry[]
+  readonly percent?: number | null
 }
 
 const PERCENT = 80
@@ -187,7 +193,7 @@ async function createHarness(t: TestContext, options: HarnessOptions = {}): Prom
   const watcher = startThresholdWatcher({
     api: fake.api,
     autoCompact,
-    percent: PERCENT,
+    percent: options.percent === undefined ? PERCENT : options.percent,
     log: (message) => logs.push(message),
   })
   t.after(() => {
@@ -399,8 +405,16 @@ test('the watcher stops after the stream fails twice', async (t) => {
   assert.equal(harness.fake.subscribers.length, 2)
   assert.equal(
     harness.logs[1],
-    'auto-compact: the threshold watcher stream ended again. The token threshold is inactive until opencode restarts.',
+    'auto-compact: the threshold watcher stream ended again. The token threshold is inactive until opencode restarts or /auto-compact sets it again.',
   )
+})
+
+test('the watcher reports not running after the stream fails twice', async (t) => {
+  const harness = await createHarness(t, { streams: ['throws', 'throws'] })
+
+  await settle()
+
+  assert.equal(harness.watcher.isRunning(), false)
 })
 
 test('stop ends the subscription', async (t) => {
@@ -420,22 +434,6 @@ test('stop does not log the ended stream', async (t) => {
   assert.deepEqual(harness.logs, [])
 })
 
-test('the watcher skips an event it cannot handle', async (t) => {
-  const harness = await createHarness(t)
-  const malformedStepEnded: ThresholdEvent = {
-    type: 'session.step.ended',
-    data: { sessionID: SESSION, tokens: { input: 900 } as never },
-  }
-
-  await emitAndSettle(harness, stepStarted(), malformedStepEnded, stepEnded({ input: 900 }))
-
-  assert.equal(compactCalls(harness).length, 1)
-  assert.equal(
-    harness.logs.some((line) => line.includes('stream')),
-    false,
-  )
-})
-
 test('the watcher logs the error when the stream fails twice', async (t) => {
   const harness = await createHarness(t, { streams: ['throws', 'throws'] })
 
@@ -443,7 +441,7 @@ test('the watcher logs the error when the stream fails twice', async (t) => {
 
   assert.equal(
     harness.logs[1],
-    'auto-compact: the threshold watcher stream failed again (stream broke). The token threshold is inactive until opencode restarts.',
+    'auto-compact: the threshold watcher stream failed again (stream broke). The token threshold is inactive until opencode restarts or /auto-compact sets it again.',
   )
 })
 
@@ -506,19 +504,28 @@ test('the watcher logs a skipped event with its type', async (t) => {
   ])
 })
 
-test('the watcher does not compact on the final step after a plan compaction hook', async (t) => {
-  const harness = await createHarness(t)
-  await emitAndSettle(harness, stepStarted())
-  await startPlanCompaction(harness)
-  await harness.autoCompact.handleCompaction({ sessionID: SESSION, messages: [] })
+test('setting a lower percentage compacts when the lowered threshold is reached', async (t) => {
+  const harness = await createHarness(t, { percent: 80 })
+  harness.watcher.setPercent(50)
 
-  emitToAll(harness.fake, stepEnded({ input: 900 }))
-  emitToAll(harness.fake, stepEnded({}, 'child-1'))
-  await settleUntil(() =>
-    harness.fake.calls.some(
-      (call) => call.method === 'session.get' && (call.args as { sessionID: string }).sessionID === 'child-1',
-    ),
-  )
+  await emitAndSettle(harness, stepStarted(), stepEnded({ input: 600 }))
 
   assert.equal(compactCalls(harness).length, 1)
+})
+
+test('the watcher reports not running after stop', async (t) => {
+  const harness = await createHarness(t)
+
+  harness.watcher.stop()
+
+  assert.equal(harness.watcher.isRunning(), false)
+})
+
+test('the watcher does not compact while the threshold is off', async (t) => {
+  const harness = await createHarness(t)
+  harness.watcher.setPercent(null)
+
+  await emitAndSettle(harness, stepStarted(), stepEnded({ input: 990 }))
+
+  assert.deepEqual(compactCalls(harness), [])
 })

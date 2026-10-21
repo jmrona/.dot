@@ -4,8 +4,14 @@ import { homedir } from 'node:os'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { parsePercentArgument, savePercent } from './command.ts'
 import { loadAutoCompactConfig } from './config.ts'
-import { startThresholdWatcher, type ThresholdApi } from './threshold.ts'
+import {
+  startThresholdWatcher,
+  type ThresholdApi,
+  type ThresholdDependencies,
+  type ThresholdWatcher,
+} from './threshold.ts'
 
 const PLAN_DIRECTORY = '/Users/jose.romero/.opencode/plan'
 
@@ -411,12 +417,34 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+export interface CommandInvocation {
+  readonly sessionID: string
+  readonly prompt: { readonly text: string }
+}
+
+export interface CommandDraft {
+  add(command: {
+    name: string
+    description: string
+    execute(invocation: CommandInvocation): Promise<void>
+  }): void
+}
+
+export interface PluginApi extends ThresholdApi {
+  readonly command: { transform(fn: (draft: CommandDraft) => void): unknown }
+}
+
+const USAGE_TEXT = 'Use /auto-compact <1-100> or /auto-compact off.'
+
+const COMMAND_DESCRIPTION =
+  'Set the auto-compact token threshold: /auto-compact <1-100> or /auto-compact off'
+
 export interface SetupOptions {
   readonly configPath: string
   readonly log: (message: string) => void
 }
 
-export async function setupAutoCompact(api: ThresholdApi, options: SetupOptions): Promise<void> {
+export async function setupAutoCompact(api: PluginApi, options: SetupOptions): Promise<void> {
   const config = await loadAutoCompactConfig(options.configPath, options.log)
   const autoCompact = createAutoCompact({
     planDirectory: PLAN_DIRECTORY,
@@ -427,24 +455,110 @@ export async function setupAutoCompact(api: ThresholdApi, options: SetupOptions)
     await api.tool.hook('execute.after', (input) => autoCompact.handleExecuteAfter(api, input))
   }
   await api.session.hook('compaction', (input) => autoCompact.handleCompaction(input))
-  if (config.compactAtPercentOfInputLimit !== null) {
-    startThresholdWatcher({
-      api,
-      autoCompact,
-      percent: config.compactAtPercentOfInputLimit,
-      log: options.log,
+  const threshold: ThresholdControl = {
+    watcher: undefined,
+    percent: config.compactAtPercentOfInputLimit,
+  }
+  const watcherDependencies = { api, autoCompact, log: options.log }
+  if (threshold.percent !== null) {
+    threshold.watcher = startThresholdWatcher({
+      ...watcherDependencies,
+      percent: threshold.percent,
     })
   }
+  api.command.transform((draft) =>
+    draft.add({
+      name: 'auto-compact',
+      description: COMMAND_DESCRIPTION,
+      execute: (invocation) =>
+        executeCommand(api, invocation, threshold, watcherDependencies, options.configPath),
+    }),
+  )
+}
+
+interface ThresholdControl {
+  watcher: ThresholdWatcher | undefined
+  percent: number | null
+}
+
+type WatcherDependencies = Omit<ThresholdDependencies, 'percent'>
+
+async function executeCommand(
+  api: AutoCompactApi,
+  invocation: CommandInvocation,
+  threshold: ThresholdControl,
+  watcherDependencies: WatcherDependencies,
+  configPath: string,
+): Promise<void> {
+  const argument = parsePercentArgument(invocation.prompt.text)
+  if (argument.kind === 'show') {
+    await recordNotice(api, invocation.sessionID, currentThresholdText(threshold.percent))
+  } else if (argument.kind === 'invalid') {
+    await recordNotice(api, invocation.sessionID, USAGE_TEXT)
+  } else {
+    const percent = argument.kind === 'set' ? argument.percent : null
+    await changeThreshold(api, invocation, percent, threshold, watcherDependencies, configPath)
+  }
+}
+
+async function changeThreshold(
+  api: AutoCompactApi,
+  invocation: CommandInvocation,
+  percent: number | null,
+  threshold: ThresholdControl,
+  watcherDependencies: WatcherDependencies,
+  configPath: string,
+): Promise<void> {
+  try {
+    await savePercent(configPath, percent)
+  } catch (error: unknown) {
+    await recordNotice(api, invocation.sessionID, saveFailureText(error))
+    return
+  }
+  applyPercent(threshold, watcherDependencies, percent)
+  threshold.percent = percent
+  await recordNotice(api, invocation.sessionID, changeConfirmationText(percent))
+}
+
+function changeConfirmationText(percent: number | null): string {
+  return percent === null
+    ? 'Auto-compact threshold turned off.'
+    : `Auto-compact threshold set to ${percent}% of the input limit.`
+}
+
+function saveFailureText(error: unknown): string {
+  return `Could not save the auto-compact threshold: ${errorMessage(error)}. The threshold is unchanged.`
+}
+
+function currentThresholdText(percent: number | null): string {
+  return percent === null
+    ? 'Auto-compact threshold is off.'
+    : `Auto-compact threshold is ${percent}% of the input limit.`
+}
+
+function applyPercent(
+  threshold: ThresholdControl,
+  watcherDependencies: WatcherDependencies,
+  percent: number | null,
+): void {
+  if (threshold.watcher?.isRunning()) {
+    threshold.watcher.setPercent(percent)
+    return
+  }
+  if (percent === null) {
+    return
+  }
+  threshold.watcher = startThresholdWatcher({ ...watcherDependencies, percent })
 }
 
 interface AutoCompactPlugin {
   readonly id: string
-  readonly setup: (api: ThresholdApi) => Promise<void>
+  readonly setup: (api: PluginApi) => Promise<void>
 }
 
 const autoCompactPlugin: AutoCompactPlugin = {
   id: 'auto-compact',
-  setup: (api: ThresholdApi): Promise<void> =>
+  setup: (api: PluginApi): Promise<void> =>
     setupAutoCompact(api, {
       configPath: fileURLToPath(new URL('./config.json', import.meta.url)),
       log: console.error,
