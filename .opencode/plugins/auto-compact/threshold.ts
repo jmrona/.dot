@@ -41,6 +41,7 @@ export interface ThresholdDependencies {
   }
   readonly percent: number | null
   readonly log: (message: string) => void
+  readonly onGiveUp: () => Promise<void>
 }
 
 type StreamEnding =
@@ -71,6 +72,7 @@ export function startThresholdWatcher(deps: ThresholdDependencies): ThresholdWat
     api: deps.api,
     autoCompact: deps.autoCompact,
     log: deps.log,
+    onGiveUp: deps.onGiveUp,
     threshold: { percent: deps.percent },
     signal: controller.signal,
     modelBySession: new Map<string, ModelReference>(),
@@ -101,6 +103,7 @@ async function watchWithOneRetry(context: WatcherContext): Promise<void> {
     return
   }
   context.log(giveUpNotice(secondEnding))
+  await context.onGiveUp()
 }
 
 function retryNotice(ending: StreamEnding): string {

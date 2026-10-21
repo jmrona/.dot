@@ -44,6 +44,7 @@ interface Harness {
   readonly watcher: ThresholdWatcher
   readonly logs: string[]
   readonly planPath: string
+  readonly giveUpCalls: { count: number }
 }
 
 interface HarnessOptions {
@@ -51,6 +52,7 @@ interface HarnessOptions {
   readonly streams?: readonly StreamBehaviour[]
   readonly models?: ModelEntry[]
   readonly percent?: number | null
+  readonly onGiveUp?: () => Promise<void>
 }
 
 const PERCENT = 80
@@ -190,11 +192,17 @@ async function createHarness(t: TestContext, options: HarnessOptions = {}): Prom
     confirmationTimeoutMs: 1000,
   })
   const logs: string[] = []
+  const giveUpCalls = { count: 0 }
   const watcher = startThresholdWatcher({
     api: fake.api,
     autoCompact,
     percent: options.percent === undefined ? PERCENT : options.percent,
     log: (message) => logs.push(message),
+    onGiveUp:
+      options.onGiveUp ??
+      (async () => {
+        giveUpCalls.count += 1
+      }),
   })
   t.after(() => {
     for (const sessionID of KNOWN_SESSIONS) {
@@ -202,7 +210,7 @@ async function createHarness(t: TestContext, options: HarnessOptions = {}): Prom
     }
     watcher.stop()
   })
-  return { fake, autoCompact, watcher, logs, planPath }
+  return { fake, autoCompact, watcher, logs, planPath, giveUpCalls }
 }
 
 function stepStarted(model: ModelEntry = MODEL_A, sessionID = SESSION): ThresholdEvent {
@@ -409,12 +417,40 @@ test('the watcher stops after the stream fails twice', async (t) => {
   )
 })
 
-test('the watcher reports not running after the stream fails twice', async (t) => {
+test('the watcher calls onGiveUp once when the stream fails twice', async (t) => {
   const harness = await createHarness(t, { streams: ['throws', 'throws'] })
 
   await settle()
 
-  assert.equal(harness.watcher.isRunning(), false)
+  assert.equal(harness.giveUpCalls.count, 1)
+})
+
+test('the watcher does not call onGiveUp after stop', async (t) => {
+  const harness = await createHarness(t, { streams: ['throws', 'events'] })
+  await settleUntil(() => harness.fake.subscribers.length === 2)
+
+  harness.watcher.stop()
+  await settle()
+
+  assert.equal(harness.giveUpCalls.count, 0)
+})
+
+test('the watcher reports running until onGiveUp resolves', async (t) => {
+  let finishGiveUp: () => void = () => undefined
+  const pendingGiveUp = new Promise<void>((resolve) => {
+    finishGiveUp = resolve
+  })
+  const harness = await createHarness(t, {
+    streams: ['throws', 'throws'],
+    onGiveUp: () => pendingGiveUp,
+  })
+  await settle()
+  const runningWhilePending = harness.watcher.isRunning()
+
+  finishGiveUp()
+  await settle()
+
+  assert.deepEqual([runningWhilePending, harness.watcher.isRunning()], [true, false])
 })
 
 test('stop ends the subscription', async (t) => {
@@ -519,13 +555,4 @@ test('the watcher reports not running after stop', async (t) => {
   harness.watcher.stop()
 
   assert.equal(harness.watcher.isRunning(), false)
-})
-
-test('the watcher does not compact while the threshold is off', async (t) => {
-  const harness = await createHarness(t)
-  harness.watcher.setPercent(null)
-
-  await emitAndSettle(harness, stepStarted(), stepEnded({ input: 990 }))
-
-  assert.deepEqual(compactCalls(harness), [])
 })

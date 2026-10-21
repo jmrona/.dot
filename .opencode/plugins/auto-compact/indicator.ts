@@ -1,5 +1,6 @@
 import { loadAutoCompactConfig } from './config.ts'
 import { contextTokensOf, inputLimitOf, type ModelLimit, type StepTokens } from './context-usage.ts'
+import { readWatcherFailed } from './status.ts'
 
 export interface IndicatorData {
   readonly session: {
@@ -35,6 +36,7 @@ interface ModelEntry extends ModelReference {
 }
 
 const THRESHOLD_KEY_PREFIX = 'auto-compact: ignoring compactAtPercentOfInputLimit in '
+const WATCHER_ERROR_LABEL = 'auto-compact error'
 
 export function indicatorLabel(input: {
   contextTokens: number
@@ -52,9 +54,10 @@ export async function readIndicatorState(
   data: IndicatorData,
   sessionID: string | undefined,
   configPath: string,
+  statusPath: string,
 ): Promise<string | undefined> {
   try {
-    return await readIndicatorLabel(data, sessionID, configPath)
+    return await readIndicatorLabel(data, sessionID, configPath, statusPath)
   } catch {
     return undefined
   }
@@ -64,6 +67,7 @@ async function readIndicatorLabel(
   data: IndicatorData,
   sessionID: string | undefined,
   configPath: string,
+  statusPath: string,
 ): Promise<string | undefined> {
   if (sessionID === undefined) {
     return undefined
@@ -78,6 +82,9 @@ async function readIndicatorLabel(
   }
   if (percent === null) {
     return indicatorLabel({ contextTokens: 0, limit: 0, percent: null })
+  }
+  if (await readWatcherFailed(statusPath)) {
+    return WATCHER_ERROR_LABEL
   }
   return readUsageLabel(data, sessionID, session, percent)
 }

@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { test, type TestContext } from 'node:test'
 
 import { commandReplyOf, indicatorLabel, readIndicatorState, type IndicatorData } from './indicator.ts'
+import { markWatcherFailed } from './status.ts'
 
 const ROOT_SESSION = { id: 'ses_root', location: { directory: '/work/app' } }
 
@@ -62,6 +63,10 @@ async function missingConfigPath(t: TestContext): Promise<string> {
   return join(await createDirectory(t), 'config.json')
 }
 
+async function missingStatusPath(t: TestContext): Promise<string> {
+  return join(await createDirectory(t), 'status.json')
+}
+
 test('indicator rounds usage half up to the nearest whole percent', () => {
   assert.equal(indicatorLabel({ contextTokens: 505, limit: 1000, percent: 50 }), 'auto-compact 51/50%')
 })
@@ -71,19 +76,62 @@ test('indicator rounds usage below half down to the nearest whole percent', () =
 })
 
 test('indicator state shows auto-compact off when the config file is missing', async (t) => {
-  const label = await readIndicatorState(fakeData({ session: ROOT_SESSION }), 'ses_root', await missingConfigPath(t))
+  const label = await readIndicatorState(
+    fakeData({ session: ROOT_SESSION }),
+    'ses_root',
+    await missingConfigPath(t),
+    await missingStatusPath(t),
+  )
 
   assert.equal(label, 'auto-compact off')
 })
 
+test('indicator state shows auto-compact off when the watcher failed without a threshold', async (t) => {
+  const statusPath = await missingStatusPath(t)
+  await markWatcherFailed(statusPath)
+
+  const label = await readIndicatorState(
+    fakeData({ session: ROOT_SESSION }),
+    'ses_root',
+    await missingConfigPath(t),
+    statusPath,
+  )
+
+  assert.equal(label, 'auto-compact off')
+})
+
+test('indicator state shows auto-compact error when the watcher failed with a threshold set', async (t) => {
+  const statusPath = await missingStatusPath(t)
+  await markWatcherFailed(statusPath)
+
+  const label = await readIndicatorState(
+    fakeData({ session: ROOT_SESSION, messages: [assistantMessage()] }),
+    'ses_root',
+    await configPathWith(t, '{ "compactAtPercentOfInputLimit": 50 }'),
+    statusPath,
+  )
+
+  assert.equal(label, 'auto-compact error')
+})
+
 test('indicator state hides when there is no session ID', async (t) => {
-  const label = await readIndicatorState(fakeData({ session: ROOT_SESSION }), undefined, await missingConfigPath(t))
+  const label = await readIndicatorState(
+    fakeData({ session: ROOT_SESSION }),
+    undefined,
+    await missingConfigPath(t),
+    await missingStatusPath(t),
+  )
 
   assert.equal(label, undefined)
 })
 
 test('indicator state hides when the session cannot be found yet', async (t) => {
-  const label = await readIndicatorState(fakeData(), 'ses_new', await missingConfigPath(t))
+  const label = await readIndicatorState(
+    fakeData(),
+    'ses_new',
+    await missingConfigPath(t),
+    await missingStatusPath(t),
+  )
 
   assert.equal(label, undefined)
 })
@@ -95,6 +143,22 @@ test('indicator state hides for a child session even when the threshold is off',
     fakeData({ session: childSession }),
     'ses_child',
     await missingConfigPath(t),
+    await missingStatusPath(t),
+  )
+
+  assert.equal(label, undefined)
+})
+
+test('indicator state hides for a child session even when the watcher failed', async (t) => {
+  const childSession = { ...ROOT_SESSION, parentID: 'ses_root' }
+  const statusPath = await missingStatusPath(t)
+  await markWatcherFailed(statusPath)
+
+  const label = await readIndicatorState(
+    fakeData({ session: childSession, messages: [assistantMessage()] }),
+    'ses_child',
+    await configPathWith(t, '{ "compactAtPercentOfInputLimit": 50 }'),
+    statusPath,
   )
 
   assert.equal(label, undefined)
@@ -111,6 +175,7 @@ test('indicator state shows usage from the last assistant message that has token
     fakeData({ session: ROOT_SESSION, messages }),
     'ses_root',
     await configPathWith(t, '{ "compactAtPercentOfInputLimit": 50 }'),
+    await missingStatusPath(t),
   )
 
   assert.equal(label, 'auto-compact 32/50%')
@@ -123,6 +188,7 @@ test('indicator state uses the context limit when the input limit is absent', as
     fakeData({ session: ROOT_SESSION, messages: [assistantMessage()], models }),
     'ses_root',
     await configPathWith(t, '{ "compactAtPercentOfInputLimit": 50 }'),
+    await missingStatusPath(t),
   )
 
   assert.equal(label, 'auto-compact 16/50%')
@@ -135,6 +201,7 @@ test('indicator state hides when no assistant message has tokens', async (t) => 
     fakeData({ session: ROOT_SESSION, messages }),
     'ses_root',
     await configPathWith(t, '{ "compactAtPercentOfInputLimit": 50 }'),
+    await missingStatusPath(t),
   )
 
   assert.equal(label, undefined)
@@ -147,6 +214,7 @@ test('indicator state hides when no model entry matches the last assistant messa
     fakeData({ session: ROOT_SESSION, messages: [assistantMessage()], models }),
     'ses_root',
     await configPathWith(t, '{ "compactAtPercentOfInputLimit": 50 }'),
+    await missingStatusPath(t),
   )
 
   assert.equal(label, undefined)
@@ -157,6 +225,7 @@ test('indicator state hides when config.json is not valid JSON', async (t) => {
     fakeData({ session: ROOT_SESSION, messages: [assistantMessage()] }),
     'ses_root',
     await configPathWith(t, '{ "compactAtPercentOfInputLimit": '),
+    await missingStatusPath(t),
   )
 
   assert.equal(label, undefined)
@@ -167,6 +236,7 @@ test('indicator state hides when the threshold in config.json is out of range', 
     fakeData({ session: ROOT_SESSION, messages: [assistantMessage()] }),
     'ses_root',
     await configPathWith(t, '{ "compactAtPercentOfInputLimit": 150 }'),
+    await missingStatusPath(t),
   )
 
   assert.equal(label, undefined)
@@ -177,6 +247,7 @@ test('indicator state still shows usage when only another config key is invalid'
     fakeData({ session: ROOT_SESSION, messages: [assistantMessage()] }),
     'ses_root',
     await configPathWith(t, '{ "compactOnPlanSave": "yes", "compactAtPercentOfInputLimit": 50 }'),
+    await missingStatusPath(t),
   )
 
   assert.equal(label, 'auto-compact 32/50%')
@@ -197,6 +268,7 @@ test('indicator state hides when a data method throws', async (t) => {
     throwingData,
     'ses_root',
     await configPathWith(t, '{ "compactAtPercentOfInputLimit": 50 }'),
+    await missingStatusPath(t),
   )
 
   assert.equal(label, undefined)
@@ -215,6 +287,7 @@ test('indicator state works when the data methods return promises', async (t) =>
     asyncData,
     'ses_root',
     await configPathWith(t, '{ "compactAtPercentOfInputLimit": 50 }'),
+    await missingStatusPath(t),
   )
 
   assert.equal(label, 'auto-compact 32/50%')

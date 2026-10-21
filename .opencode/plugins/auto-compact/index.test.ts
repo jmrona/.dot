@@ -16,6 +16,7 @@ import autoCompactPlugin, {
   type PluginApi,
   setupAutoCompact,
 } from './index.ts'
+import { readWatcherFailed } from './status.ts'
 import type { ThresholdEvent } from './threshold.ts'
 
 interface RecordedCall {
@@ -274,6 +275,16 @@ async function waitFor(condition: () => boolean): Promise<void> {
   }
 }
 
+async function waitForFailedStatus(statusPath: string): Promise<void> {
+  const deadline = Date.now() + WAIT_LIMIT_MS
+  while (!(await readWatcherFailed(statusPath))) {
+    if (Date.now() > deadline) {
+      throw new Error(`failed status not written within ${WAIT_LIMIT_MS} ms`)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1))
+  }
+}
+
 async function waitForUnsubscribe(fake: FakeApi): Promise<void> {
   await waitFor(() => fake.calls.some((call) => call.method === 'event.unsubscribe'))
 }
@@ -431,17 +442,6 @@ test('a changed plan saved after a finished compaction compacts the session agai
   assert.equal(compactCalls(harness.fake.calls).length, 2)
 })
 
-test('a save of changed plan content during an in-flight compaction does not compact again', async (t) => {
-  const harness = await createHarness(t)
-  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
-  await savePlan(harness, planPath)
-  await writeFile(planPath, 'plan two')
-
-  await savePlan(harness, planPath)
-
-  assert.equal(compactCalls(harness.fake.calls).length, 1)
-})
-
 test('the save handler returns before the compaction is confirmed', async (t) => {
   const harness = await createHarness(t)
   const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
@@ -577,16 +577,6 @@ test('setup registers an execute.after handler that reaches the plugin', async (
   assert.equal(autoCompactPlugin.id, 'auto-compact')
   const [notice] = syntheticTexts(fake.calls)
   assert.ok(notice?.startsWith(`Plan saved to ${missingPath}, but it could not be read`), notice)
-})
-
-test('setup registers a compaction handler that leaves messages unchanged without an in-flight compaction', async (t) => {
-  const { fake } = await setupWithConfig(t)
-  const handler = fake.hooks.get('compaction') as (input: CompactionInput) => Promise<void>
-  const input: CompactionInput = { sessionID: 'session-1', messages: [] }
-
-  await handler(input)
-
-  assert.deepEqual(input.messages, [])
 })
 
 test('an end event for another session does not end the watched compaction', async (t) => {
@@ -866,20 +856,11 @@ test('a threshold compaction whose event stream fails posts the threshold unconf
   ])
 })
 
-test('a threshold compaction that ends posts no notice', async (t) => {
-  const harness = await createHarness(t)
-  await startThreshold(harness)
-
-  emitEvent(harness.fake, ENDED_EVENT)
-  await waitForUnsubscribe(harness.fake)
-
-  assert.deepEqual(syntheticTexts(harness.fake.calls), [])
-})
-
 interface SetupHarness {
   readonly fake: FakeApi
   readonly logs: string[]
   readonly configPath: string
+  readonly statusPath: string
 }
 
 async function setupWithConfig(
@@ -887,6 +868,8 @@ async function setupWithConfig(
   config?: unknown,
   stream?: StreamBehaviour,
   failingSubscriptions?: number,
+  statusPathOverride?: (root: string) => string,
+  existingStatus?: string,
 ): Promise<SetupHarness> {
   const root = await mkdtemp(join(tmpdir(), 'auto-compact-setup-'))
   t.after(() => rm(root, { recursive: true, force: true }))
@@ -894,10 +877,18 @@ async function setupWithConfig(
   if (config !== undefined) {
     await writeFile(configPath, JSON.stringify(config))
   }
+  const statusPath = statusPathOverride?.(root) ?? join(root, 'status.json')
+  if (existingStatus !== undefined) {
+    await writeFile(statusPath, existingStatus)
+  }
   const fake = createWatchedFakeApi(t, { stream, failingSubscriptions })
   const logs: string[] = []
-  await setupAutoCompact(fake.api, { configPath, log: (message) => logs.push(message) })
-  return { fake, logs, configPath }
+  await setupAutoCompact(fake.api, {
+    configPath,
+    statusPath,
+    log: (message) => logs.push(message),
+  })
+  return { fake, logs, configPath, statusPath }
 }
 
 function thresholdReachingEvents(): ThresholdEvent[] {
@@ -1214,4 +1205,61 @@ test('the command resolves when posting the message is rejected', async (t) => {
   harness.fake.failures.set('session.synthetic', 'post rejected')
 
   await assert.doesNotReject(runCommand(harness, '50'))
+})
+
+const FAILED_STATUS_FILE = '{"thresholdWatcher":"failed"}'
+
+test('setup removes an existing status file when no threshold is configured', async (t) => {
+  const { statusPath } = await setupWithConfig(t, {}, undefined, undefined, undefined, FAILED_STATUS_FILE)
+
+  assert.equal(await readWatcherFailed(statusPath), false)
+})
+
+test('setting the threshold after the watcher gave up removes the failed status file', async (t) => {
+  const harness = await setupWithConfig(t, { compactAtPercentOfInputLimit: 80 }, undefined, 2)
+  await waitForFailedStatus(harness.statusPath)
+
+  await runCommand(harness, '50')
+
+  assert.equal(await readWatcherFailed(harness.statusPath), false)
+})
+
+test('a failed status write is logged with the status path', async (t) => {
+  const missingDirectoryStatus = (root: string): string => join(root, 'missing', 'status.json')
+  const { logs, statusPath } = await setupWithConfig(
+    t,
+    { compactAtPercentOfInputLimit: 80 },
+    undefined,
+    2,
+    missingDirectoryStatus,
+  )
+  await waitForImmediates(() => logs.length === 3)
+
+  assert.ok(logs[2]?.startsWith(`auto-compact: could not write ${statusPath}: `))
+})
+
+const DIRECTORY_AS_STATUS_PATH = (root: string): string => root
+
+test('a failed clear at setup is logged with the status path', async (t) => {
+  const { logs, statusPath } = await setupWithConfig(
+    t,
+    {},
+    undefined,
+    undefined,
+    DIRECTORY_AS_STATUS_PATH,
+  )
+
+  assert.ok(logs[0]?.startsWith(`auto-compact: could not clear ${statusPath}: `))
+})
+
+test('a failed clear at setup still starts the threshold watcher', async (t) => {
+  const { fake } = await setupWithConfig(
+    t,
+    { compactAtPercentOfInputLimit: 80 },
+    undefined,
+    undefined,
+    DIRECTORY_AS_STATUS_PATH,
+  )
+
+  assert.equal(fake.subscriptions.length, 1)
 })

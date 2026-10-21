@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 import { parsePercentArgument, savePercent } from './command.ts'
 import { loadAutoCompactConfig } from './config.ts'
+import { clearWatcherStatus, markWatcherFailed } from './status.ts'
 import {
   startThresholdWatcher,
   type ThresholdApi,
@@ -441,6 +442,7 @@ const COMMAND_DESCRIPTION =
 
 export interface SetupOptions {
   readonly configPath: string
+  readonly statusPath: string
   readonly log: (message: string) => void
 }
 
@@ -459,7 +461,13 @@ export async function setupAutoCompact(api: PluginApi, options: SetupOptions): P
     watcher: undefined,
     percent: config.compactAtPercentOfInputLimit,
   }
-  const watcherDependencies = { api, autoCompact, log: options.log }
+  const watcherDependencies = {
+    api,
+    autoCompact,
+    log: options.log,
+    onGiveUp: () => markWatcherFailedSafely(options.statusPath, options.log),
+  }
+  await clearWatcherStatusSafely(options.statusPath, options.log)
   if (threshold.percent !== null) {
     threshold.watcher = startThresholdWatcher({
       ...watcherDependencies,
@@ -471,7 +479,7 @@ export async function setupAutoCompact(api: PluginApi, options: SetupOptions): P
       name: 'auto-compact',
       description: COMMAND_DESCRIPTION,
       execute: (invocation) =>
-        executeCommand(api, invocation, threshold, watcherDependencies, options.configPath),
+        executeCommand(api, invocation, threshold, watcherDependencies, options),
     }),
   )
 }
@@ -488,7 +496,7 @@ async function executeCommand(
   invocation: CommandInvocation,
   threshold: ThresholdControl,
   watcherDependencies: WatcherDependencies,
-  configPath: string,
+  options: SetupOptions,
 ): Promise<void> {
   const argument = parsePercentArgument(invocation.prompt.text)
   if (argument.kind === 'show') {
@@ -497,7 +505,7 @@ async function executeCommand(
     await recordNotice(api, invocation.sessionID, USAGE_TEXT)
   } else {
     const percent = argument.kind === 'set' ? argument.percent : null
-    await changeThreshold(api, invocation, percent, threshold, watcherDependencies, configPath)
+    await changeThreshold(api, invocation, percent, threshold, watcherDependencies, options)
   }
 }
 
@@ -507,15 +515,15 @@ async function changeThreshold(
   percent: number | null,
   threshold: ThresholdControl,
   watcherDependencies: WatcherDependencies,
-  configPath: string,
+  options: SetupOptions,
 ): Promise<void> {
   try {
-    await savePercent(configPath, percent)
+    await savePercent(options.configPath, percent)
   } catch (error: unknown) {
     await recordNotice(api, invocation.sessionID, saveFailureText(error))
     return
   }
-  applyPercent(threshold, watcherDependencies, percent)
+  await applyPercent(threshold, watcherDependencies, percent, options)
   threshold.percent = percent
   await recordNotice(api, invocation.sessionID, changeConfirmationText(percent))
 }
@@ -536,11 +544,12 @@ function currentThresholdText(percent: number | null): string {
     : `Auto-compact threshold is ${percent}% of the input limit.`
 }
 
-function applyPercent(
+async function applyPercent(
   threshold: ThresholdControl,
   watcherDependencies: WatcherDependencies,
   percent: number | null,
-): void {
+  options: SetupOptions,
+): Promise<void> {
   if (threshold.watcher?.isRunning()) {
     threshold.watcher.setPercent(percent)
     return
@@ -548,7 +557,30 @@ function applyPercent(
   if (percent === null) {
     return
   }
+  await clearWatcherStatusSafely(options.statusPath, options.log)
   threshold.watcher = startThresholdWatcher({ ...watcherDependencies, percent })
+}
+
+async function markWatcherFailedSafely(
+  statusPath: string,
+  log: (message: string) => void,
+): Promise<void> {
+  try {
+    await markWatcherFailed(statusPath)
+  } catch (error: unknown) {
+    log(`auto-compact: could not write ${statusPath}: ${errorMessage(error)}`)
+  }
+}
+
+async function clearWatcherStatusSafely(
+  statusPath: string,
+  log: (message: string) => void,
+): Promise<void> {
+  try {
+    await clearWatcherStatus(statusPath)
+  } catch (error: unknown) {
+    log(`auto-compact: could not clear ${statusPath}: ${errorMessage(error)}`)
+  }
 }
 
 interface AutoCompactPlugin {
@@ -561,6 +593,7 @@ const autoCompactPlugin: AutoCompactPlugin = {
   setup: (api: PluginApi): Promise<void> =>
     setupAutoCompact(api, {
       configPath: fileURLToPath(new URL('./config.json', import.meta.url)),
+      statusPath: fileURLToPath(new URL('./status.json', import.meta.url)),
       log: console.error,
     }),
 }

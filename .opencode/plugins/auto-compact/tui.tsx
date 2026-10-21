@@ -4,6 +4,7 @@ import { createEffect, createSignal } from 'solid-js'
 import { commandReplyOf, readIndicatorState, type IndicatorData } from './indicator.ts'
 
 const CONFIG_PATH = fileURLToPath(new URL('./config.json', import.meta.url))
+const STATUS_PATH = fileURLToPath(new URL('./status.json', import.meta.url))
 
 interface TuiContext {
   readonly data: IndicatorData & { on(event: string, handler: (event: unknown) => void): unknown }
@@ -22,7 +23,7 @@ export default {
 
     async function refresh(sessionID: string | undefined): Promise<void> {
       const thisRefresh = ++latestRefresh
-      const next = await readIndicatorState(ctx.data, sessionID, CONFIG_PATH)
+      const next = await readIndicatorState(ctx.data, sessionID, CONFIG_PATH, STATUS_PATH)
       if (thisRefresh === latestRefresh) {
         setLabel(next)
       }
