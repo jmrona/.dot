@@ -235,3 +235,30 @@ test('still injects rules when subscribing to events throws', async (t) => {
 
   assert.match(systemTexts(event)[0] ?? '', /GO RULES/)
 })
+
+test('keeps the languages of a session when an event other than deletion names it', async (t) => {
+  const stream = createControlledStream()
+  const handler = await registerPlugin(await createRulesDirectory(t), stream.events)
+  await handler(eventForSession('s1', { name: 'read', input: { path: '/repo/main.go' } }))
+
+  stream.emit({ type: 'session.updated', data: { sessionID: 's1' } })
+  await settle()
+  const afterUpdate = eventForSession('s1')
+  await handler(afterUpdate)
+
+  assert.match(systemTexts(afterUpdate)[0] ?? '', /GO RULES/)
+})
+
+test('handles a deletion that follows an event without data', async (t) => {
+  const stream = createControlledStream()
+  const handler = await registerPlugin(await createRulesDirectory(t), stream.events)
+  await handler(eventForSession('s1', { name: 'read', input: { path: '/repo/main.go' } }))
+
+  stream.emit({ type: 'session.deleted' })
+  stream.emit({ type: 'session.deleted', data: { sessionID: 's1' } })
+  await settle()
+  const afterDeletion = eventForSession('s1')
+  await handler(afterDeletion)
+
+  assert.deepEqual(systemTexts(afterDeletion), [])
+})

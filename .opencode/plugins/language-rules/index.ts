@@ -21,7 +21,7 @@ export interface ContextEvent {
 
 export interface SessionEvent {
   readonly type: string
-  readonly data: { readonly sessionID?: string }
+  readonly data?: { readonly sessionID?: string }
 }
 
 export interface LanguageRulesApi {
@@ -66,14 +66,15 @@ async function forgetDeletedSessions(
   let reason = 'the stream ended'
   try {
     for await (const event of api.event.subscribe({ signal: new AbortController().signal })) {
-      if (event.type === 'session.deleted' && event.data.sessionID) {
-        sessionLanguages.forget(event.data.sessionID)
-      }
+      const sessionID = event.data?.sessionID
+      if (event.type === 'session.deleted' && sessionID) sessionLanguages.forget(sessionID)
     }
   } catch (error: unknown) {
     reason = error instanceof Error ? error.message : String(error)
   }
-  console.warn(`language-rules: the event stream stopped (${reason}). Sessions will no longer be forgotten.`)
+  console.warn(
+    `language-rules: the event stream stopped (${reason}). Sessions will no longer be forgotten.`,
+  )
 }
 
 export interface LanguageRulesPlugin {
