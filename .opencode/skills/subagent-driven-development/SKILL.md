@@ -184,9 +184,9 @@ The gate output (commands run, exit codes, pass/fail counts) is shown to the use
 
 After the wave gate passes, present one checkpoint for the wave. Present it also when the gate reports only failures owned by a stopped task. For each task show the summary, the reviewer verdict, the implementer's TDD RED to GREEN evidence and the task's own diff. Then show the wave gate commands with their exit codes and pass/fail counts. If the user stopped a task, the whole-project checks stay red until the stopped task is resolved. The gate evidence is non-optional, because without it you have not satisfied `../../rules/common/verification.md`.
 
-If the user chose "ask me each time", use one `question` for the wave with the options "Commit all tasks", "Adjust first" and "Skip commit". Commit only when the user chooses "Commit all tasks". A stopped task stays uncommitted.
+If the session's commit preference is "Ask me each time", use one `question` for the wave with the options "Commit all tasks", "Adjust first" and "Skip commit". Commit only when the user chooses "Commit all tasks". A stopped task stays uncommitted.
 
-If the user chose auto-commit, commit right after you present the summary, unless a stopped task leaves the checks red. In that case you **MUST** ask the commit question even under auto-commit.
+If the session's commit preference is auto-commit, commit right after you present the summary, unless a stopped task leaves the checks red. In that case you **MUST** ask the commit question even under auto-commit.
 
 **Adjust first.** Map the user's request to tasks by path. Continue the owners through `sessionID`, in parallel when their `writes` are disjoint. Apply the re-review rule, re-run the gate, and ask the same question again. If the request needs a path outside every `writes`, ask the user which task gets it, or run it as a new single-task wave. A new single-task wave runs the full pipeline, including its own checkpoint.
 
@@ -221,6 +221,7 @@ After the last wave's checkpoint, run the PRUNE stage of `../test-driven-develop
 - If the user approves one or more REMOVE, apply them as the PRUNE procedure says. Then re-run the project's full test command and linter, and cite the output.
 - If that re-run passes, commit the removals as one extra commit under the session's commit preference. Under auto-commit, commit without asking. Under "Ask me each time", ask one commit question. Follow the path-limited commit rules of `## User Checkpoint`.
 - If that re-run fails, restore the removed tests from the restore record and report the failure. Then continue to the final review without the removals.
+- If the audit reports an uncovered behaviour, write its test in a new single-task wave through an implementer. The wave uses the full per-wave pipeline: review, gate, checkpoint, and commit under the session's commit preference. The orchestrator does not write the test itself. Then audit again with `[SCOPE]` limited to the tests that wave added. Handle the results of that audit under the bullets above, and treat the prune as resolved when it ends.
 
 ## Final Feature-Level Review
 

@@ -136,3 +136,22 @@ test('implementer prompt says the implementer does not run the test prune', () =
   assert.match(implementerPrompt(), /You do not run the test prune/)
   assert.match(implementerPrompt(), /orchestrator runs it once per feature/)
 })
+
+test('feature test prune runs an uncovered behaviour as a new single-task wave through an implementer', () => {
+  const prune = featurePrune()
+  assert.match(prune, /uncovered behaviour/i)
+  assert.match(prune, /new single-task wave/)
+  assert.match(prune, /implementer/)
+  assert.match(prune, /does not write the test itself/)
+})
+
+test('feature test prune audits again with the scope limited to the tests the new wave added', () => {
+  assert.match(featurePrune(), /\[SCOPE\][^.]*added/)
+})
+
+test('user checkpoint refers to the session commit preference instead of a user choice', () => {
+  const checkpoint = section(development(), '## User Checkpoint')
+  assert.match(checkpoint, /session's commit preference is "Ask me each time"/)
+  assert.match(checkpoint, /session's commit preference is auto-commit/)
+  assert.doesNotMatch(checkpoint, /If the user chose/)
+})

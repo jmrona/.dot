@@ -51,3 +51,23 @@ test('test-driven-development prune still asks for the touched-file list outside
 
   assert.match(procedure, /ask your human partner for the touched-file list/)
 })
+
+test('test-driven-development first-RED recording names the orchestration exception for a non-git project', () => {
+  const recording = section(tdd, '## Before the First RED')
+
+  assert.match(recording, /inside an orchestration[^.]*prune base that the orchestrator recorded/i)
+})
+
+test('test-driven-development completion gate leaves the prune box to the orchestrator in an orchestration', () => {
+  const gate = tdd.slice(tdd.indexOf('The prune ran, and its audit'))
+
+  assert.match(gate, /`subagent-driven-development` or `fast-path-implementation`[^.]*orchestrator checks this box/)
+  assert.match(gate, /implementer leaves it to the orchestrator/)
+})
+
+test('test-driven-development uncovered behaviour step points an orchestrated prune to a new single-task wave', () => {
+  const procedure = section(tdd, '### Procedure')
+
+  assert.match(procedure, /new single-task wave/)
+  assert.match(procedure, /orchestrator does not write the test/)
+})
