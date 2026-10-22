@@ -53,3 +53,11 @@ You **MUST** use type declarations on all function signatures (parameters and re
 - Prefer dependency injection over global state
 - Use typed properties to avoid runtime type errors
 - Use `final` by default for classes unless designed for inheritance
+
+## Reusing Existing Functions
+
+Before you write a new PHP method or function, search the codebase for code that already does the same job. Search by behaviour, not only by name, because a duplicate often carries a different name. Read the classes next to the file you edit first, then the rest of the module.
+
+If an existing method does the job, call it. If it almost does the job, add a parameter that the current task needs instead of a variant. If it is a private method of another class, extract it rather than copy it. You **MUST NOT** write a method that repeats the logic of an existing one, whatever name either carries. Extracting the duplicate that the current task needs is part of that task. For that extraction only, this section takes precedence over the YAGNI section of `../common/coding-style.md` and the Follow Existing Patterns section of `../common/consistency.md`. Do not hunt for duplicates that the current task does not need.
+
+Place extracted code as close as possible to the classes that use it. Create a directory named after the shared concept under the nearest directory that contains every caller. Put a small `final` class there. For example, in Ember the `Delete*Tool` classes in `Assistant/Tools/` share `Assistant/Tools/Deletion/FlexiDeletionEvidenceReader.php`. If the callers live in different modules, use the shared directory that the project rules define. Follow the project rules on dependencies between modules. If the project defines no shared directory, or its rules forbid the dependency, ask before you create one. Inject the class through the constructor and update every former copy to use it.
