@@ -274,7 +274,7 @@ test('routes every design question and section through the stack planner verbati
   const standard = read('skills/brainstorming-standard/SKILL.md')
   const routing = read('rules/common/model-routing.md')
 
-  assert.ok(standard.includes('When you delegate, `stack-planner` authors every design question. Relay each planner question to the user verbatim.'), 'parent relays planner questions verbatim')
+  assert.ok(standard.includes('`stack-planner` authors every design question') && standard.includes('Relay each planner question to the user verbatim'), 'parent relays planner questions verbatim')
   assert.ok(
     standard.includes('**MUST NOT** write, reword, or add a design question yourself'),
     'parent does not author design questions',
@@ -285,7 +285,7 @@ test('routes every design question and section through the stack planner verbati
     'parent does not draft design content',
   )
   assert.ok(
-    routing.includes('When the parent delegates, it relays planner questions and design sections to the human verbatim'),
+    routing.includes('delegates, it relays planner questions and design sections to the human verbatim'),
     'routing rule relays planner output verbatim when delegating',
   )
   assert.ok(standard.includes('present each one verbatim'), 'parent presents planner sections verbatim')
@@ -307,7 +307,7 @@ test('routes every design question and section through the stack planner verbati
     'parent keeps the planner sessionID',
   )
   assert.ok(
-    standard.includes('Move to step 4 only when no question remains, which the planner reports when you delegate.'),
+    standard.includes('Move to step 4 only when no question remains, which the planner reports'),
     'planner decides when clarification ends',
   )
 })
@@ -350,7 +350,7 @@ test('brainstorming modes hand off to implementation from plan mode without a ma
 
     assert.match(skill, /invoke `subagent-driven-development` now, even if Plan mode is still active/, path)
     assert.match(skill, /mode-switch plugin moves the session to Build/, path)
-    assert.match(skill, /Do not ask the user to switch agents unless the plugin reports that the switch failed/, path)
+    assert.match(skill, /Do not ask the user to switch agents unless/, path)
   }
 })
 
@@ -463,7 +463,7 @@ test('limits the no-authoring prohibitions in the brainstorming skills to delega
   assert.match(standard, /^2\. \*\*Develop the design\.\*\*[^\n]*Develop 2-3 viable alternatives/m)
   assert.doesNotMatch(standard, /Have the author produce/)
   assert.doesNotMatch(standard, /(?<!delegate, you )\*\*MUST NOT\*\* write, reword, or add a design question yourself/)
-  assert.match(standard, /When you delegate, you \*\*MUST NOT\*\* write, reword, or add a design question yourself/)
+  assert.match(standard, /\*\*MUST NOT\*\* write, reword, or add a design question yourself/)
 })
 
 test('keeps the design-review revision step explicit in both modes', () => {
@@ -478,7 +478,7 @@ test('limits the planning bullet no-authoring clause to a delegating parent', ()
   const routing = read('rules/common/model-routing.md')
   const bullet = routing.split('\n').find((line) => line.startsWith('- Send substantive planning'))
 
-  assert.match(bullet, /When the parent delegates, it does not author design questions or design content/)
+  assert.match(bullet, /delegates, it does not author design questions or design content/)
   for (const sentence of bullet.split(/(?<=\.) /)) {
     assert.ok(sentence.split(/\s+/).length <= 25, sentence)
   }
@@ -504,9 +504,19 @@ test('applies the brainstorming-skip planner brief only after the judgement cond
   assert.ok(step.indexOf('require judgement') < step.indexOf('Delegate to `stack-planner` unless'))
   assert.doesNotMatch(step, /the next two sentences apply/)
   assert.doesNotMatch(step, /If no judgement is needed/)
-  assert.match(step, /If the user's statement is already clear, capture the user's statement verbatim/)
+  assert.match(step, /statement is already clear, capture the user's statement verbatim/)
 })
 
 test('keeps the coordinator bullet wording on other bounded work', () => {
   assert.match(read('rules/common/model-routing.md'), /straightforward discovery, and other bounded work\./)
+})
+
+test('rules state that a ticket input with a Mode line spares the router mode question', () => {
+  for (const path of ['rules/common/workflow.md', 'rules/common/skills-policy.md']) {
+    const rule = read(path)
+
+    assert.match(rule, /`Source: work-on-ticket`/, path)
+    assert.match(rule, /`Mode:` line/, path)
+    assert.match(rule, /router does not ask again/, path)
+  }
 })

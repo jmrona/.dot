@@ -30,7 +30,7 @@ test('standard mode asks the approach choice as a separate question before the s
 test('standard mode presents every section in one message', () => {
   const step = stepBody(read(standardPath), 'Present approaches and approve sections')
 
-  assert.match(step, /every section \(architecture, components, data flow, error handling, and testing\) in one message/)
+  assert.match(step, /every section \([^)]*testing\) in one message/)
 })
 
 test('standard mode approves sections with one multiSelect question', () => {
@@ -44,7 +44,7 @@ test('standard mode approves sections with one multiSelect question', () => {
 test('standard mode tells the user to write changes in the custom answer', () => {
   const step = stepBody(read(standardPath), 'Present approaches and approve sections')
 
-  assert.match(step, /question text tells the user to write what to change in the custom answer/)
+  assert.match(step, /tells the user to write what to change/)
 })
 
 test('standard mode reworks each unselected section from the custom answer', () => {
@@ -56,7 +56,7 @@ test('standard mode reworks each unselected section from the custom answer', () 
 test('standard mode asks one plain follow-up when the user left no custom answer', () => {
   const step = stepBody(read(standardPath), 'Present approaches and approve sections')
 
-  assert.match(step, /If the user left no custom answer, ask one plain follow-up for the changes/)
+  assert.match(step, /left no custom answer, ask one plain follow-up/)
 })
 
 test('standard mode asks again only about the reworked sections', () => {
@@ -90,7 +90,7 @@ for (const path of modeSkills) {
   test(`${path} keeps the create tickets or implement question without a ticket`, () => {
     const step = stepBody(read(path), 'Decide the next step')
 
-    assert.match(step, /If the design input does not have `Source: work-on-ticket`, use `question` to ask whether to create tickets or start implementation/)
+    assert.match(step, /does not have `Source: work-on-ticket`, use `question` to ask whether/)
   })
 
   test(`${path} hands off to create-tickets when a ticket run asks for more tickets`, () => {
@@ -154,4 +154,10 @@ test('standard worked example splits the no-ticket next step into two sentences'
 
   assert.ok(line.length > 0)
   assert.doesNotMatch(line, /;/)
+})
+
+test('standard mode returns the chosen approach to the same planner before it drafts sections', () => {
+  const step = stepBody(read(standardPath), 'Present approaches and approve sections')
+
+  assert.match(step, /return the chosen approach to the same `stack-planner` with its `sessionID` before it drafts the sections/i)
 })

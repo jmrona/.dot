@@ -8,19 +8,19 @@ The design lives in the conversation unless it has been captured in a ticket, an
 
 ### The Brainstorming Router Is the Design Step
 
-The procedural entry point for the design step is the `brainstorming` skill (the router). You **MUST** invoke it before any code edit, regardless of how obvious the change feels. The router enters plan mode and asks the user to pick one of three modes (standard, committee, or skip). The skip option exists for cases where structured brainstorming would be overkill, it captures a brief design statement and proceeds, so the router being mandatory does not mean every change goes through a long dialogue.
+The procedural entry point for the design step is the `brainstorming` skill (the router). You **MUST** invoke it before any code edit, regardless of how obvious the change feels. The router enters plan mode and asks the user to pick one of three modes (standard, committee, or skip). The skip option exists for cases where structured brainstorming would be overkill, it captures a brief design statement and proceeds, so the router being mandatory does not mean every change goes through a long dialogue. If the design input has `Source: work-on-ticket` and a `Mode:` line, the user already chose the mode in `work-on-ticket`, and the router does not ask again.
 
 You **MUST NOT** bypass the router by:
 
 - Designing in your own context and considering it "presented" because you typed it in the conversation
 - Entering plan mode manually instead of through the router
-- Picking `brainstorming-skip` on the user's behalf, the user picks the mode, the router asks
+- Picking `brainstorming-skip` on the user's behalf, the user picks the mode, the router asks (except in a ticket run, as the router paragraph above states)
 - Deciding the work is "too small" or "obvious" to need the router, that judgement is the user's, not yours, and the skip option exists for exactly this case
 
 ### What Counts as an Approved Design
 
 - A design produced by the `brainstorming` router (any of its modes: standard, committee, or skip) that the user has explicitly approved
-- An epic or ticket containing a design that the user has written or previously approved. A ticket pickup still goes through the `brainstorming` router, where the user can choose skip.
+- An epic or ticket containing a design that the user has written or previously approved. A ticket pickup still goes through the `brainstorming` router, which takes the mode that the user chose in `work-on-ticket`.
 - A specification committed to the repository that the user has pointed to as the source of truth for the current change
 
 ### What Does Not Count

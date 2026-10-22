@@ -120,3 +120,11 @@ test('router common mistakes row for picking a mode names the ticket exception',
   assert.match(row, /work-on-ticket/)
   assert.match(row, /Mode:/)
 })
+
+test('ticket scope question describes each Scope OK option as a correct scope', () => {
+  const descriptions = scopeStep().match(/description: "[^"]*"/g) ?? []
+  const scopeOk = descriptions.filter((line) => line.includes('The scope is correct.'))
+
+  assert.equal(scopeOk.length, 3)
+  assert.ok(descriptions.some((line) => line.startsWith('description: "Recommended because')))
+})

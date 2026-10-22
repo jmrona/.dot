@@ -46,14 +46,14 @@ When more than one skill could apply, you **MUST** invoke them in this order:
 
 Examples:
 
-- "Let's build X" -> `brainstorming` first (the router asks the user which mode); the user picks a mode; the mode skill produces a design; an implementation skill takes over.
+- "Let's build X" -> `brainstorming` first (the router asks the user which mode, except in a ticket run); the user picks a mode; the mode skill produces a design; an implementation skill takes over.
 - "Fix this bug" -> `debugging` first (reproduce, find root cause, get user approval on the fix approach); then `test-driven-development` for the regression test; then the fix; then `verification-before-completion`.
 - "Work on #42" -> `work-on-ticket` first. It recovers the context from the ticket and its parent epic and hands it to the `brainstorming` router.
 - "Is this done?" -> `verification-before-completion` first, nothing else until the gate has been run.
 
 Specific mandatory pairings:
 
-- **Before any code edit, no matter how small**: `brainstorming`. The router will enter plan mode and ask the user how to approach the design. The router includes a "Skip brainstorming" option for cases where structured brainstorming would be overkill, that option exists so the router can be a hard requirement without becoming a usability tax. You **MUST NOT** rationalise your way out of invoking the router by deciding the work is "obvious", "small", or "just an X". The user picks the mode; you do not pick on their behalf.
+- **Before any code edit, no matter how small**: `brainstorming`. The router will enter plan mode and ask the user how to approach the design. The router includes a "Skip brainstorming" option for cases where structured brainstorming would be overkill, that option exists so the router can be a hard requirement without becoming a usability tax. You **MUST NOT** rationalise your way out of invoking the router by deciding the work is "obvious", "small", or "just an X". The user picks the mode; you do not pick on their behalf. If the design input has `Source: work-on-ticket` and a `Mode:` line, the user already chose the mode in `work-on-ticket`, and the router does not ask again.
 - **Before writing implementation code for a feature or non-trivial change**: `test-driven-development`. This does not apply to one-line bug fixes (those go through `debugging` first), typo corrections, or edits to non-code files.
 - **Before any debugging or fix work**: `debugging`. The hard gate in `debugging.md` (reproduce + root cause) applies whether or not the skill is invoked, and the skill is the procedure that produces the evidence the rule requires.
 - **Before claiming work is complete**: `requesting-code-review` followed by `verification-before-completion`. In orchestrated work via `subagent-driven-development`, the per-task reviewer covers the per-task review and `subagent-driven-development` invokes `requesting-code-review` itself at the end of the feature against the cumulative diff, you do not invoke it again.

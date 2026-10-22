@@ -57,11 +57,11 @@ You **MUST** complete these steps in order. Do not skip a step and do not reorde
      header: "Scope"
      options:
        - label: "Scope OK, standard (Recommended)"
-         description: "Recommended because <reason from this request>. Interactive dialogue, then implementation."
+         description: "Recommended because <reason from this request>. The scope is correct. Interactive dialogue, then implementation."
        - label: "Scope OK, committee"
          description: "The scope is correct. Three AI agents deliberate and I review the final design."
        - label: "Scope OK, skip"
-         description: "The scope is correct and the design is clear. Capture a brief statement and proceed."
+         description: "The scope is correct. The design is clear, so capture a brief statement and proceed."
        - label: "Adjust scope"
          description: "Something needs changing or is missing. Say what is missing, for example more tickets or more codebase context."
      multiSelect: false
