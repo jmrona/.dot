@@ -49,32 +49,45 @@ You **MUST** complete these steps in order. Do not skip a step and do not reorde
      - What is explicitly out of scope (from sibling tickets, things that belong to other tickets)
    - **Current codebase state**: relevant observations from step 5
 
-7. **Get explicit user confirmation.** Use `question` to confirm scope. Plain-text confirmation is not sufficient.
+7. **Get explicit user confirmation and the mode.** Use one `question` to confirm the scope and to choose the design mode. Plain-text confirmation is not sufficient. Choose the mode you recommend by the rules in step 2 of `skills/brainstorming/SKILL.md`. Put the recommended mode first and append ` (Recommended)` to its label. Use ` (Recomendado)` when the user writes in Spanish. Begin its description with `Recommended because` and the specific reason from the request. The other options keep the descriptions below. The recommendation is advice, so you **MUST** wait for the user's choice.
 
    ```
    question:
-     question: "Does this scope look right for the design step?"
+     question: "Is this scope right, and how would you like to approach the design step?"
      header: "Scope"
      options:
-       - label: "Looks good, proceed"
-         description: "The scope, design context, and acceptance criteria are correct. Start the design step."
+       - label: "Scope OK, standard (Recommended)"
+         description: "Recommended because <reason from this request>. Interactive dialogue, then implementation."
+       - label: "Scope OK, committee"
+         description: "The scope is correct. Three AI agents deliberate and I review the final design."
+       - label: "Scope OK, skip"
+         description: "The scope is correct and the design is clear. Capture a brief statement and proceed."
        - label: "Adjust scope"
-         description: "Something needs changing before the design step begins."
-       - label: "Need more context"
-         description: "Fetch additional tickets or explore the codebase further before deciding."
+         description: "Something needs changing or is missing. Say what is missing, for example more tickets or more codebase context."
      multiSelect: false
    ```
 
-   If the user selects "Adjust scope" or "Need more context", address the feedback and re-present with `question` again. Only proceed to step 8 after "Looks good, proceed".
+   The example shows standard as recommended. Reorder and relabel the options to match your recommendation.
 
-8. **Hand off to the brainstorming router.** Use `skill` to invoke the `brainstorming` skill. The confirmed scope is the input to the design step, not an approved design. The router asks the user to pick standard, committee, or skip. The chosen mode skill hands off to implementation after the user approves the design. The ticket already exists. When the mode skill asks whether to create tickets or implement, mark implementation as the recommended option. You **MUST NOT** invoke `subagent-driven-development` directly from this skill.
+   If the user selects "Adjust scope", address the feedback, including any context the user says is missing, and ask again with `question`. Only proceed to step 8 after a "Scope OK" option.
+
+8. **Hand off to the brainstorming router.** Use `skill` to invoke the `brainstorming` skill. The confirmed scope and the chosen mode are the input to the design step, not an approved design. The router enters plan mode and hands off to the mode that the user chose, without asking again. The chosen mode skill implements directly after final approval, without a next-step question. The ticket already exists. You **MUST NOT** invoke `subagent-driven-development` directly from this skill.
 
    ```
    skill:
      skill: "brainstorming"
    ```
 
-   Before invoking, construct the design input by combining:
+   Before invoking, construct the design input. It begins with these four lines, where `Mode` is the mode that the user chose in step 7:
+
+   ```
+   Source: work-on-ticket
+   Ticket: <TICKET-KEY>
+   Scope: confirmed by the user
+   Mode: <standard | committee | skip>, chosen by the user
+   ```
+
+   The four lines are followed by:
 
    1. The design context recovered from the epic (the architectural vision)
    2. The ticket scope (what specifically this ticket delivers)

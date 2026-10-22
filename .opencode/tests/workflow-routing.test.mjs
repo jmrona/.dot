@@ -323,7 +323,7 @@ test('routes a picked-up ticket through the brainstorming router before implemen
   const workflow = read('rules/common/workflow.md')
 
   assert.ok(
-    workOnTicket.indexOf('label: "Looks good, proceed"') < workOnTicket.indexOf('skill: "brainstorming"'),
+    workOnTicket.indexOf('label: "Scope OK, standard') < workOnTicket.indexOf('skill: "brainstorming"'),
     'router runs only after the user confirms the scope',
   )
   assert.ok(
