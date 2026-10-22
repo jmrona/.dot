@@ -1,4 +1,3 @@
-/** @jsxImportSource @opentui/solid */
 import { hardLimitReplyOf } from './hard-limit-reply.ts'
 
 interface TuiContext {

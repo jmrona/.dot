@@ -62,3 +62,12 @@ test('non-string text gives undefined', () => {
 test('auto-compact reply text gives undefined', () => {
   assert.equal(hardLimitReplyOf(enqueued('Auto-compact threshold set to 80%.'), SESSION), undefined)
 })
+
+test('text with At most in the middle gives undefined', () => {
+  assert.equal(hardLimitReplyOf(enqueued('Retry: At most 3 openai/hard subagents'), SESSION), undefined)
+})
+
+test('reply about another model gives undefined', () => {
+  const text = 'At most 2 openai/easy subagents run at once.'
+  assert.equal(hardLimitReplyOf(enqueued(text), SESSION), undefined)
+})
