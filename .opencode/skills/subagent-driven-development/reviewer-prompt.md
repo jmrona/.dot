@@ -6,6 +6,8 @@ Use this template when dispatching a reviewer subagent on the full path.
 
 **Reviewer role:** Use `code-reviewer` on `openai/hard` for this independent implementation review. For design or architecture review use `architect-reviewer` on `openai/hard`. If the required role is unavailable, report `BLOCKED`; do not silently substitute.
 
+The parent dispatches each task's reviewer as soon as that implementer returns `DONE` or `DONE_WITH_CONCERNS`, without waiting for siblings.
+
 Native subagent call:
 
 ```text
@@ -13,7 +15,7 @@ subagent({
   agent: "code-reviewer",
   description: "Review Task N: [task name]",
   prompt: "[complete review prompt below]",
-  background: false
+  background: true
 })
 ```
 
@@ -23,6 +25,20 @@ Review prompt:
     You are reviewing an implementation for both spec compliance and code quality.
 
     You are read-only. Do not run shell commands, invoke review workflows, or launch nested reviewers. The parent supplies the implementation diff and verification evidence; inspect the relevant files and checklist directly. Return questions to the parent, never to the human.
+
+    ## What the Parent Supplies
+
+    - The task spec and the implementer's report.
+    - `git diff <wave-base> -- <writes>` for the task.
+    - The full content of new untracked files in `writes`.
+    - A diff against the base copy for paths that were already dirty at the wave base.
+    - The list of each sibling's `writes`.
+
+    In a non-git project, the parent supplies the `diff -ruN` against the task baseline instead.
+
+    ## Scope of Your Judgement
+
+    You judge only the task's paths. Siblings edit the same tree at the same time, so their files are in flux. Do not flag sibling files and do not rely on their content. Foundation interfaces are stable, and you can rely on them.
 
     ## What Was Requested
 

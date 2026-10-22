@@ -28,18 +28,18 @@ A generic fallback is permitted only when the user explicitly authorises that fa
 
 Use the native OpenCode V2 subagent interface. New calls carry `agent`, `description`, and `prompt`; `background` is optional. The `sessionID` field is optional: omit it for every new child, and set it only to the ID returned by a prior call when continuing that same child in the same role. Never pass the parent session ID. The configured role profile supplies the model. Include the complete task brief, relevant context, approvals, constraints, and verification evidence in `prompt`. Only include an optional model when the user explicitly requested an override. Do not use legacy task APIs or invent alternative dispatch fields.
 
-When decomposing work or preparing parallel dispatches, annotate each task in advance with its required agent role and alias, exact scope, and acceptance criteria. Select `stack-specialist` for bounded implementation by default, and `complex-worker` only when the task is genuinely difficult or explicitly escalated.
+When decomposing work or preparing parallel dispatches, annotate each task in advance with its required agent role and alias, exact scope, and acceptance criteria. Select `stack-specialist` for bounded implementation by default, and `complex-worker` only when the task is genuinely difficult or explicitly escalated. Within `subagent-driven-development`, a task whose difficulty is unsure goes to `complex-worker` on `openai/hard`.
 
 ## Questions and Process Discipline
 
-For dependent sequential work, use foreground calls (`background: false` or omit it) and wait for each result. Use `background: true` only for independent work; wait for completion notifications before synthesis or dependent work and do not poll. Children do not ask the human questions, seek approval, or launch nested agents or orchestration workflows. They return concise questions and evidence to the parent. The parent resolves missing context and asks the human one decision question at a time when approval is needed. A child must not make an approval decision on the parent's behalf.
+For dependent sequential work, use foreground calls (`background: false` or omit it) and wait for each result. Use `background: true` only for independent work. The tasks of one wave in `subagent-driven-development` are independent work, so dispatch them together with `background: true`. In `subagent-driven-development`, reviewers and a wave of one also use `background: true`. The fast-path reviewer stays in the foreground, because the fast path waits for it before its gate. Wait for completion notifications before synthesis or dependent work and do not poll. Children do not ask the human questions, seek approval, or launch nested agents or orchestration workflows. They return concise questions and evidence to the parent. The parent resolves missing context and asks the human one decision question at a time when approval is needed. A child must not make an approval decision on the parent's behalf.
 
 If a worker discovers the task is more difficult than expected, it stops and reports the evidence to the parent. The parent may provide missing context, narrow the scope, or dispatch the approved difficult work to `complex-worker` on `openai/hard`. Do not blindly retry the same task. The one exception is a rate-limit error, handled under "Rate-Limit Retries". A missing-context report is `NEEDS_CONTEXT`, not a model-escalation retry.
 
 When orchestrating subagents, you **MUST NOT**:
 
 - Skip reviews, whether combined or separate; every independent review uses its designated hard reviewer
-- Proceed to the next task while a review has unfixed issues
+- Close a task or start the next wave while a review has unfixed issues
 - Accept "close enough" on spec compliance. If the reviewer found issues, the task is not done.
 - Let the implementer's self-review replace the external review. Both are required.
 - Force a worker to retry without changing the context, approved scope, or plan, except after a rate-limit error as described under "Rate-Limit Retries"

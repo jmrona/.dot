@@ -142,7 +142,7 @@ test('preserves approved bounded implementation, TDD, review, and approval gates
   assert.match(development, /six-criterion complexity triage/i)
   assert.match(development, /bounded implementation[\s\S]*stack-specialist[\s\S]*openai\/easy/i)
   assert.match(development, /complex-worker[\s\S]*openai\/hard/i)
-  assert.match(development, /per-task pipeline/i)
+  assert.match(development, /per-wave pipeline/i)
   assert.match(development, /final feature-level review/i)
   assert.match(implementer, /approved task/i)
   assert.match(implementer, /must not (?:re-run|run).{0,40}(?:brainstorming|orchestrat)/i)
