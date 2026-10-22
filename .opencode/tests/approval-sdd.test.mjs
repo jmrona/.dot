@@ -23,19 +23,25 @@ const implementerPrompt = () => read('skills/subagent-driven-development/impleme
 const commitPreference = () => section(development(), '## Commit Preference')
 const featurePrune = () => section(development(), '## Feature Test Prune')
 
-test('commit preference compares the git dir with the git common dir', () => {
-  assert.match(commitPreference(), /git rev-parse --git-dir/, 'reads the git dir')
-  assert.match(commitPreference(), /git rev-parse --git-common-dir/, 'reads the common dir')
+test('commit preference compares the git dir with the git common dir in one command', () => {
+  assert.match(
+    commitPreference(),
+    /git rev-parse --path-format=absolute --git-dir --git-common-dir/,
+    'one command reads both dirs',
+  )
+  assert.match(commitPreference(), /git 2\.31 or later/, 'the minimum git version is named')
 })
 
-test('commit preference resolves both git dirs to absolute paths before comparing', () => {
-  assert.match(commitPreference(), /absolute paths/, 'relative output is resolved first')
+test('commit preference gets both git dirs as absolute paths without resolving them', () => {
+  assert.match(commitPreference(), /prints both absolute paths/, 'the command output is already absolute')
+  assert.doesNotMatch(commitPreference(), /Resolve both outputs/, 'no manual resolution step remains')
+  assert.doesNotMatch(commitPreference(), /`git rev-parse --git-dir`/, 'the two-command form is gone')
 })
 
 test('commit preference chooses auto-commit without asking in a linked worktree', () => {
   assert.match(
     commitPreference(),
-    /linked worktree[^.]*\. Choose "Auto-commit after each wave" without asking/i,
+    /paths differ[^.]*linked worktree\. Choose "Auto-commit after each wave" without asking/i,
     'a linked worktree skips the commit question',
   )
 })
@@ -45,11 +51,11 @@ test('commit preference announces the automatic choice in one line', () => {
 })
 
 test('commit preference still asks the commit question in the main worktree', () => {
-  assert.match(commitPreference(), /main worktree[^.]*\. Ask the user how commits should be handled/i)
+  assert.match(commitPreference(), /paths are equal[^.]*main worktree\. Ask the user how commits should be handled/i)
 })
 
 test('commit preference asks as in the main worktree when a worktree command fails', () => {
-  assert.match(commitPreference(), /fails or (its|gives) unexpected output[^.]*ask[^.]*main worktree/i)
+  assert.match(commitPreference(), /command fails[^.]*ask[^.]*main worktree/i)
 })
 
 test('process overview no longer says the commit preference is always asked', () => {
@@ -65,7 +71,9 @@ test('development skill records the prune base at session start as test-driven-d
 
 test('development skill uses the feature baseline as the prune base in the no-git flow', () => {
   assert.match(commitPreference(), /FEATURE_BASELINE_DIR/)
-  assert.match(commitPreference(), /diff -ruN "\$FEATURE_BASELINE_DIR" "\$WORKING_DIR"/)
+  assert.match(commitPreference(), /diff -rqN "\$FEATURE_BASELINE_DIR" "\$WORKING_DIR"/)
+  assert.match(commitPreference(), /every path named in the lines that `diff -rqN/)
+  assert.doesNotMatch(commitPreference(), /diff -ruN/, 'the touched list needs names, not content')
 })
 
 test('feature test prune section sits before the final feature-level review', () => {
@@ -99,16 +107,23 @@ test('feature test prune restores the removed tests when the re-run fails', () =
 })
 
 test('feature test prune asks nothing when the audit has no removal', () => {
-  assert.match(featurePrune(), /no REMOVE, nothing changes and nothing is asked/)
+  assert.match(featurePrune(), /no REMOVE[^.]*nothing is asked/)
 })
 
 test('feature test prune is skipped and reported when no test file was touched', () => {
   assert.match(featurePrune(), /no touched test file[^.]*skip the prune[^.]*completion report/i)
+  assert.match(featurePrune(), /`diff -rqN` reports no test file/)
+  assert.doesNotMatch(featurePrune(), /diff -ruN/)
 })
 
 test('final review captures the feature range only after the prune is resolved', () => {
   const finalReview = section(development(), '## Final Feature-Level Review')
   assert.match(finalReview, /1\. \*\*Identify the feature range\.\*\*[^\n]*after the feature test prune is resolved/)
+})
+
+test('final review range includes prune removals left uncommitted because the user declined the extra commit', () => {
+  const finalReview = section(development(), '## Final Feature-Level Review')
+  assert.match(finalReview, /1\. \*\*Identify the feature range\.\*\*[^\n]*prune removals[^\n]*uncommitted[^\n]*declined/)
 })
 
 test('fast path relies on a settled commit preference', () => {
@@ -130,6 +145,14 @@ test('fast path runs the feature test prune after its user checkpoint', () => {
   const checkpointIndex = text.indexOf('### 4. User Checkpoint')
   const pruneIndex = text.indexOf('### 5. Feature Test Prune')
   assert.ok(pruneIndex > checkpointIndex, 'the prune follows the checkpoint')
+})
+
+test('fast path explains why no review follows the prune', () => {
+  const prune = section(fastPath(), '### 5. Feature Test Prune')
+  assert.match(prune, /no review follows the prune/i)
+  assert.match(prune, /auditor on `openai\/hard`/)
+  assert.match(prune, /user's approval/)
+  assert.match(prune, /re-run of the tests and the linter/)
 })
 
 test('implementer prompt says the implementer does not run the test prune', () => {
