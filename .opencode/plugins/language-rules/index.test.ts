@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, type TestContext } from 'node:test'
 
-import { createLanguageRules, type ContextEvent, type LanguageRulesApi } from './index.ts'
+import {
+  createLanguageRules,
+  type ContextEvent,
+  type LanguageRulesApi,
+  type SessionEvent,
+} from './index.ts'
 
 async function createRulesDirectory(t: TestContext): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'language-rules-'))
@@ -25,7 +30,38 @@ async function writeLanguage(
   await writeFile(join(root, language, 'coding-style.md'), `---\nglobs: ${globs.join(', ')}\n---\n${body}`)
 }
 
-async function registerPlugin(root: string): Promise<(event: ContextEvent) => Promise<void>> {
+interface ControlledStream {
+  readonly events: AsyncIterable<SessionEvent>
+  emit(event: SessionEvent): void
+}
+
+function createControlledStream(): ControlledStream {
+  const queue: SessionEvent[] = []
+  let wake: (() => void) | undefined
+  async function* events(): AsyncGenerator<SessionEvent> {
+    while (true) {
+      const next = queue.shift()
+      if (next) yield next
+      else await new Promise<void>((resolve) => (wake = resolve))
+    }
+  }
+  return {
+    events: events(),
+    emit(event) {
+      queue.push(event)
+      wake?.()
+    },
+  }
+}
+
+async function settle(): Promise<void> {
+  await new Promise((resolve) => setImmediate(resolve))
+}
+
+async function registerPlugin(
+  root: string,
+  events: AsyncIterable<SessionEvent> = createControlledStream().events,
+): Promise<(event: ContextEvent) => Promise<void>> {
   let handler: ((event: ContextEvent) => Promise<void>) | undefined
   const api: LanguageRulesApi = {
     session: {
@@ -34,6 +70,7 @@ async function registerPlugin(root: string): Promise<(event: ContextEvent) => Pr
         handler = registered
       },
     },
+    event: { subscribe: () => events },
   }
   await createLanguageRules(root).setup(api)
   assert.ok(handler)
@@ -41,8 +78,15 @@ async function registerPlugin(root: string): Promise<(event: ContextEvent) => Pr
 }
 
 function eventWithCalls(...calls: Array<{ name: string; input: unknown }>): ContextEvent {
+  return eventForSession('s1', ...calls)
+}
+
+function eventForSession(
+  sessionID: string,
+  ...calls: Array<{ name: string; input: unknown }>
+): ContextEvent {
   return {
-    sessionID: 's1',
+    sessionID,
     system: [],
     messages: [
       {
@@ -118,4 +162,76 @@ test('injects nothing when the rules directory cannot be read', async () => {
   await handler(event)
 
   assert.deepEqual(systemTexts(event), [])
+})
+
+test('injects the rules of a language seen earlier when the messages hold no tool calls', async (t) => {
+  const handler = await registerPlugin(await createRulesDirectory(t))
+  await handler(eventForSession('s1', { name: 'read', input: { path: '/repo/main.go' } }))
+  const afterCompaction = eventForSession('s1')
+
+  await handler(afterCompaction)
+
+  assert.match(systemTexts(afterCompaction)[0] ?? '', /GO RULES/)
+})
+
+test('keeps the rules of a language seen earlier alongside newly matched languages', async (t) => {
+  const handler = await registerPlugin(await createRulesDirectory(t))
+  await handler(eventForSession('s1', { name: 'read', input: { path: '/repo/main.go' } }))
+  const later = eventForSession('s1', { name: 'read', input: { path: '/repo/a.php' } })
+
+  await handler(later)
+
+  assert.match(systemTexts(later)[0] ?? '', /GO RULES/)
+  assert.match(systemTexts(later)[1] ?? '', /PHP RULES/)
+})
+
+test('withholds the rules of a language that only another session has seen', async (t) => {
+  const handler = await registerPlugin(await createRulesDirectory(t))
+  await handler(eventForSession('s1', { name: 'read', input: { path: '/repo/main.go' } }))
+  const other = eventForSession('s2')
+
+  await handler(other)
+
+  assert.deepEqual(systemTexts(other), [])
+})
+
+test('forgets the languages of a session once it is deleted', async (t) => {
+  const stream = createControlledStream()
+  const handler = await registerPlugin(await createRulesDirectory(t), stream.events)
+  await handler(eventForSession('s1', { name: 'read', input: { path: '/repo/main.go' } }))
+
+  stream.emit({ type: 'session.deleted', data: { sessionID: 's1' } })
+  await settle()
+  const afterDeletion = eventForSession('s1')
+  await handler(afterDeletion)
+
+  assert.deepEqual(systemTexts(afterDeletion), [])
+})
+
+test('keeps the languages of a session when another session is deleted', async (t) => {
+  const stream = createControlledStream()
+  const handler = await registerPlugin(await createRulesDirectory(t), stream.events)
+  await handler(eventForSession('s1', { name: 'read', input: { path: '/repo/main.go' } }))
+
+  stream.emit({ type: 'session.deleted', data: { sessionID: 's2' } })
+  await settle()
+  const afterOtherDeletion = eventForSession('s1')
+  await handler(afterOtherDeletion)
+
+  assert.match(systemTexts(afterOtherDeletion)[0] ?? '', /GO RULES/)
+})
+
+test('still injects rules when subscribing to events throws', async (t) => {
+  const throwingEvents: AsyncIterable<SessionEvent> = {
+    [Symbol.asyncIterator]() {
+      throw new Error('stream unavailable')
+    },
+  }
+  const handler = await registerPlugin(await createRulesDirectory(t), throwingEvents)
+  const event = eventForSession('s1', { name: 'read', input: { path: '/repo/main.go' } })
+
+  await handler(event)
+  await settle()
+
+  assert.match(systemTexts(event)[0] ?? '', /GO RULES/)
 })
