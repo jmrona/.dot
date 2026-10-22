@@ -73,6 +73,7 @@ test('development skill uses the feature baseline as the prune base in the no-gi
   assert.match(commitPreference(), /FEATURE_BASELINE_DIR/)
   assert.match(commitPreference(), /diff -rqN "\$FEATURE_BASELINE_DIR" "\$WORKING_DIR"/)
   assert.match(commitPreference(), /every path named in the lines that `diff -rqN/)
+  assert.match(commitPreference(), /`\$WORKING_DIR` path of each line\. Leave out files that exist only in `\$FEATURE_BASELINE_DIR`/)
   assert.doesNotMatch(commitPreference(), /diff -ruN/, 'the touched list needs names, not content')
 })
 

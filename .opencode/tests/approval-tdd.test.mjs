@@ -24,7 +24,7 @@ test('test-driven-development skill makes the orchestrator run the prune once fo
 
   assert.match(repeat, /`subagent-driven-development`/)
   assert.match(repeat, /`fast-path-implementation`/)
-  assert.match(repeat, /orchestrator runs the PRUNE once for the whole feature/)
+  assert.match(repeat, /orchestrator runs the PRUNE once for the whole feature, before the final review/)
 })
 
 test('test-driven-development skill tells an implementer subagent not to run the prune', () => {
@@ -44,6 +44,7 @@ test('test-driven-development prune uses the feature baseline diff instead of as
 
   assert.match(procedure, /diff -rqN "\$FEATURE_BASELINE_DIR" "\$WORKING_DIR"/)
   assert.match(procedure, /every path named in the lines that `diff -rqN/)
+  assert.match(procedure, /`\$WORKING_DIR` path of each line\. Leave out files that exist only in `\$FEATURE_BASELINE_DIR`/)
   assert.doesNotMatch(procedure, /diff -ruN/)
   assert.match(procedure, /instead of asking/)
 })
@@ -63,7 +64,7 @@ test('test-driven-development first-RED recording names the orchestration except
 test('test-driven-development completion gate leaves the prune box to the orchestrator in an orchestration', () => {
   const gate = tdd.slice(tdd.indexOf('The prune ran, and its audit'))
 
-  assert.match(gate, /orchestrator checks this box/)
+  assert.match(gate, /`fast-path-implementation`[^.]*orchestrator checks this box/)
   assert.match(gate, /implementer leaves it to the orchestrator/)
 })
 

@@ -44,7 +44,7 @@ If the two paths are equal, the session is in the main worktree. Ask the user ho
 
 Ask this once. The choice applies to every wave in the session, including any fast-path handoff. If the user chose auto-commit, the checkpoint still shows a summary of the changes. It skips the commit question unless a stopped task leaves the checks red.
 
-Alongside the commit preference, record the prune base for the feature test prune. Record it exactly as "Before the First RED" in `../test-driven-development/SKILL.md` defines it. In the no-git flow, the base is `FEATURE_BASELINE_DIR`. The touched-file list is then every path named in the lines that `diff -rqN "$FEATURE_BASELINE_DIR" "$WORKING_DIR"` prints. It prints one line per differing file.
+Alongside the commit preference, record the prune base for the feature test prune. Record it exactly as "Before the First RED" in `../test-driven-development/SKILL.md` defines it. In the no-git flow, the base is `FEATURE_BASELINE_DIR`. The touched-file list is then every path named in the lines that `diff -rqN "$FEATURE_BASELINE_DIR" "$WORKING_DIR"` prints. Each line names two paths. Take the `$WORKING_DIR` path of each line. Leave out files that exist only in `$FEATURE_BASELINE_DIR`, because they are deleted.
 
 ## Triage and Path Selection
 
