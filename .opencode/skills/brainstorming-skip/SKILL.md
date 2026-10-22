@@ -51,7 +51,7 @@ For the rule that no implementation may begin until the user has approved a desi
      multiSelect: false
    ```
 
-6. **Hand off via `skill`.** Invoke `subagent-driven-development` or `create-tickets` per the user's choice. If the user picks implementation, invoke `subagent-driven-development` now, even if Plan mode is still active. The mode-switch plugin moves the session to Build before the skill loads. Do not ask the user to switch agents unless the plugin reports that the switch failed. **MUST NOT** invoke any other skill from here.
+6. **Hand off via `skill`.** Invoke `subagent-driven-development` or `create-tickets` as step 5 decides. If the handoff is implementation, invoke `subagent-driven-development` now, even if Plan mode is still active. The mode-switch plugin moves the session to Build before the skill loads. Do not ask the user to switch agents unless the plugin reports that the switch failed. **MUST NOT** invoke any other skill from here.
 
 ## What Skip Mode Does Not Do
 
@@ -120,7 +120,7 @@ You **MUST NOT** invoke `create-tickets` or `subagent-driven-development` until 
 
 - The user provided a brief design statement
 - You presented it via `exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)` and the user approved
-- The user picked an implementation next step via `question`
+- Without a `Source: work-on-ticket` line, the user picked an implementation next step via `question`
 
 If any one of these is false, the gate has not been crossed, and you **MUST NOT** hand off.
 

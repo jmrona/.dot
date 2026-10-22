@@ -120,3 +120,38 @@ test('standard worked example shows the multiSelect section step instead of per-
   assert.match(example, /\*\*Sections\.\*\*[^\n]*one `multiSelect` question/)
   assert.match(example, /asks again about data flow only/)
 })
+
+test('skip completion gate requires the next-step question only without a ticket run', () => {
+  const gate = read('skills/brainstorming-skip/SKILL.md').match(/## Completion Gate([\s\S]*?)(?=\n## )/)?.[1] ?? ''
+  const bullet = gate.split('\n').find((line) => /implementation next step/.test(line)) ?? ''
+
+  assert.match(bullet, /Source: work-on-ticket/)
+  assert.match(bullet, /^- Without a `Source: work-on-ticket` line/)
+})
+
+test('skip hand-off follows step 5 instead of an unconditional user choice', () => {
+  const step = stepBody(read('skills/brainstorming-skip/SKILL.md'), 'Hand off via `skill`')
+
+  assert.match(step, /step 5/)
+  assert.doesNotMatch(step, /per the user's choice/)
+  assert.doesNotMatch(step, /If the user picks implementation/)
+})
+
+test('no mode skill saves the plan with wording that presupposes a question', () => {
+  for (const path of modeSkills) {
+    assert.doesNotMatch(read(path), /Before you ask, save/, path)
+  }
+})
+
+test('mode skills do not join the downstream skill clauses with a semicolon', () => {
+  for (const path of modeSkills) {
+    assert.doesNotMatch(read(path), /`subagent-driven-development`; invoke whichever/, path)
+  }
+})
+
+test('standard worked example splits the no-ticket next step into two sentences', () => {
+  const line = read(standardPath).match(/\*\*Next step \(no `Source: work-on-ticket`\)\.\*\*[^\n]*/)?.[0] ?? ''
+
+  assert.ok(line.length > 0)
+  assert.doesNotMatch(line, /;/)
+})
