@@ -4,7 +4,11 @@ Use this template when dispatching an implementer subagent.
 
 **Subagent type selection:** Replace `[SPECIALISED_SUBAGENT_TYPE]` with the most specific implementer type available for the task per `../_shared/subagent-dispatch.md`. For example, a type named for the task's language or framework. Use `general-purpose` only when no specialised type fits. The recommended type for each task should already be in the task entry the orchestrator created during decomposition.
 
-**Model selection:** Pick one concrete model. Start at the Low-cost default tier and escalate only on evidence to Standard escalation, resolving each per `../_shared/subagent-dispatch.md`.
+**Model selection:** Pick one concrete model, resolving each tier per `../_shared/subagent-dispatch.md`. Use the Low-cost default tier for bounded work. Use the Standard escalation tier for difficult work. Within `subagent-driven-development`, if the difficulty of a task is unsure, use the Standard escalation tier. A wave lasts as long as its slowest task. Reach the High-capability tier only by escalation on evidence.
+
+If a task is harder than expected, the implementer stops with `BLOCKED` and states the reasoning-capacity cause. The orchestrator then dispatches a new `Agent` one tier up in the same wave. The new agent's brief states that the partial edits in the task's `writes` are still in the tree. `SendMessage` cannot raise the tier, because it continues an agent on its own model.
+
+**Background dispatch:** Dispatch the `Agent` in the background. The orchestrator dispatches every implementer of a wave in one message, and a wave of one follows the same rule.
 
 ```
 Agent ([SPECIALISED_SUBAGENT_TYPE]):
@@ -15,6 +19,8 @@ Agent ([SPECIALISED_SUBAGENT_TYPE]):
     ## Task Description
 
     [FULL TEXT of task from plan - paste it here, don't make subagent read file]
+
+    [WRITES: exact paths]
 
     ## Context
 
@@ -44,6 +50,21 @@ Agent ([SPECIALISED_SUBAGENT_TYPE]):
 
     Work from: [directory]
 
+    ## Writes Boundary
+
+    The orchestrator gives you a `writes` list of exact paths. Siblings edit the same working tree at the same time.
+
+    - You MUST edit, create and delete only paths in your `writes`.
+    - If you need another path, stop and report `NEEDS_CONTEXT`. Name the path.
+    - If you find a duplicate to extract outside your `writes`, report `DONE_WITH_CONCERNS` and name it. The orchestrator schedules an extraction task in a later wave.
+    - During a wave, the PHP extraction rule in `rules/php/coding-style.md` is deferred to that scheduled task.
+
+    ## Allowed Checks
+
+    Run only commands that take file paths, and only on your `writes`. Examples are your own test files, `pint <paths>`, `biome check <paths>`, `gofmt -l <paths>` and `rustfmt --check <paths>`. You can also run the tests of one Go package or one Rust crate that the task owns, and nothing wider. Examples are `go test <package>` and `cargo test -p <crate>`.
+
+    You MUST NOT run whole-project checks: PHPStan, `tsc`, project-wide Biome, full suites, cargo workspace builds or clippy, and `just <pillar> check|test`. The orchestrator runs those at the wave gate.
+
     **While you work:** If you encounter something unexpected or unclear, **ask questions**.
     It is always OK to pause and clarify. Don't guess or make assumptions.
 
@@ -69,8 +90,10 @@ Agent ([SPECIALISED_SUBAGENT_TYPE]):
     3. **GREEN**: write the simplest code that makes the test pass. No options, no error paths
        the test doesn't cover, no "while I am here" improvements, no future-proofing. Only what
        the test requires.
-    4. **Verify GREEN**: run the test and confirm it passes, AND that all other tests still pass.
-       Output must be pristine: no warnings, no stray errors, no unintended skips.
+    4. **Verify GREEN**: run the test and confirm that the new test passes, every test file in `writes` passes,
+       and the allowed checks exit 0. Output must be pristine: no warnings, no stray errors,
+       no unintended skips. Siblings edit the same tree, so you do not prove the whole suite.
+       The orchestrator proves the whole suite at the wave gate.
     5. **REFACTOR** (optional, only while green): clean up duplication, improve names, extract
        helpers. Keep every test green throughout. Do not add new behaviour during refactor.
     6. **Repeat** for the next behaviour.
@@ -108,14 +131,14 @@ Agent ([SPECIALISED_SUBAGENT_TYPE]):
 
     In your final report, for each new behaviour you implemented, include the test name, the
     observed RED failure (test name + first line of failure output), and the observed GREEN
-    pass (test name + N/N passed). The orchestrator will check this in the verification gate.
+    pass (test name + N/N passed). The orchestrator will check this in the wave gate.
     "All tests pass" without per-test RED to GREEN evidence is not sufficient.
 
     ### Exceptions
 
     The Iron Law applies to all new behaviour. The narrow exceptions are:
 
-    - Pure refactors that change no observable behaviour (existing tests must stay green)
+    - Pure refactors that change no observable behaviour (the existing test files in `writes` must stay green)
     - Instruction files (rules, skills, prompts, documentation) and non-executable configuration. Write a check first, for example a grep or a diff, that fails before the edit and passes after it. Report both outputs as the RED and GREEN evidence. Executable scripts and hooks are code.
     - Generated code and throwaway prototypes, only when the task says so explicitly.
 
@@ -159,8 +182,12 @@ Agent ([SPECIALISED_SUBAGENT_TYPE]):
 
     **How to escalate:** Report back with status BLOCKED or NEEDS_CONTEXT. Describe
     specifically what you're stuck on, what you've tried, and what kind of help you need.
-    The controller can provide more context, re-dispatch with a more capable model,
+    The orchestrator can provide more context, dispatch a new `Agent` one tier up,
     or break the task into smaller pieces.
+
+    If the task is harder than expected, report `BLOCKED` and state the reasoning-capacity cause with evidence.
+
+    **A sibling breaks your check:** If a command fails on a file outside your `writes`, report `BLOCKED_BY_SIBLING`. Name the command and quote the error line that names a file. State that the file is outside the task's `writes`. Finish what you can, report partial RED and GREEN evidence, and stop. `BLOCKED_BY_SIBLING` is not an escalation.
 
     ## Before Reporting Back: Self-Review
 
@@ -187,7 +214,7 @@ Agent ([SPECIALISED_SUBAGENT_TYPE]):
     - Did I write minimal code to pass each test, with no extras?
     - Do my tests exercise real code, not mocks of the code under test?
     - Are mocks used only at true boundaries (network, filesystem, clocks, randomness)?
-    - Do all tests pass now? Is the output pristine?
+    - Does every test file in `writes` pass now? Is the output pristine?
     - Can I report the RED to GREEN sequence for each new behaviour?
 
     If I cannot answer YES to all of these, I broke the Iron Law and **MUST** delete the
@@ -198,19 +225,20 @@ Agent ([SPECIALISED_SUBAGENT_TYPE]):
     ## Report Format
 
     When done, report:
-    - **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+    - **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | BLOCKED_BY_SIBLING | NEEDS_CONTEXT
     - What you implemented (or what you attempted, if blocked)
     - **TDD evidence**: for each new behaviour, the test name, the observed RED failure (test name plus first line of failure output), and the observed GREEN pass (test name plus N/N passed)
     - Final test run: command, exit code, total pass/fail counts
+    - **Environment failures**: for each command that timed out, the command, its time limit and the elapsed time. A timeout is never RED or GREEN evidence. Retry it once.
     - Files changed
     - Self-review findings (if any)
     - Any issues or concerns
 
     Use DONE_WITH_CONCERNS if you completed the work but have doubts about correctness.
-    Use BLOCKED if you cannot complete the task. Use NEEDS_CONTEXT if you need
+    Use BLOCKED if you cannot complete the task. Use BLOCKED_BY_SIBLING if a sibling's file breaks your check. Use NEEDS_CONTEXT if you need
     information that wasn't provided. Never silently produce work you're unsure about.
 
-    Reports without TDD RED to GREEN evidence will be rejected at the verification gate
+    Reports without TDD RED to GREEN evidence will be rejected at the wave gate
     and re-dispatched. If you broke the Iron Law and want to be honest about it, report
     DONE_WITH_CONCERNS and describe what happened, that is recoverable. Hiding it is not.
 ```

@@ -40,7 +40,7 @@ Agent ([REVIEWER_SUBAGENT_TYPE]):
 
     If the actual changes are more complex than the triage suggested, stop here.
     Report TRIAGE_INVALID with a specific explanation of which criterion was wrong
-    and why. The controller will switch to the full path.
+    and why. The orchestrator will switch to the full path.
 
     ## THEN: Review Both Dimensions
 

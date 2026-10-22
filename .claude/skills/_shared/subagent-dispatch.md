@@ -47,6 +47,10 @@ Naming a tier is not the same as producing a value the harness will accept. Befo
 
 Start at the Low-cost default tier. Escalate exactly one tier at a time, and only on evidence: a failed attempt at the current tier, or a stated complexity signal from the task (multi-file integration, design judgement, broad codebase understanding). You **MUST NOT** pre-escalate on the assumption that a task might be hard. One failed inexpensive attempt costs less than always paying for the expensive model.
 
+Within `subagent-driven-development`, a task whose difficulty is unsure starts at the Standard escalation tier, as a scoped exception to that ban. The reason is that a wave lasts as long as its slowest task, so one failed inexpensive attempt costs a whole wave round. The High-capability tier is still reached only by escalation on evidence.
+
+If an implementer returns `BLOCKED` with a reasoning-capacity cause, dispatch a new `Agent` one tier up in the same wave. `SendMessage` continues an agent on its own model. The new agent's brief states that the partial edits in its `writes` are still in the tree.
+
 Some tasks are complexity signals: copying, moving, backing up or restructuring files across more than one directory. Rewriting an existing file whose full contents the subagent was not given is another. Start those tasks at the Standard escalation tier. A subagent can need one rework for a structural error, such as a flattened layout, a whole-file overwrite after a failed edit or lost numbering. In that case, escalate one tier for the retry. Do not dispatch the same tier again.
 
 ### Rationalisation Prevention
@@ -58,7 +62,11 @@ Every thought below means **stop and re-run the resolution procedure**:
 | "I know the naming pattern, I can write the identifier" | Recognising the shape of an identifier is not confirming it exists. Constructing an identifier from a pattern is inventing it; enumerate the environment instead. |
 | "This was valid last month"                             | Catalogues change. Re-verify against the current environment before every dispatch, not from memory.                                                              |
 | "The table lists it, so it exists"                      | The tier table is a worked example, not an availability guarantee. Confirm the value against the enumerated list.                                                 |
-| "I will use the session model to be safe"               | That is pre-escalation. Sort by cost first and start at the cheapest tier.                                                                                        |
+| "I will use the session model to be safe"               | That is pre-escalation. Start at the cheapest tier, except for the unsure-task exception in `### Escalation Triggers`.                                            |
+
+## Waves and Foreground
+
+The tasks of one wave in `subagent-driven-development` are independent work, so dispatch every implementer of a wave together in the background. Dispatch each reviewer in the background as its implementer returns. The implementer of a wave of one, including the fast-path implementer, also runs in the background. The fast-path reviewer is the one exception and runs in the foreground, because the fast path waits for it before its gate. Wait for completion notifications before synthesis or dependent work and do not poll.
 
 ## Answering Subagent Questions
 
@@ -69,7 +77,7 @@ When a subagent asks a question before or during its task, you **MUST** answer i
 When orchestrating subagents, you **MUST NOT**:
 
 - Skip reviews, whether combined or separate
-- Proceed to the next task while a review has unfixed issues
+- Close a task or start the next wave while a review has unfixed issues
 - Accept "close enough" on spec compliance. If the reviewer found issues, the task is not done.
 - Let the implementer's self-review replace the external review. Both are required.
 - Force the same model to retry a failed task without changing anything (more context, different model, smaller scope, or escalation to the human)
