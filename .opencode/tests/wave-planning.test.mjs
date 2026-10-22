@@ -52,6 +52,14 @@ test('fast-path skill refers to the wave gate', () => {
   assert.match(fastPath(), /wave gate/i, 'the verification gate points to the wave gate')
 })
 
+test('fast-path skill names its gate step Wave Gate', () => {
+  assert.match(fastPath(), /^### 3\. Wave Gate$/m, 'the gate step is headed Wave Gate')
+})
+
+test('fast-path skill no longer says verification gate', () => {
+  assert.doesNotMatch(fastPath(), /verification gate/i, 'the verification gate wording is gone')
+})
+
 test('fast-path skill treats BLOCKED_BY_SIBLING as BLOCKED', () => {
   assert.match(
     fastPath(),

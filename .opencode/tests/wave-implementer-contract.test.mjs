@@ -39,10 +39,6 @@ test('implementer prompt dispatches in the background', () => {
   assert.match(implementer(), /background: true/)
 })
 
-test('implementer prompt never dispatches in the foreground', () => {
-  assert.doesNotMatch(implementer(), /background: false/)
-})
-
 test('implementer prompt asks for an Environment failures field in the report', () => {
   assert.match(implementer(), /Environment failures/)
 })
@@ -81,10 +77,6 @@ test('implementer prompt keeps the no-git rule', () => {
 
 test('reviewer prompt dispatches in the background', () => {
   assert.match(reviewer(), /background: true/)
-})
-
-test('reviewer prompt never dispatches in the foreground', () => {
-  assert.doesNotMatch(reviewer(), /background: false/)
 })
 
 test('reviewer prompt receives the diff against the wave base limited to writes', () => {

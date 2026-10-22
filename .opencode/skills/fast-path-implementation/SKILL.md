@@ -33,9 +33,9 @@ The reviewer returns one of three outcomes:
 - **FAIL**: continue the same implementer through `sessionID` with the review issues as fix instructions, then re-review. Repeat until PASS.
 - **TRIAGE_INVALID**: the reviewer judges the work is more complex than the triage concluded. Stop the fast path, reclassify as COMPLEX, and hand back to `subagent-driven-development` for re-decomposition.
 
-### 3. Verification Gate
+### 3. Wave Gate
 
-After the reviewer approves and **before** the user checkpoint, run the verification gate against the implementer's work yourself. This is the wave gate of `../subagent-driven-development/SKILL.md`, because fast-path work is a wave of one task, and it is required by `../../rules/common/verification.md`. Even on the fast path, "the reviewer said it was fine" is not a substitute for running the verification yourself.
+After the reviewer approves and **before** the user checkpoint, run the wave gate against the implementer's work yourself. This is the wave gate of `../subagent-driven-development/SKILL.md`, because fast-path work is a wave of one task, and it is required by `../../rules/common/verification.md`. Even on the fast path, "the reviewer said it was fine" is not a substitute for running the verification yourself.
 
 A wave of one treats `BLOCKED_BY_SIBLING` as `BLOCKED`.
 
@@ -69,8 +69,8 @@ digraph fast_path {
     "Reviewer result?" [shape=diamond];
     "Implementer fixes issues" [shape=box];
     "Hand back to subagent-driven-development\n(re-decompose)" [shape=box];
-    "Verification gate (orchestrator):\ngit diff + re-run verification\n(../../rules/common/verification.md)" [shape=box, style=bold];
-    "Verification passes?" [shape=diamond];
+    "Wave gate (orchestrator):\ngit diff + re-run verification\n(../../rules/common/verification.md)" [shape=box, style=bold];
+    "Wave gate passes?" [shape=diamond];
     "User checkpoint:\npresent changes + verification evidence,\ncommit or ask" [shape=box, style=bold];
 
     "Triage: SIMPLE" -> "Dispatch bounded implementer\n(stack-specialist / openai/easy)";
@@ -80,13 +80,13 @@ digraph fast_path {
     "Implementer asks questions?" -> "Implementer implements, tests, self-reviews" [label="no"];
     "Implementer implements, tests, self-reviews" -> "Dispatch hard combined reviewer\n(code-reviewer / openai/hard, ./fast-path-reviewer-prompt.md)";
     "Dispatch hard combined reviewer\n(code-reviewer / openai/hard, ./fast-path-reviewer-prompt.md)" -> "Reviewer result?";
-    "Reviewer result?" -> "Verification gate (orchestrator):\ngit diff + re-run verification\n(../../rules/common/verification.md)" [label="PASS"];
+    "Reviewer result?" -> "Wave gate (orchestrator):\ngit diff + re-run verification\n(../../rules/common/verification.md)" [label="PASS"];
     "Reviewer result?" -> "Implementer fixes issues" [label="FAIL"];
     "Reviewer result?" -> "Hand back to subagent-driven-development\n(re-decompose)" [label="TRIAGE_INVALID"];
     "Implementer fixes issues" -> "Dispatch hard combined reviewer\n(code-reviewer / openai/hard, ./fast-path-reviewer-prompt.md)" [label="re-review"];
-    "Verification gate (orchestrator):\ngit diff + re-run verification\n(../../rules/common/verification.md)" -> "Verification passes?";
-    "Verification passes?" -> "Implementer fixes issues" [label="no"];
-    "Verification passes?" -> "User checkpoint:\npresent changes + verification evidence,\ncommit or ask" [label="yes"];
+    "Wave gate (orchestrator):\ngit diff + re-run verification\n(../../rules/common/verification.md)" -> "Wave gate passes?";
+    "Wave gate passes?" -> "Implementer fixes issues" [label="no"];
+    "Wave gate passes?" -> "User checkpoint:\npresent changes + verification evidence,\ncommit or ask" [label="yes"];
 }
 ```
 
@@ -111,7 +111,7 @@ Implementer:
 Combined reviewer: [PASS] All 8 files correctly updated. Changes match spec exactly,
 no extra modifications, consistent with surrounding code style.
 
-[Verification gate: orchestrator runs git diff + standard verification itself]
+[Wave gate: orchestrator runs git diff + standard verification itself]
 $ git diff --stat
  8 files changed, 8 insertions(+), 8 deletions(-)
 $ npm test
@@ -119,7 +119,7 @@ PASS (78 tests, 78 passed)
 $ npm run lint
 exit 0
 
-[Verification PASSES]
+[Wave gate PASSES]
 
 [Present diff + verification evidence to user]
 Here are the changes: 8 files with updated copyright headers.
