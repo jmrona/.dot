@@ -15,7 +15,7 @@ You **MUST NOT** enter this skill without a SIMPLE classification from `complexi
 
 If `git rev-parse --is-inside-work-tree` fails, the working directory is not a git repository. In that case you **MUST** follow `../_shared/no-git-flow.md` in place of every git step in this skill.
 
-The caller of this skill is responsible for having asked the commit preference question before arriving here.
+The caller of this skill is responsible for having settled the commit preference before arriving here.
 
 ## Process
 
@@ -54,6 +54,10 @@ Present the changes to the user:
 3. Show a `git diff` of the uncommitted changes
 4. Follow the `## User Checkpoint` section of `../subagent-driven-development/SKILL.md` unchanged for the commit question and the path-limited commit rules. This wave of one uses the same options: "Commit all tasks", "Adjust first" and "Skip commit".
 
+### 5. Feature Test Prune
+
+After the user checkpoint, run the `## Feature Test Prune` section of `../subagent-driven-development/SKILL.md` once, with the prune base that the caller recorded. Its removal handling, extra commit and restore on failure apply unchanged. Then report completion.
+
 ## Process Flow
 
 ```dot
@@ -72,6 +76,8 @@ digraph fast_path {
     "Wave gate (orchestrator):\ngit diff + re-run verification\n(../../rules/common/verification.md)" [shape=box, style=bold];
     "Wave gate passes?" [shape=diamond];
     "User checkpoint:\npresent changes + verification evidence,\ncommit or ask" [shape=box, style=bold];
+    "Feature test prune\n(../subagent-driven-development/SKILL.md)" [shape=box];
+    "Report completion" [shape=doublecircle];
 
     "Triage: SIMPLE" -> "Dispatch bounded implementer\n(stack-specialist / openai/easy)";
     "Dispatch bounded implementer\n(stack-specialist / openai/easy)" -> "Implementer asks questions?";
@@ -87,6 +93,8 @@ digraph fast_path {
     "Wave gate (orchestrator):\ngit diff + re-run verification\n(../../rules/common/verification.md)" -> "Wave gate passes?";
     "Wave gate passes?" -> "Implementer fixes issues" [label="no"];
     "Wave gate passes?" -> "User checkpoint:\npresent changes + verification evidence,\ncommit or ask" [label="yes"];
+    "User checkpoint:\npresent changes + verification evidence,\ncommit or ask" -> "Feature test prune\n(../subagent-driven-development/SKILL.md)";
+    "Feature test prune\n(../subagent-driven-development/SKILL.md)" -> "Report completion";
 }
 ```
 
@@ -95,8 +103,9 @@ digraph fast_path {
 ```
 You: I'm implementing the design for updating copyright headers across the codebase.
 
-[Orchestrator has already asked commit preference]
-User chose: Auto-commit after each wave
+[Orchestrator has already settled the commit preference]
+git-dir differs from git-common-dir
+Linked worktree: auto-commit after each wave.
 
 [Run complexity-triage, classification returns SIMPLE with evidence table]
 
@@ -125,7 +134,9 @@ exit 0
 Here are the changes: 8 files with updated copyright headers.
 Verification: 78/78 tests passing, lint exit 0.
 
-[Auto-commit: user chose auto-commit at start, so the single task is committed with its path-limited commit]
+[Auto-commit: settled at start, so the single task is committed with its path-limited commit]
+
+[Feature test prune: no touched test file, so the prune is skipped and the completion report says so]
 
 Done.
 ```

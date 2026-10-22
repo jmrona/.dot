@@ -48,6 +48,8 @@ You are implementing Task N: [task name]
     6. Self-review (see below)
     7. Report back with RED to GREEN evidence for each behaviour
 
+    You do not run the test prune. The orchestrator runs it once per feature, after the last wave.
+
     Work from: [directory]
 
     ## Writes Boundary

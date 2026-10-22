@@ -21,11 +21,11 @@ If the approved design was saved to a plan file under `/Users/jose.romero/.openc
 
 ## Process Overview
 
-1. Ask the commit preference (once, at the start of the session)
+1. Settle the commit preference and record the prune base (once, at the start of the session)
 2. Run `complexity-triage` against the design
 3. If SIMPLE: hand off to `fast-path-implementation` and stop
 4. If COMPLEX: decompose into tasks, group them into waves, and execute the per-wave pipeline for each wave
-5. When all waves are complete, run the final feature-level review and verification, then report completion
+5. When all waves are complete, run the feature test prune, then the final feature-level review and verification, then report completion
 
 A wave is a set of independent tasks that run together in the same working tree. A sequential run is waves of one task. Worktrees stay forbidden.
 
@@ -33,12 +33,18 @@ A wave is a set of independent tasks that run together in the same working tree.
 
 If `git rev-parse --is-inside-work-tree` fails, the working directory is not a git repository. In that case you **MUST** follow `../_shared/no-git-flow.md` in place of every git step in this skill. A non-git project always runs waves of one task.
 
-Before any further work, ask the user how commits should be handled using `question`:
+Otherwise, before any further work, run `git rev-parse --git-dir` and `git rev-parse --git-common-dir` once. Resolve both outputs to absolute paths, then compare them. If either command fails or gives unexpected output, ask as in the main worktree.
+
+If the two paths differ, the session is in a linked worktree. Choose "Auto-commit after each wave" without asking. Announce the choice in one line, for example "Linked worktree: auto-commit after each wave."
+
+If the two paths are equal, the session is in the main worktree. Ask the user how commits should be handled using `question`:
 
 - **Auto-commit after each wave**: the orchestrator commits each task of a wave automatically after the wave gate passes. The user sees a summary of the changes but is not asked whether to commit, unless a stopped task leaves the checks red.
 - **Ask me each time**: the orchestrator pauses after each wave and asks whether to commit.
 
 Ask this once. The choice applies to every wave in the session, including any fast-path handoff. If the user chose auto-commit, the checkpoint still shows a summary of the changes. It skips the commit question unless a stopped task leaves the checks red.
+
+Alongside the commit preference, record the prune base for the feature test prune. Record it exactly as "Before the First RED" in `../test-driven-development/SKILL.md` defines it. In the no-git flow, the base is `FEATURE_BASELINE_DIR`. The touched-file list is then every path that `diff -ruN "$FEATURE_BASELINE_DIR" "$WORKING_DIR"` reports.
 
 ## Triage and Path Selection
 
@@ -206,13 +212,23 @@ Every report carries an "Environment failures" field. A timeout is never RED or 
 
 The rules in `../_shared/subagent-dispatch.md` forbid ignoring an escalation or forcing the same model to retry without changing anything.
 
+## Feature Test Prune
+
+After the last wave's checkpoint, run the PRUNE stage of `../test-driven-development/SKILL.md` once for the whole feature. Implementers do not prune. The prune covers every touched file of the feature since the prune base that you recorded at session start.
+
+- If there is no touched test file, skip the prune and say so in the completion report. In the no-git flow, this applies when `diff -ruN` reports no test file.
+- If the audit has no REMOVE, nothing changes and nothing is asked.
+- If the user approves one or more REMOVE, apply them as the PRUNE procedure says. Then re-run the project's full test command and linter, and cite the output.
+- If that re-run passes, commit the removals as one extra commit under the session's commit preference. Under auto-commit, commit without asking. Under "Ask me each time", ask one commit question. Follow the path-limited commit rules of `## User Checkpoint`.
+- If that re-run fails, restore the removed tests from the restore record and report the failure. Then continue to the final review without the removals.
+
 ## Final Feature-Level Review
 
 After every wave has run, every task must be committed or set aside per the user's preference. Then you **MUST** run a final feature-level review against the cumulative work range. Do this before you report the feature complete. The task reviewers see one task at a time. The final review sees the feature as a whole. It catches issues that only emerge across task boundaries (inconsistent naming, drifting interfaces, integration gaps, leaked test scaffolding).
 
 The procedure:
 
-1. **Identify the feature range.** Capture the base commit (`HEAD` at session start) and the head commit (current `HEAD`). Include the uncommitted diff of any skipped waves.
+1. **Identify the feature range.** Capture it only after the feature test prune is resolved, so that the review sees the pruned diff. Capture the base commit (`HEAD` at session start) and the head commit (current `HEAD`). Include the uncommitted diff of any skipped waves.
 2. **Check the wave bookkeeping.** Every extraction task scheduled from a duplicate report ran and was committed. No `DONE_WITH_CONCERNS` item is left unresolved. The `git show --name-only` of each task commit is a subset of that task's `writes`. Every task's declared tests exist.
 3. **Invoke `requesting-code-review`** against that range. It dispatches `code-reviewer` on `openai/hard` using `skills/requesting-code-review/code-reviewer.md`, with the complete diff and verification evidence. This is the production-readiness review mandated by `../../rules/common/code-review.md`. The task reviews do not replace it.
 4. **Process the reviewer output via `receiving-code-review`.** Apply severity discipline per `../../rules/common/code-review.md`:
@@ -231,8 +247,9 @@ The wording of this skill cannot prove the behaviour of a parallel run. The firs
 ```
 You: I'm using Subagent-Driven Development to implement this design.
 
-[Ask user: commit preference]
+[git-dir equals git-common-dir: main worktree, ask user: commit preference]
 User chose: Ask me each time
+[Record the prune base]
 
 [Run complexity-triage]
 Classification: COMPLEX
@@ -264,6 +281,8 @@ User: Commit all tasks
 [Commit Task 1, then Task 2, each limited to its own paths]
 
 [Wave 2: record base, dispatch implementer 3, review, gate, checkpoint, commit]
+
+[Feature test prune: the audit has no REMOVE, so nothing is asked]
 
 [Final feature-level review: requesting-code-review, then verification-before-completion]
 
