@@ -159,5 +159,5 @@ test('standard worked example splits the no-ticket next step into two sentences'
 test('standard mode returns the chosen approach to the same planner before it drafts sections', () => {
   const step = stepBody(read(standardPath), 'Present approaches and approve sections')
 
-  assert.match(step, /return the chosen approach to the same `stack-planner` with its `sessionID` before it drafts the sections/i)
+  assert.match(step, /return the chosen approach to the same `stack-planner` with its `sessionID`\. It then drafts the sections/i)
 })

@@ -49,7 +49,7 @@ You **MUST** complete these steps in order. Do not skip a step and do not reorde
      - What is explicitly out of scope (from sibling tickets, things that belong to other tickets)
    - **Current codebase state**: relevant observations from step 5
 
-7. **Get explicit user confirmation and the mode.** Use one `question` to confirm the scope and to choose the design mode. Plain-text confirmation is not sufficient. Choose the mode you recommend by the rules in step 2 of `skills/brainstorming/SKILL.md`. Put the recommended mode first and append ` (Recommended)` to its label. Use ` (Recomendado)` when the user writes in Spanish. Begin its description with `Recommended because` and the specific reason from the request. The other options keep the descriptions below. The recommendation is advice, so you **MUST** wait for the user's choice.
+7. **Get explicit user confirmation and the mode.** Use one `question` to confirm the scope and to choose the design mode. Plain-text confirmation is not sufficient. Choose the mode you recommend by the rules in step 2 of `skills/brainstorming/SKILL.md`. Put the recommended mode first and append ` (Recommended)` to its label. Use ` (Recomendado)` when the user writes in Spanish. Prepend `Recommended because` and the specific reason from the request to its description. The other options keep the descriptions below. The recommendation is advice, so you **MUST** wait for the user's choice.
 
    ```
    question:
@@ -57,7 +57,7 @@ You **MUST** complete these steps in order. Do not skip a step and do not reorde
      header: "Scope"
      options:
        - label: "Scope OK, standard (Recommended)"
-         description: "Recommended because <reason from this request>. The scope is correct. Interactive dialogue, then implementation."
+         description: "The scope is correct. Interactive dialogue, then implementation."
        - label: "Scope OK, committee"
          description: "The scope is correct. Three AI agents deliberate and I review the final design."
        - label: "Scope OK, skip"

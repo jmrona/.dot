@@ -123,8 +123,9 @@ test('router common mistakes row for picking a mode names the ticket exception',
 
 test('ticket scope question describes each Scope OK option as a correct scope', () => {
   const descriptions = scopeStep().match(/description: "[^"]*"/g) ?? []
-  const scopeOk = descriptions.filter((line) => line.includes('The scope is correct.'))
+  const scopeOk = descriptions.filter((line) => line.startsWith('description: "The scope is correct.'))
 
   assert.equal(scopeOk.length, 3)
-  assert.ok(descriptions.some((line) => line.startsWith('description: "Recommended because')))
+  assert.ok(scopeOk.some((line) => line.includes('Interactive dialogue, then implementation.')))
+  assert.match(scopeStep(), /[Pp]repend `Recommended because/)
 })
