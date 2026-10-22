@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
+import { DESIGN_ROOT_INSTRUCTION } from '../plugins/mode-switch/index.ts'
+
 const root = new URL('../', import.meta.url)
 const config = JSON.parse(readFileSync(new URL('../opencode.json', import.meta.url), 'utf8'))
 const files = [
@@ -36,7 +38,8 @@ test('defines the approved role-to-alias map and verifies native availability', 
   const dispatch = read('skills/_shared/subagent-dispatch.md')
 
   assert.match(dispatch, /bounded implementation[\s\S]*openai\/easy/i)
-  assert.match(dispatch, /routine(?: lookup| discovery)?[\s\S]*openai\/easy/i)
+  assert.match(dispatch, /bounded lookup[\s\S]*openai\/easy/i)
+  assert.match(dispatch, /openai\/routine/)
   assert.match(dispatch, /planning[\s\S]*design[\s\S]*decomposition[\s\S]*openai\/hard/i)
   assert.match(dispatch, /every independent implementation or specification review[\s\S]*openai\/hard/i)
   assert.match(dispatch, /known difficult[\s\S]*openai\/hard/i)
@@ -48,7 +51,7 @@ test('defines the approved role-to-alias map and verifies native availability', 
 
   for (const role of [
     ['stack-specialist', 'openai/easy'],
-    ['utility', 'openai/easy'],
+    ['utility', 'openai/routine'],
     ['stack-planner', 'openai/hard'],
     ['architect-reviewer', 'openai/hard'],
     ['qa-expert', 'openai/hard'],
@@ -118,7 +121,7 @@ test('keeps substantive brainstorming and decomposition with the parent and stac
 
   assert.match(standard, /one question per message/i)
   assert.match(standard, /parent[\s\S]*question/i)
-  assert.match(standard, /design work[\s\S]*alternatives/i)
+  assert.match(standard, /Develop the design[\s\S]*alternatives/i)
   assert.match(standard, /explicit final approval/i)
   assert.match(skip, /capture.{0,30}verbatim/i)
   assert.match(skip, /substantive judgement[\s\S]*stack-planner/i)
@@ -235,7 +238,7 @@ test('delegates committee agenda and summary authorship to the hard planner', ()
 
   assert.match(committee, /agenda[\s\S]*`stack-planner` on `openai\/hard`/i)
   assert.match(committee, /substantive agenda development[\s\S]*stack-planner/i)
-  assert.match(committee, /final design summary authorship[\s\S]*`stack-planner` on `openai\/hard`/i)
+  assert.match(committee, /Author the final design summary[\s\S]*`stack-planner` on `openai\/hard`/i)
   assert.match(committee, /recorded committee consensus[\s\S]*stack-planner/i)
   assert.match(committee, /parent.{0,80}(?:scope-check|checks the summary against scope)/i)
   assert.match(committee, /Administer the vote and consensus process[\s\S]*The parent administers the process/i)
@@ -248,7 +251,7 @@ test('routes difficult debugging analysis to the hard worker in every interactio
   assert.doesNotMatch(debugging, /Autonomous mode is the only mode in which investigator subagents run/i)
   assert.match(debugging, /every interaction mode[\s\S]*complex-worker[\s\S]*openai\/hard/i)
   assert.match(debugging, /Collaborative and Guided[\s\S]*complex-worker[\s\S]*openai\/hard/i)
-  assert.match(debugging, /simple, routine evidence collection[\s\S]*stack-specialist[\s\S]*openai\/easy/i)
+  assert.match(debugging, /simple, bounded evidence collection[\s\S]*stack-specialist[\s\S]*openai\/easy/i)
   assert.match(debugging, /parent retains.{0,80}(?:questions|explanations|approval)/i)
   assert.match(debugging, /parallel investigation.{0,80}(?:optional|Autonomous)/i)
   assert.match(debugging, /Investigation Budget[\s\S]*three cycles maximum/i)
@@ -271,23 +274,23 @@ test('routes every design question and section through the stack planner verbati
   const standard = read('skills/brainstorming-standard/SKILL.md')
   const routing = read('rules/common/model-routing.md')
 
-  assert.ok(standard.includes('Relay each planner question to the user verbatim'), 'parent relays planner questions verbatim')
+  assert.ok(standard.includes('When you delegate, `stack-planner` authors every design question. Relay each planner question to the user verbatim.'), 'parent relays planner questions verbatim')
   assert.ok(
     standard.includes('**MUST NOT** write, reword, or add a design question yourself'),
     'parent does not author design questions',
   )
   assert.ok(standard.includes('continuing it with its `sessionID`'), 'user answers return to the same planner')
   assert.ok(
-    standard.includes('Do not draft, reword, or decide design content yourself'),
+    standard.includes('do not draft, reword, or decide design content yourself'),
     'parent does not draft design content',
   )
   assert.ok(
-    routing.includes('relays planner questions and design sections to the human verbatim'),
-    'routing rule relays planner output verbatim',
+    routing.includes('When the parent delegates, it relays planner questions and design sections to the human verbatim'),
+    'routing rule relays planner output verbatim when delegating',
   )
-  assert.ok(standard.includes('Present each one verbatim'), 'parent presents planner sections verbatim')
+  assert.ok(standard.includes('present each one verbatim'), 'parent presents planner sections verbatim')
   assert.ok(
-    standard.includes("Return the user's feedback to the same planner with its `sessionID`"),
+    standard.includes("return the user's feedback to the same planner with its `sessionID`"),
     'section feedback returns to the same planner',
   )
   assert.ok(
@@ -298,13 +301,13 @@ test('routes every design question and section through the stack planner verbati
     standard.includes('continue the same `stack-planner` with its `sessionID`'),
     'same planner authors the consolidated summary',
   )
-  assert.ok(standard.includes('return one design question per turn'), 'planner returns one question per turn')
+  assert.ok(standard.includes('Produce one design question per turn'), 'planner returns one question per turn')
   assert.ok(
     standard.includes('Keep the `sessionID` that the call returns'),
     'parent keeps the planner sessionID',
   )
   assert.ok(
-    standard.includes('Move to step 4 only when the planner reports that no question remains'),
+    standard.includes('Move to step 4 only when no question remains, which the planner reports when you delegate.'),
     'planner decides when clarification ends',
   )
 })
@@ -406,4 +409,104 @@ test('implementation skills pass the plan file path to subagents instead of the 
   assert.match(planSection, /instead of pasting/)
   assert.match(dispatchParagraph, /\/Users\/jose\.romero\/\.opencode\/plan\//)
   assert.match(dispatchParagraph, /paste only the task scope/)
+})
+
+const DESIGN_CONTENT_OPENER =
+  'Delegate to `stack-planner` unless your instructions say that you author design content yourself. In that case, you author the design content directly.'
+const DESIGN_CONTENT_DISCIPLINE = 'In that case, you author the design content directly and keep the same one-question-per-message discipline with the user.'
+
+test('lets a design root author design content itself instead of relaying through the stack planner', () => {
+  for (const path of [
+    'skills/brainstorming-standard/SKILL.md',
+    'skills/brainstorming-skip/SKILL.md',
+    'skills/brainstorming-committee/SKILL.md',
+    'skills/design-review/SKILL.md',
+  ]) {
+    assert.ok(read(path).includes(DESIGN_CONTENT_OPENER.replace(' In that case, you author the design content directly.', '')), `${path} carries the design-content condition`)
+    assert.match(read(path), /In that case, you author the design content directly[ .]/, path)
+  }
+})
+
+test('keeps the one-question discipline clause only in the standard brainstorming skill', () => {
+  assert.ok(read('skills/brainstorming-standard/SKILL.md').includes(DESIGN_CONTENT_DISCIPLINE))
+  for (const path of [
+    'skills/brainstorming-skip/SKILL.md',
+    'skills/brainstorming-committee/SKILL.md',
+    'skills/design-review/SKILL.md',
+  ]) {
+    assert.ok(!read(path).includes('one-question-per-message discipline'), path)
+    assert.ok(read(path).includes(DESIGN_CONTENT_OPENER), `${path} carries the bare opener`)
+  }
+})
+
+test('labels the worked examples as a delegating root and keeps lead-in sentences short', () => {
+  assert.match(read('skills/brainstorming-standard/SKILL.md'), /Delegating root\. User: "I want to add structured logging/)
+  assert.match(read('skills/design-review/SKILL.md'), /\(a brainstorming skill, delegating root\)/)
+  assert.match(read('skills/brainstorming-committee/SKILL.md'), /\*\*Author the final design summary\.\*\*/)
+  assert.match(read('skills/brainstorming-skip/SKILL.md'), /or the faithful summary when judgement was needed/)
+})
+
+test('scopes the planning rule and the planner row to a root that does not author design content', () => {
+  const routing = read('rules/common/model-routing.md')
+  const dispatch = read('skills/_shared/subagent-dispatch.md')
+
+  assert.match(routing, /instructions say[^.]*author[s]? design content[^.]*itself/i)
+  assert.match(routing, /task decomposition goes to it from any root/i)
+  assert.match(dispatch, /\| `stack-planner`[^\n]*unless[^\n]*author[s]? design content/i)
+})
+
+test('limits the no-authoring prohibitions in the brainstorming skills to delegation', () => {
+  const standard = read('skills/brainstorming-standard/SKILL.md')
+
+  assert.match(standard, /\| Rewording a planner question or drafting a design section yourself while delegating +\| Delegated design judgement belongs to `stack-planner`/)
+  assert.doesNotMatch(standard, /^2\. \*\*Delegate substantive design work/m)
+  assert.match(standard, /^2\. \*\*Develop the design\.\*\*[^\n]*Develop 2-3 viable alternatives/m)
+  assert.doesNotMatch(standard, /Have the author produce/)
+  assert.doesNotMatch(standard, /(?<!delegate, you )\*\*MUST NOT\*\* write, reword, or add a design question yourself/)
+  assert.match(standard, /When you delegate, you \*\*MUST NOT\*\* write, reword, or add a design question yourself/)
+})
+
+test('keeps the design-review revision step explicit in both modes', () => {
+  const review = read('skills/design-review/SKILL.md')
+
+  assert.doesNotMatch(review, /apply this rule/)
+  assert.match(review, /When you delegate, send the reviewer findings[\s\S]*When you author design content yourself, draft the revision directly/)
+  assert.doesNotMatch(review, /scope-checks the planner's proposal against approved context/)
+})
+
+test('limits the planning bullet no-authoring clause to a delegating parent', () => {
+  const routing = read('rules/common/model-routing.md')
+  const bullet = routing.split('\n').find((line) => line.startsWith('- Send substantive planning'))
+
+  assert.match(bullet, /When the parent delegates, it does not author design questions or design content/)
+  for (const sentence of bullet.split(/(?<=\.) /)) {
+    assert.ok(sentence.split(/\s+/).length <= 25, sentence)
+  }
+})
+
+test('lists the same design content items in the planner row as the design root instruction', () => {
+  const dispatch = read('skills/_shared/subagent-dispatch.md')
+  const row = dispatch.split('\n').find((line) => line.startsWith('| `stack-planner`'))
+
+  const listed = DESIGN_ROOT_INSTRUCTION.match(/yourself: (.*?)\. Do not/)[1]
+  const items = listed.split(/, | and /).map((item) => item.replace(/^(the|design) /, '').replace(/^design /, ''))
+
+  assert.equal(items.length, 6)
+  for (const item of items) {
+    assert.ok(row.includes(item), item)
+  }
+})
+
+test('applies the brainstorming-skip planner brief only after the judgement condition', () => {
+  const skip = read('skills/brainstorming-skip/SKILL.md')
+  const step = skip.split('\n').find((line) => line.startsWith('3. **'))
+
+  assert.ok(step.indexOf('require judgement') < step.indexOf('Delegate to `stack-planner` unless'))
+  assert.doesNotMatch(step, /the next two sentences apply/)
+  assert.doesNotMatch(step, /If no judgement is needed/)
+  assert.match(step, /If the user's statement is already clear, capture the user's statement verbatim/)
+})
+
+test('keeps the coordinator bullet wording on other bounded work', () => {
+  assert.match(read('rules/common/model-routing.md'), /straightforward discovery, and other bounded work\./)
 })

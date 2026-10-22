@@ -1,44 +1,49 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const configRoot = fileURLToPath(new URL('../', import.meta.url))
 const config = JSON.parse(readFileSync(join(configRoot, 'opencode.json'), 'utf8'))
-const expectedInstructions = readdirSync(join(configRoot, 'rules'), { withFileTypes: true })
-  .flatMap((directory) => directory.isDirectory()
-    ? readdirSync(join(configRoot, 'rules', directory.name), { withFileTypes: true })
-      .filter((file) => file.isFile() && file.name.endsWith('.md'))
-      .map((file) => resolve(configRoot, 'rules', directory.name, file.name))
-    : [])
+const expectedInstructions = readdirSync(join(configRoot, 'rules', 'common'), { withFileTypes: true })
+  .filter((file) => file.isFile() && file.name.endsWith('.md'))
+  .map((file) => resolve(configRoot, 'rules', 'common', file.name))
   .sort()
 
-test('uses the easy alias by default and loads every rule by explicit path', () => {
+test('uses the easy alias by default and loads every common rule by explicit path and no language rule', () => {
   assert.equal(config.model, 'openai/easy')
   assert.deepEqual(config.instructions, expectedInstructions)
+  assert.ok(config.instructions.every((instruction) => instruction.includes(`${sep}rules${sep}common${sep}`)))
   assert.ok(config.instructions.every((instruction) => existsSync(instruction)))
   assert.ok(config.instructions.every((instruction) => !['*', '?', '[', ']'].some((marker) => instruction.includes(marker))))
 })
 
-test('defines high-default aliases with valid OpenAI catalogue metadata', () => {
+test('defines routine, easy and hard aliases with valid OpenAI catalogue metadata', () => {
   const models = config.providers?.openai?.models
 
   assert.ok(models, 'OpenAI native model aliases are configured')
-  assert.ok(models.easy && models.hard, 'both aliases are configured')
-  const aliases = [models.easy, models.hard]
+  assert.deepEqual(Object.keys(models).sort(), ['easy', 'hard', 'routine'])
+  const aliases = [models.routine, models.easy, models.hard]
 
   assert.ok(aliases.every((model) => typeof model.modelID === 'string' && model.modelID.length > 0))
   assert.notEqual(models.easy.modelID, models.hard.modelID)
+  assert.equal(models.routine.modelID, models.easy.modelID)
+  assert.equal(models.routine.settings.reasoningEffort, 'medium')
+  assert.equal(models.easy.settings.reasoningEffort, 'high')
+  assert.equal(models.hard.settings.reasoningEffort, 'high')
+  assert.deepEqual(models.routine.capabilities.reasoning.effort, ['medium'])
+  assert.equal(models.routine.name, 'Routine work')
+  assert.equal(models.easy.name, 'Bounded work')
 
   for (const model of aliases) {
     assert.equal(model.package, '@opencode/ai/providers/openai')
-    assert.equal(model.settings.reasoningEffort, 'high')
+    assert.equal(model.settings.reasoningEffort, model === models.routine ? 'medium' : 'high')
     assert.equal(model.capabilities.tools, true)
     assert.ok(['text', 'image', 'pdf'].every((input) => model.capabilities.input.includes(input)))
     assert.ok(model.capabilities.output.includes('text'))
     assert.equal(model.capabilities.reasoning.supported, true)
-    assert.ok(model.capabilities.reasoning.effort.includes('high'))
+    assert.ok(model.capabilities.reasoning.effort.includes(model.settings.reasoningEffort))
     assert.ok(typeof model.name === 'string' && model.name.trim().length > 0)
     assert.ok(typeof model.family === 'string' && model.family.trim().length > 0)
 

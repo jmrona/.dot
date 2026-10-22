@@ -1,7 +1,7 @@
 ---
 description: Runs self-contained routine skill work from a complete parent-supplied brief and context.
 mode: subagent
-model: openai/easy
+model: openai/routine
 hidden: false
 permissions:
   - action: edit

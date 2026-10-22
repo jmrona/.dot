@@ -124,7 +124,7 @@ function assertParentAlias(messages, evidence) {
   assert.ok(reply, 'The parent session returned an assistant response')
   evidence.parentAlias = reply.model?.id
   assert.equal(reply.model?.providerID, 'openai')
-  assert.equal(reply.model?.id, 'easy', 'The parent uses the default build alias')
+  assert.equal(reply.model?.id, 'routine', 'The parent uses the default build alias')
 }
 
 function recordInvocations(messages, evidence) {
@@ -253,7 +253,7 @@ test('automatically routes a conventional commit-message request to the utility 
     title: 'Automatic routing smoke: commit message',
     prompt: commitPrompt,
     expectedAgent: 'utility',
-    expectedAlias: 'easy',
+    expectedAlias: 'routine',
     responseCheck: (reply) => assert.match(reply, /SYNTH-1/),
   })
 })

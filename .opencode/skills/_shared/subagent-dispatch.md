@@ -10,9 +10,9 @@ The parent owns orchestration and selects a role from the current visible agent 
 
 | Role | Alias | Use |
 |------|-------|-----|
-| `stack-specialist` | `openai/easy` | Bounded implementation of approved tasks, routine lookup, and simple evidence collection |
-| `utility` | `openai/easy` | Routine text and skill tasks, or bounded lookup |
-| `stack-planner` | `openai/hard` | Substantive planning, design alternatives and summary authorship, and task decomposition |
+| `stack-specialist` | `openai/easy` | Bounded implementation of approved tasks, bounded lookup, and simple evidence collection |
+| `utility` | `openai/routine` | Routine text and skill tasks, or bounded lookup |
+| `stack-planner` | `openai/hard` | Substantive planning, design content (questions, alternatives, sections, committee agenda, summaries, revisions) unless the root's instructions say that it authors design content itself, and task decomposition from any root |
 | `architect-reviewer` | `openai/hard` | Design and architecture review; the Architect committee perspective and tiebreaker |
 | `qa-expert` | `openai/hard` | The Advocate committee perspective and quality analysis |
 | `code-reviewer` | `openai/hard` | Every independent implementation or specification review |

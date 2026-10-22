@@ -19,31 +19,13 @@
 		"/Users/jose.romero/.config/opencode/rules/common/subagents.md",
 		"/Users/jose.romero/.config/opencode/rules/common/testing.md",
 		"/Users/jose.romero/.config/opencode/rules/common/verification.md",
-		"/Users/jose.romero/.config/opencode/rules/common/workflow.md",
-		"/Users/jose.romero/.config/opencode/rules/go/coding-style.md",
-		"/Users/jose.romero/.config/opencode/rules/go/testing.md",
-		"/Users/jose.romero/.config/opencode/rules/go/tooling.md",
-		"/Users/jose.romero/.config/opencode/rules/javascript/coding-style.md",
-		"/Users/jose.romero/.config/opencode/rules/javascript/testing.md",
-		"/Users/jose.romero/.config/opencode/rules/javascript/tooling.md",
-		"/Users/jose.romero/.config/opencode/rules/php/coding-style.md",
-		"/Users/jose.romero/.config/opencode/rules/php/testing.md",
-		"/Users/jose.romero/.config/opencode/rules/php/tooling.md",
-		"/Users/jose.romero/.config/opencode/rules/python/coding-style.md",
-		"/Users/jose.romero/.config/opencode/rules/python/testing.md",
-		"/Users/jose.romero/.config/opencode/rules/python/tooling.md",
-		"/Users/jose.romero/.config/opencode/rules/rust/coding-style.md",
-		"/Users/jose.romero/.config/opencode/rules/rust/testing.md",
-		"/Users/jose.romero/.config/opencode/rules/rust/tooling.md",
-		"/Users/jose.romero/.config/opencode/rules/typescript/coding-style.md",
-		"/Users/jose.romero/.config/opencode/rules/typescript/testing.md",
-		"/Users/jose.romero/.config/opencode/rules/typescript/tooling.md"
+		"/Users/jose.romero/.config/opencode/rules/common/workflow.md"
 	],
 	"model": "openai/easy",
 	"agents": {
-		"build": { "model": "openai/easy" },
+		"build": { "model": "openai/routine" },
 		"general": { "model": "openai/easy" },
-		"explore": { "model": "openai/easy" },
+		"explore": { "model": "openai/routine" },
 		"plan": { "model": "openai/hard" },
 		"title": {
 			"model": "openai/easy",
@@ -53,9 +35,40 @@
 	"providers": {
 		"openai": {
 			"models": {
-				"easy": {
+				"routine": {
 					"modelID": "gpt-6-luna",
 					"name": "Routine work",
+					"family": "gpt-luna",
+					"package": "@opencode/ai/providers/openai",
+					"settings": {
+						"reasoningEffort": "medium",
+						"reasoningSummary": "auto",
+						"include": ["reasoning.encrypted_content"]
+					},
+					"cost": [
+						{
+							"input": 0.1,
+							"output": 0.5,
+							"cache": { "read": 0.01, "write": 0.125 }
+						},
+						{
+							"tier": { "type": "context", "size": 272000 },
+							"input": 0.2,
+							"output": 0.75,
+							"cache": { "read": 0.02, "write": 0.25 }
+						}
+					],
+					"limit": { "context": 1050000, "input": 922000, "output": 128000 },
+					"capabilities": {
+						"tools": true,
+						"input": ["text", "image", "pdf"],
+						"output": ["text"],
+						"reasoning": { "supported": true, "effort": ["medium"] }
+					}
+				},
+				"easy": {
+					"modelID": "gpt-6-luna",
+					"name": "Bounded work",
 					"family": "gpt-luna",
 					"package": "@opencode/ai/providers/openai",
 					"settings": {

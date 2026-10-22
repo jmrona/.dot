@@ -30,12 +30,25 @@ export interface ToolExecuteBeforeInput {
   readonly input: unknown
 }
 
+export interface ContextEvent {
+  readonly agent: string
+  readonly sessionID: string
+  readonly system: { type: 'text'; text: string }[]
+}
+
+export const DESIGN_ROOT_INSTRUCTION =
+  'You are the design root on openai/hard. You author design content yourself: design questions, alternatives, sections, the committee agenda, summaries and design revisions. Do not delegate them to stack-planner.'
+
 export interface ModeSwitchApi {
   readonly session: {
     get(input: { sessionID: string }): Promise<ModeSwitchSession>
     switchAgent(input: { sessionID: string; agent: string }): Promise<void>
     switchModel(input: { sessionID: string; model: ModeSwitchModel }): Promise<void>
     synthetic(input: { sessionID: string; text: string; resume: boolean }): Promise<void>
+    hook(
+      name: 'context',
+      handler: (event: ContextEvent) => Promise<void>,
+    ): Promise<void>
   }
   readonly agent: {
     get(input: { agentID: string }): Promise<{ data: { model: ModeSwitchModel } }>
@@ -56,9 +69,10 @@ export async function applySwitch(
   reason: string,
 ): Promise<void> {
   if (current === target) {
+    await applyTargetModel(api, sessionID, target)
     return
   }
-  let agent: { data: { model: ModeSwitchModel } }
+  let agent: TargetAgent
   try {
     agent = await api.agent.get({ agentID: target })
     await api.session.switchAgent({ sessionID, agent: target })
@@ -66,13 +80,43 @@ export async function applySwitch(
     await recordNotice(api, sessionID, failureText(target, error))
     return
   }
+  if (await trySwitchModel(api, sessionID, target, agent)) {
+    await recordNotice(api, sessionID, switchNotice(current, target, reason))
+  }
+}
+
+interface TargetAgent {
+  readonly data: { readonly model: ModeSwitchModel }
+}
+
+async function applyTargetModel(
+  api: ModeSwitchApi,
+  sessionID: string,
+  target: string,
+): Promise<void> {
+  let agent: TargetAgent
   try {
-    await api.session.switchModel({ sessionID, model: agent.data.model })
+    agent = await api.agent.get({ agentID: target })
   } catch (error: unknown) {
-    await recordNotice(api, sessionID, modelFailureText(target, error))
+    await recordNotice(api, sessionID, failureText(target, error))
     return
   }
-  await recordNotice(api, sessionID, switchNotice(current, target, reason))
+  await trySwitchModel(api, sessionID, target, agent)
+}
+
+async function trySwitchModel(
+  api: ModeSwitchApi,
+  sessionID: string,
+  target: string,
+  agent: TargetAgent,
+): Promise<boolean> {
+  try {
+    await api.session.switchModel({ sessionID, model: agent.data.model })
+    return true
+  } catch (error: unknown) {
+    await recordNotice(api, sessionID, modelFailureText(target, error))
+    return false
+  }
 }
 
 async function recordNotice(api: ModeSwitchApi, sessionID: string, text: string): Promise<void> {
@@ -121,6 +165,17 @@ async function readSessionOrNull(
   }
 }
 
+export async function handleContext(api: ModeSwitchApi, event: ContextEvent): Promise<void> {
+  if (event.agent !== 'plan') {
+    return
+  }
+  const session = await readSessionOrNull(api, event.sessionID)
+  if (session === null || session.parentID !== undefined) {
+    return
+  }
+  event.system.push({ type: 'text', text: DESIGN_ROOT_INSTRUCTION })
+}
+
 interface ModeSwitchPlugin {
   readonly id: string
   readonly setup: (api: ModeSwitchApi) => Promise<void>
@@ -130,6 +185,7 @@ const modeSwitchPlugin: ModeSwitchPlugin = {
   id: 'mode-switch',
   setup: async (api: ModeSwitchApi): Promise<void> => {
     await api.tool.hook('execute.before', (input) => handleToolExecuteBefore(api, input))
+    await api.session.hook('context', (event) => handleContext(api, event))
   },
 }
 

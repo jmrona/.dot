@@ -56,7 +56,7 @@ In **Guided mode**, explain why reproduction matters: without it, you cannot ver
 
 Apply the scope discipline in `../../rules/common/debugging.md`. The initial-scope allowlist and the explicit prohibitions on wider reading are the rules; this phase is where they bite.
 
-The parent may delegate bounded evidence gathering in every interaction mode through the native OpenCode V2 subagent interface using `investigator-prompt.md`. Assign `stack-specialist` on `openai/easy` for simple, routine evidence collection. In Collaborative and Guided as well as Autonomous mode, delegate known difficult substantive hypothesis or root-cause analysis, integration reasoning, and security analysis to `complex-worker` on `openai/hard`; do not spend an easy attempt first or ask it to run this debugging workflow. The parent provides the full brief, evidence, hypothesis, and scoped files, and retains responsibility for investigation phases and user interaction.
+The parent may delegate bounded evidence gathering in every interaction mode through the native OpenCode V2 subagent interface using `investigator-prompt.md`. Assign `stack-specialist` on `openai/easy` for simple, bounded evidence collection. In Collaborative and Guided as well as Autonomous mode, delegate known difficult substantive hypothesis or root-cause analysis, integration reasoning, and security analysis to `complex-worker` on `openai/hard`; do not spend an easy attempt first or ask it to run this debugging workflow. The parent provides the full brief, evidence, hypothesis, and scoped files, and retains responsibility for investigation phases and user interaction.
 
 In Autonomous mode, the parent may split independent evidence gathering across two or three investigators in parallel:
 
@@ -91,7 +91,7 @@ Test the most likely hypothesis first:
 3. Record the result as evidence for or against
 4. If confirmed, proceed to Phase 6. If disproven, move to the next hypothesis.
 
-When a hypothesis requires substantive difficult analysis, the parent delegates that bounded hypothesis to `complex-worker` on `openai/hard` in every interaction mode; routine evidence checks may go to `stack-specialist` on `openai/easy`. In Autonomous mode, the parent may test independent hypotheses in parallel using investigators, each with one focused question. Parallel investigation is optional; Collaborative and Guided modes retain their user-facing hypothesis discussion and explanations while the parent relays bounded analysis requests and evidence. Invoke `dispatching-parallel-agents` only when more than one investigation is independent. Investigators return evidence only and never run nested workflows.
+When a hypothesis requires substantive difficult analysis, the parent delegates that bounded hypothesis to `complex-worker` on `openai/hard` in every interaction mode; bounded evidence checks may go to `stack-specialist` on `openai/easy`. In Autonomous mode, the parent may test independent hypotheses in parallel using investigators, each with one focused question. Parallel investigation is optional; Collaborative and Guided modes retain their user-facing hypothesis discussion and explanations while the parent relays bounded analysis requests and evidence. Invoke `dispatching-parallel-agents` only when more than one investigation is independent. Investigators return evidence only and never run nested workflows.
 
 Apply the Investigation Budget from `../../rules/common/debugging.md`: three cycles maximum before you stop and refocus with the user.
 
@@ -118,7 +118,7 @@ Once the user has approved the root cause and the fix approach:
 
 The parent remains the debugging orchestrator in every mode. Investigators perform only bounded evidence collection or analysis; they do not own investigation phases, ask the human, seek approval, or fix anything.
 
-- Use `stack-specialist` on `openai/easy` for routine evidence collection.
+- Use `stack-specialist` on `openai/easy` for bounded evidence collection.
 - In Collaborative and Guided as well as Autonomous mode, route all known difficult substantive hypothesis or root-cause analysis, integration reasoning, and security analysis to `complex-worker` on `openai/hard`.
 - Use `skills/debugging/investigator-prompt.md` and provide the expected and actual behaviour, the specific hypothesis, scoped files, full relevant evidence, and one question to answer.
 - In Collaborative and Guided modes, the parent retains user questions, explanations, hypothesis presentation, and approval. In Autonomous mode, parallel investigations remain optional and are used only for independent questions.

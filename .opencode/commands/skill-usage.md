@@ -1,6 +1,6 @@
 ---
 description: How your skills are actually being used — routing leaks, fallbacks, dead skills
-model: openai/easy
+model: openai/routine
 subagent: true
 ---
 

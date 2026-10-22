@@ -24,7 +24,7 @@ If any of these is false, a parallel dispatch is not valid. Either investigate s
 
 1. **Identify independent domains.** Group the work by what is broken or what needs building. Each group **MUST** map to exactly one problem domain with no shared files, shared state, or shared causal chain. If you cannot cleanly partition the work, stop. This skill does not apply.
 
-2. **Annotate each task with its required role and alias.** Use `stack-specialist` on `openai/easy` for bounded routine work and evidence collection. Use `complex-worker` on `openai/hard` only for known difficult root-cause, integration, or security analysis, or explicitly escalated approved work. Every task is annotated before dispatch; do not use a model-tier ladder.
+2. **Annotate each task with its required role and alias.** Use `stack-specialist` on `openai/easy` for bounded work and evidence collection. Use `complex-worker` on `openai/hard` only for known difficult root-cause, integration, or security analysis, or explicitly escalated approved work. Every task is annotated before dispatch; do not use a model-tier ladder.
 
 3. **Construct each task prompt.** Per `../../rules/common/subagents.md`, do not let any subagent inherit your session history. For each agent, write a self-contained prompt containing its required role and alias, and:
 

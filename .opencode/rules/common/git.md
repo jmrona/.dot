@@ -37,6 +37,12 @@ You **MUST** use Conventional Commits:
 
 You **MUST NOT** run `git push` (or any variant) under any circumstances. The user will push when they are ready. If a workflow appears to require a push (e.g. opening a pull request), stop and tell the user what needs to happen next.
 
+## Worktrees
+
+If the repository's justfile has a `worktree-create` recipe, you **MUST** create worktrees with `just worktree-create <branch> [--create|--pull] --path .worktrees/<branch>`. Remove them with `just worktree-drop <branch>`. You **MUST NOT** run `git worktree add` followed by a manual setup.
+
+The recipe copies the environment files and installs the dependencies that a manual `git worktree add` leaves out.
+
 ## Destructive Commands Are Forbidden
 
 You **MUST NOT** run destructive version control commands without explicit, specific permission from the user for that exact action. Permission for one destructive action is not permission for another.

@@ -6,6 +6,7 @@ import modeSwitchPlugin, {
   handleToolExecuteBefore,
   switchNotice,
   targetAgentForSkill,
+  type ContextEvent,
   type ModeSwitchApi,
   type ModeSwitchModel,
   type ModeSwitchSession,
@@ -67,6 +68,10 @@ function createFakeApi(options: FakeApiOptions = {}): FakeApi {
       switchAgent: (input) => record('session.switchAgent', input),
       switchModel: (input) => record('session.switchModel', input),
       synthetic: (input) => record('session.synthetic', input),
+      hook: async (name, handler) => {
+        await record('session.hook', { name })
+        hooks.set(name, async (event) => handler(event as ContextEvent))
+      },
     },
     agent: {
       get: async (input) => {
@@ -118,12 +123,63 @@ test('switchNotice formats the transition in upper case with its reason', () => 
   assert.equal(switchNotice('build', 'plan', 'brainstorming'), 'BUILD -> PLAN (brainstorming)')
 })
 
-test('applySwitch does nothing when the target matches the current agent', async () => {
+test('applySwitch sets the target agent model when the session already runs that agent', async () => {
   const { api, calls } = createFakeApi()
 
-  await applySwitch(api, 'session-1', 'build', 'build', 'fast-path-implementation')
+  await applySwitch(api, 'session-1', 'plan', 'plan', 'brainstorming')
 
-  assert.deepEqual(calls, [])
+  assert.deepEqual(calls, [
+    { method: 'agent.get', args: { agentID: 'plan' } },
+    { method: 'session.switchModel', args: { sessionID: 'session-1', model: DEFAULT_MODEL } },
+  ])
+})
+
+test('applySwitch neither switches agent nor records a notice when the session already runs that agent', async () => {
+  const { api, calls } = createFakeApi()
+
+  await applySwitch(api, 'session-1', 'plan', 'plan', 'brainstorming')
+
+  const agentOrNoticeCalls = calls.filter(
+    ({ method }) => method === 'session.switchAgent' || method === 'session.synthetic',
+  )
+  assert.deepEqual(agentOrNoticeCalls, [])
+})
+
+test('applySwitch records a model failure notice when the session already runs that agent and its model cannot be set', async () => {
+  const { api, calls } = createFakeApi({ failures: { 'session.switchModel': 'model rejected' } })
+
+  await applySwitch(api, 'session-1', 'plan', 'plan', 'brainstorming')
+
+  assert.deepEqual(calls, [
+    { method: 'agent.get', args: { agentID: 'plan' } },
+    { method: 'session.switchModel', args: { sessionID: 'session-1', model: DEFAULT_MODEL } },
+    {
+      method: 'session.synthetic',
+      args: {
+        sessionID: 'session-1',
+        text: 'Switched to PLAN but its model could not be set: model rejected. Press Tab to switch manually.',
+        resume: false,
+      },
+    },
+  ])
+})
+
+test('applySwitch records a failure notice when the session already runs that agent and its agent cannot be read', async () => {
+  const { api, calls } = createFakeApi({ failures: { 'agent.get': 'agent missing' } })
+
+  await applySwitch(api, 'session-1', 'plan', 'plan', 'brainstorming')
+
+  assert.deepEqual(calls, [
+    { method: 'agent.get', args: { agentID: 'plan' } },
+    {
+      method: 'session.synthetic',
+      args: {
+        sessionID: 'session-1',
+        text: 'Mode switch to PLAN failed: agent missing. Press Tab to switch manually.',
+        resume: false,
+      },
+    },
+  ])
 })
 
 test('applySwitch switches agent, then the target agent model, then records the notice', async () => {
@@ -231,12 +287,16 @@ test('handleToolExecuteBefore makes no calls for a skill without a target', asyn
   assert.deepEqual(calls, [])
 })
 
-test('handleToolExecuteBefore records nothing when a root session is already on the target agent', async () => {
+test('handleToolExecuteBefore sets the model without a notice when a root session is already on the target agent', async () => {
   const { api, calls } = createFakeApi()
 
   await handleToolExecuteBefore(api, skillExecution({ agent: 'plan' }))
 
-  assert.deepEqual(calls, [{ method: 'session.get', args: { sessionID: 'session-1' } }])
+  assert.deepEqual(calls, [
+    { method: 'session.get', args: { sessionID: 'session-1' } },
+    { method: 'agent.get', args: { agentID: 'plan' } },
+    { method: 'session.switchModel', args: { sessionID: 'session-1', model: DEFAULT_MODEL } },
+  ])
 })
 
 test('handleToolExecuteBefore ignores child sessions', async () => {
@@ -282,4 +342,45 @@ test('handleToolExecuteBefore does not throw when the session lookup fails', asy
   await assert.doesNotReject(handleToolExecuteBefore(api, skillExecution()))
 
   assert.deepEqual(calls, [{ method: 'session.get', args: { sessionID: 'session-1' } }])
+})
+
+const DESIGN_ROOT_TEXT =
+  'You are the design root on openai/hard. You author design content yourself: design questions, alternatives, sections, the committee agenda, summaries and design revisions. Do not delegate them to stack-planner.'
+
+async function runContextHook(
+  options: FakeApiOptions,
+  agent: string,
+): Promise<{ event: ContextEvent; calls: RecordedCall[] }> {
+  const { api, hooks, calls } = createFakeApi(options)
+  await modeSwitchPlugin.setup(api)
+  const event: ContextEvent = { agent, sessionID: 'session-1', system: [] }
+  await hooks.get('context')?.(event)
+  return { event, calls }
+}
+
+test('the context hook appends the design root instruction for a root plan session', async () => {
+  const { event } = await runContextHook({}, 'plan')
+
+  assert.deepEqual(event.system, [{ type: 'text', text: DESIGN_ROOT_TEXT }])
+})
+
+test('the context hook appends nothing for a non-plan agent', async () => {
+  const { event } = await runContextHook({}, 'build')
+
+  assert.deepEqual(event.system, [])
+})
+
+test('the context hook appends nothing for a child plan session', async () => {
+  const { event } = await runContextHook(
+    { session: { id: 'session-1', parentID: 'session-0' } },
+    'plan',
+  )
+
+  assert.deepEqual(event.system, [])
+})
+
+test('the context hook appends nothing when the session lookup fails', async () => {
+  const { event } = await runContextHook({ failures: { 'session.get': 'lookup failed' } }, 'plan')
+
+  assert.deepEqual(event.system, [])
 })

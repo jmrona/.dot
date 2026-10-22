@@ -55,7 +55,7 @@ function lastWildcardEffect(rules, action) {
     .at(-1)?.effect
 }
 
-test('routes every configured agent through the central easy or hard alias', () => {
+test('routes every configured agent through the central routine, easy or hard alias', () => {
   const expectedModels = {
     'architect-reviewer': 'openai/hard',
     'qa-expert': 'openai/hard',
@@ -65,7 +65,7 @@ test('routes every configured agent through the central easy or hard alias', () 
     'stack-planner': 'openai/hard',
     'code-reviewer': 'openai/hard',
     'complex-worker': 'openai/hard',
-    utility: 'openai/easy',
+    utility: 'openai/routine',
   }
 
   for (const [name, model] of Object.entries(expectedModels)) {
@@ -184,9 +184,9 @@ test('pins built-in agents and preserves the title system prompt', () => {
     'Generate a one-line session title as [context]: sentence. Keep plain text only: no Markdown, no quotation marks, no trailing punctuation. Do not invent details. Do not include secrets, credentials, personal data, or email addresses. Keep it concise and factual.'
 
   assert.deepEqual(config.agents, {
-    build: { model: 'openai/easy' },
+    build: { model: 'openai/routine' },
     general: { model: 'openai/easy' },
-    explore: { model: 'openai/easy' },
+    explore: { model: 'openai/routine' },
     plan: { model: 'openai/hard' },
     title: { model: 'openai/easy', system: titlePrompt },
   })
@@ -222,10 +222,10 @@ test('routes optional commands to easy or hard child agents with complete argume
   assert.match(review, /Do not invoke review orchestration or launch another reviewer/i)
 })
 
-test('pins existing utility commands to easy child runs without rewriting their bodies', () => {
+test('pins existing utility commands to routine child runs without rewriting their bodies', () => {
   for (const name of ['skill-usage']) {
     const metadata = frontmatter(read(`commands/${name}.md`))
-    assert.match(metadata, /^model: openai\/easy$/m)
+    assert.match(metadata, /^model: openai\/routine$/m)
     assert.match(metadata, /^subagent: true$/m)
     assert.doesNotMatch(metadata, /^subtask:/m)
     assert.doesNotMatch(metadata, /reasoningEffort|temperature/)
@@ -236,12 +236,17 @@ test('pins existing utility commands to easy child runs without rewriting their 
 test('defines actionable automatic routing, escalation, and nesting policy', () => {
   const policy = read('rules/common/model-routing.md')
 
-  assert.match(policy, /root easy coordinator/i)
+  assert.match(policy, /root routine coordinator/i)
+  assert.match(policy, /coordinator runs on `routine`/i)
   assert.match(policy, /substantive planning[\s\S]*stack-planner[\s\S]*openai\/hard/i)
   assert.match(policy, /independent reviews[\s\S]*openai\/hard/i)
   assert.match(policy, /bounded implementation[\s\S]*openai\/easy/i)
   assert.match(policy, /complex-worker[\s\S]*openai\/hard/i)
-  assert.match(policy, /utility[\s\S]*openai\/easy/i)
+  assert.match(policy, /utility[\s\S]*openai\/routine/i)
+  assert.match(policy, /discovery or utility task stays pinned to `openai\/routine`/i)
+  assert.match(policy, /Use only `openai\/routine`, `openai\/easy` and `openai\/hard`/)
+  assert.match(policy, /reasoning effort comes only from the alias definition/i)
+  assert.doesNotMatch(policy, /routine investigation/i)
   assert.match(policy, /NEEDS_CONTEXT/)
   assert.match(policy, /V2 subagent tool/i)
   assert.match(policy, /workflow COMPLEX is not model difficulty/i)

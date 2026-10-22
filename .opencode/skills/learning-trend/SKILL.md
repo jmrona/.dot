@@ -2,7 +2,7 @@
 name: learning-trend
 description: Shows how the user's ticket-coach performance has evolved over time — per-ticket scorecards, technology proficiency growth, and seniority progression. Use this when the user asks things like "how am I improving?", "show my progress", "have I gotten better at Go?", "what's my trend", or any request to see evolution/history/improvement related to ticket-coach sessions. This skill is read-only and purely presentational — it never writes to the cognitive profile or scorecards, and only activates when the user explicitly asks to see their progress, never proactively.
 metadata:
-  model: openai/easy
+  model: openai/routine
 ---
 
 # Learning Trend

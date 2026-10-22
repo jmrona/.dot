@@ -2,7 +2,7 @@
 name: explain
 description: "Use this skill whenever the user asks you to explain a concept, term, technology, or process — especially in a technical or unfamiliar domain. Always trigger on: 'explain X', 'what is X', 'what does X mean', 'how does X work', 'I don't understand X', 'what's the difference between X and Y', 'clarify X', 'como funciona X', 'que es X', 'explicame', or any phrasing that signals the user wants conceptual grounding rather than code. Also trigger proactively when a user's question contains a misconception — correct it before answering. This skill is especially important when the user is new to a domain, is asking about architecture or system design, or is trying to understand why something is built a certain way, not just what it does."
 metadata:
-  model: openai/easy
+  model: openai/routine
 ---
 
 ## Dispatch

@@ -2,7 +2,7 @@
 name: summarize-diff
 description: Summarize a git diff or code change. Use when the user asks "what changed", wants a change summary for a PR description, or needs risks flagged in a diff. The caller must paste the diff text into the tool prompt — this skill cannot run git itself.
 metadata:
-  model: openai/easy
+  model: openai/routine
 ---
 
 ## Utility dispatch

@@ -2,7 +2,7 @@
 name: detect-ticketing-system
 description: Identifies the ticketing system from current MCP tool, git remote, and CLI evidence gathered by the parent (GitHub Issues, Jira, GitLab, Linear, or none). Returns the detected system so a caller can pick the right API, or reports when no system is available.
 metadata:
-  model: openai/easy
+  model: openai/routine
 ---
 
 # Detect Ticketing System

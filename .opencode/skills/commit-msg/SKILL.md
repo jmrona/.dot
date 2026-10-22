@@ -2,7 +2,7 @@
 name: commit-msg
 description: Generate a conventional commit message from a diff or change description. Use when the user asks for a commit message. The caller must include the diff or a description of the changes, and the ticket key from the branch name if any, in the tool prompt.
 metadata:
-  model: openai/easy
+  model: openai/routine
 ---
 
 ## Utility dispatch

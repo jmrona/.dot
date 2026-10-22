@@ -53,6 +53,7 @@ test('retires the old routing plugin and moves v1-format plugins and commands ou
   ])
 
   assert.equal(config.model, 'openai/easy')
+  assert.ok(config.providers.openai.models.routine)
   assert.ok(config.providers.openai.models.easy)
   assert.ok(config.providers.openai.models.hard)
   assert.doesNotMatch(JSON.stringify(config), /opencode-subagent-model-alias|skill-model-router/)
@@ -65,7 +66,7 @@ test('uses native routine dispatch metadata without per-skill overrides', () => 
     const source = read(`skills/${name}/SKILL.md`)
     const metadata = frontmatter(source)
     assert.match(metadata, new RegExp(`^name: ${name}$`, 'm'))
-    assert.match(metadata, /^metadata:\n  model: openai\/easy$/m)
+    assert.match(metadata, /^metadata:\n  model: openai\/routine$/m)
     assert.doesNotMatch(metadata, /fallback_model|reasoning_effort|reasoning:/)
     assert.match(source, /routine-skill-dispatch\.md/)
   }
