@@ -25,7 +25,7 @@ export interface SlotTracker {
 
 export function createSlotTracker(dependencies: SlotTrackerDependencies): SlotTracker {
   const { semaphore, isHardAgent } = dependencies
-  const heldCalls = new Map<string, { readonly isBackground: boolean }>()
+  const heldCalls = new Map<string, { readonly isBackground: boolean; readonly sessionID: string }>()
   const callByChild = new Map<string, string>()
   const pendingCalls = new Map<string, { readonly sessionID: string; isCancelled: boolean }>()
 
@@ -64,13 +64,20 @@ export function createSlotTracker(dependencies: SlotTrackerDependencies): SlotTr
       semaphore.release()
       return
     }
-    heldCalls.set(call.id, { isBackground: call.input.background === true })
+    heldCalls.set(call.id, { isBackground: call.input.background === true, sessionID: call.sessionID })
   }
 
   function releaseCall(callID: string): void {
     if (heldCalls.delete(callID)) {
       semaphore.release()
     }
+  }
+
+  function releaseForegroundCallsOf(sessionID: string): void {
+    const foregroundCallIDs = [...heldCalls]
+      .filter(([, held]) => held.sessionID === sessionID && !held.isBackground)
+      .map(([callID]) => callID)
+    foregroundCallIDs.forEach(releaseCall)
   }
 
   async function shouldGate(call: SubagentCall): Promise<boolean> {
@@ -114,7 +121,11 @@ export function createSlotTracker(dependencies: SlotTrackerDependencies): SlotTr
         if (kind.wasInterrupted) {
           cancelPendingSession(kind.sessionID)
           semaphore.cancelSession(kind.sessionID)
+          releaseForegroundCallsOf(kind.sessionID)
         }
+      }
+      if (kind.kind === 'sessionDeleted') {
+        releaseChild(kind.sessionID)
       }
     },
   }

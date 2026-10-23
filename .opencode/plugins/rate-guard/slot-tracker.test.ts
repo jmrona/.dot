@@ -247,3 +247,43 @@ test('a later call in a resumed session still takes a slot after an interrupt', 
   await settle()
   assert.equal(second.done, false)
 })
+
+test('a deleted background child releases its slot', async () => {
+  const { tracker } = createFixture(1)
+  await tracker.beforeExecute(backgroundCall('c1'))
+  const second = track(tracker.beforeExecute(call('c2')))
+  await tracker.afterExecute({ ...backgroundCall('c1'), result: startedResult('child-1').result })
+  tracker.handleEvent({ type: 'session.deleted', data: { sessionID: 'child-1' } })
+  await settle()
+  assert.equal(second.done, true)
+})
+
+test('an interrupted parent releases its foreground slot', async () => {
+  const { tracker } = createFixture(1)
+  await tracker.beforeExecute(call('c1'))
+  const second = track(tracker.beforeExecute(call('c2', { sessionID: 'other' })))
+  tracker.handleEvent({ type: 'session.execution.interrupted', data: { sessionID: 'parent' } })
+  await settle()
+  assert.equal(second.done, true)
+})
+
+test('a background slot survives a parent interrupt', async () => {
+  const { tracker } = createFixture(1)
+  await tracker.beforeExecute(backgroundCall('c1'))
+  await tracker.afterExecute({ ...backgroundCall('c1'), result: startedResult('child-1').result })
+  const second = track(tracker.beforeExecute(call('c2', { sessionID: 'other' })))
+  tracker.handleEvent({ type: 'session.execution.interrupted', data: { sessionID: 'parent' } })
+  await settle()
+  assert.equal(second.done, false)
+})
+
+test('a later execute.after after an interrupt does not release twice', async () => {
+  const { tracker } = createFixture(1)
+  await tracker.beforeExecute(call('c1'))
+  tracker.handleEvent({ type: 'session.execution.interrupted', data: { sessionID: 'parent' } })
+  await tracker.beforeExecute(call('c2', { sessionID: 'other' }))
+  await tracker.afterExecute(call('c1'))
+  const third = track(tracker.beforeExecute(call('c3', { sessionID: 'other' })))
+  await settle()
+  assert.equal(third.done, false)
+})

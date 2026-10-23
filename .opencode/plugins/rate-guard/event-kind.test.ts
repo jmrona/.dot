@@ -32,3 +32,13 @@ test('an event without a session identifier is ignored', () => {
   const event = { type: 'session.execution.succeeded', data: {} }
   assert.deepEqual(classifyEvent(event), { kind: 'ignored' })
 })
+
+test('classifies a deleted session as sessionDeleted', () => {
+  const event = { type: 'session.deleted', data: { sessionID: 'child' } }
+  assert.deepEqual(classifyEvent(event), { kind: 'sessionDeleted', sessionID: 'child' })
+})
+
+test('a deleted session event without a session identifier is ignored', () => {
+  const event = { type: 'session.deleted', data: {} }
+  assert.deepEqual(classifyEvent(event), { kind: 'ignored' })
+})
