@@ -350,8 +350,17 @@ test('brainstorming modes hand off to implementation from plan mode without a ma
 
     assert.match(skill, /invoke `subagent-driven-development` now, even if Plan mode is still active/, path)
     assert.match(skill, /mode-switch plugin moves the session to Build/, path)
-    assert.match(skill, /Do not ask the user to switch agents unless/, path)
+    assert.match(skill, /Do not ask the user to switch agents unless the plugin reports that the switch failed/, path)
   }
+})
+
+test('keeps the ticket-run exception on the skip bullet of the workflow rule', () => {
+  const skipBullet = read('rules/common/workflow.md')
+    .split('\n')
+    .find((line) => line.startsWith('- Picking `brainstorming-skip`'))
+
+  assert.ok(skipBullet, 'skip bullet exists')
+  assert.ok(skipBullet.includes('(except in a ticket run'), skipBullet)
 })
 
 test('retries rate-limited subagent calls with the same role before reporting blocked', () => {

@@ -30,7 +30,7 @@ test('standard mode asks the approach choice as a separate question before the s
 test('standard mode presents every section in one message', () => {
   const step = stepBody(read(standardPath), 'Present approaches and approve sections')
 
-  assert.match(step, /every section \([^)]*testing\) in one message/)
+  assert.match(step, /every section \(architecture, components, data flow, error handling, and testing\) in one message/)
 })
 
 test('standard mode approves sections with one multiSelect question', () => {
@@ -68,7 +68,7 @@ test('standard mode asks again only about the reworked sections', () => {
 test('standard mode has the planner draft all sections in one call when delegating', () => {
   const step = stepBody(read(standardPath), 'Present approaches and approve sections')
 
-  assert.match(step, /`stack-planner` drafts all sections in one call/)
+  assert.match(step, /It then drafts all sections in one call/)
   assert.match(step, /present each one verbatim/)
 })
 
@@ -159,5 +159,5 @@ test('standard worked example splits the no-ticket next step into two sentences'
 test('standard mode returns the chosen approach to the same planner before it drafts sections', () => {
   const step = stepBody(read(standardPath), 'Present approaches and approve sections')
 
-  assert.match(step, /return the chosen approach to the same `stack-planner` with its `sessionID`\. It then drafts the sections/i)
+  assert.match(step, /return the chosen approach to the same `stack-planner` with its `sessionID`\. It then drafts all sections in one call/i)
 })
