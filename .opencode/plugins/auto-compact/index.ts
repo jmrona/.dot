@@ -6,12 +6,12 @@ import { fileURLToPath } from 'node:url'
 
 import { parsePercentArgument, savePercent } from './command.ts'
 import { loadAutoCompactConfig } from './config.ts'
+import { replaceActiveWatcher, sharedProcessState, type ProcessState } from './process-state.ts'
 import { clearWatcherStatus, markWatcherFailed } from './status.ts'
 import {
   startThresholdWatcher,
   type ThresholdApi,
   type ThresholdDependencies,
-  type ThresholdWatcher,
 } from './threshold.ts'
 
 const PLAN_DIRECTORY = '/Users/jose.romero/.opencode/plan'
@@ -69,11 +69,12 @@ export interface AutoCompactOptions {
   readonly confirmationTimeoutMs: number
 }
 
-type CompactionRun =
+export type CompactionRun =
   | { readonly kind: 'plan'; readonly planPath: string; readonly contentHash: string }
   | { readonly kind: 'threshold'; readonly percent: number }
 
 interface AutoCompactState {
+  readonly handledPlanWriteIds: Set<string>
   readonly inFlightBySession: Map<string, CompactionRun>
   readonly hashesBySession: Map<string, Map<string, string>>
   readonly noticedRuns: WeakSet<CompactionRun>
@@ -85,16 +86,17 @@ type CompactionOutcome =
   | { readonly kind: 'timedOut'; readonly confirmationTimeoutMs: number }
   | { readonly kind: 'interrupted'; readonly error: unknown }
 
-export function createAutoCompact(options: AutoCompactOptions) {
+export function createAutoCompact(options: AutoCompactOptions, processState: ProcessState) {
   const state: AutoCompactState = {
-    inFlightBySession: new Map<string, CompactionRun>(),
-    hashesBySession: new Map<string, Map<string, string>>(),
+    inFlightBySession: processState.inFlightBySession,
+    hashesBySession: processState.hashesBySession,
+    handledPlanWriteIds: processState.handledPlanWriteIds,
     noticedRuns: new WeakSet<CompactionRun>(),
   }
   return {
     async handleExecuteAfter(api: AutoCompactApi, input: ExecuteAfterInput): Promise<void> {
       const planPath = await compactionTargetOf(api, input, options, state)
-      if (planPath === undefined) {
+      if (planPath === undefined || !claimPlanWrite(state, input.id)) {
         return
       }
       const content = await readPlanOrNotice(api, input.sessionID, planPath)
@@ -153,6 +155,14 @@ async function compactionTargetOf(
     return undefined
   }
   return (await isRootSession(api, input.sessionID)) ? planPath : undefined
+}
+
+function claimPlanWrite(state: AutoCompactState, callID: string): boolean {
+  if (state.handledPlanWriteIds.has(callID)) {
+    return false
+  }
+  state.handledPlanWriteIds.add(callID)
+  return true
 }
 
 function isCompletedPlanWrite(input: ExecuteAfterInput): boolean {
@@ -446,19 +456,26 @@ export interface SetupOptions {
   readonly log: (message: string) => void
 }
 
-export async function setupAutoCompact(api: PluginApi, options: SetupOptions): Promise<void> {
+export async function setupAutoCompact(
+  api: PluginApi,
+  options: SetupOptions,
+  processState: ProcessState = sharedProcessState(),
+): Promise<void> {
   const config = await loadAutoCompactConfig(options.configPath, options.log)
-  const autoCompact = createAutoCompact({
-    planDirectory: PLAN_DIRECTORY,
-    homeDirectory: homedir(),
-    confirmationTimeoutMs: config.confirmationTimeoutMs,
-  })
+  const autoCompact = createAutoCompact(
+    {
+      planDirectory: PLAN_DIRECTORY,
+      homeDirectory: homedir(),
+      confirmationTimeoutMs: config.confirmationTimeoutMs,
+    },
+    processState,
+  )
   if (config.compactOnPlanSave) {
     await api.tool.hook('execute.after', (input) => autoCompact.handleExecuteAfter(api, input))
   }
   await api.session.hook('compaction', (input) => autoCompact.handleCompaction(input))
   const threshold: ThresholdControl = {
-    watcher: undefined,
+    processState,
     percent: config.compactAtPercentOfInputLimit,
   }
   const watcherDependencies = {
@@ -468,12 +485,12 @@ export async function setupAutoCompact(api: PluginApi, options: SetupOptions): P
     onGiveUp: () => markWatcherFailedSafely(options.statusPath, options.log),
   }
   await clearWatcherStatusSafely(options.statusPath, options.log)
-  if (threshold.percent !== null) {
-    threshold.watcher = startThresholdWatcher({
-      ...watcherDependencies,
-      percent: threshold.percent,
-    })
-  }
+  replaceActiveWatcher(
+    processState,
+    threshold.percent === null
+      ? undefined
+      : startThresholdWatcher({ ...watcherDependencies, percent: threshold.percent }),
+  )
   api.command.transform((draft) =>
     draft.add({
       name: 'auto-compact',
@@ -485,7 +502,7 @@ export async function setupAutoCompact(api: PluginApi, options: SetupOptions): P
 }
 
 interface ThresholdControl {
-  watcher: ThresholdWatcher | undefined
+  readonly processState: ProcessState
   percent: number | null
 }
 
@@ -550,15 +567,19 @@ async function applyPercent(
   percent: number | null,
   options: SetupOptions,
 ): Promise<void> {
-  if (threshold.watcher?.isRunning()) {
-    threshold.watcher.setPercent(percent)
+  const activeWatcher = threshold.processState.activeWatcher
+  if (activeWatcher?.isRunning()) {
+    activeWatcher.setPercent(percent)
     return
   }
   if (percent === null) {
     return
   }
   await clearWatcherStatusSafely(options.statusPath, options.log)
-  threshold.watcher = startThresholdWatcher({ ...watcherDependencies, percent })
+  replaceActiveWatcher(
+    threshold.processState,
+    startThresholdWatcher({ ...watcherDependencies, percent }),
+  )
 }
 
 async function markWatcherFailedSafely(

@@ -16,6 +16,7 @@ import autoCompactPlugin, {
   type PluginApi,
   setupAutoCompact,
 } from './index.ts'
+import { createProcessState, type ProcessState } from './process-state.ts'
 import { readWatcherFailed } from './status.ts'
 import type { ThresholdEvent } from './threshold.ts'
 
@@ -218,10 +219,13 @@ async function createWorkspace(t: TestContext): Promise<Workspace> {
 async function createHarness(t: TestContext, options: HarnessOptions = {}): Promise<Harness> {
   const workspace = await createWorkspace(t)
   const fake = createWatchedFakeApi(t, { session: options.session, stream: options.stream })
-  const autoCompact = createAutoCompact({
-    ...workspace,
-    confirmationTimeoutMs: options.confirmationTimeoutMs ?? WAIT_LIMIT_MS,
-  })
+  const autoCompact = createAutoCompact(
+    {
+      ...workspace,
+      confirmationTimeoutMs: options.confirmationTimeoutMs ?? WAIT_LIMIT_MS,
+    },
+    createProcessState(),
+  )
   return { workspace, fake, autoCompact }
 }
 
@@ -231,15 +235,18 @@ async function writePlan(directory: string, name: string, content: string): Prom
   return filePath
 }
 
+let nextCallNumber = 0
+
 function writeExecution(
   overrides: Partial<ExecuteAfterInput> & { readonly input: unknown },
 ): ExecuteAfterInput {
+  nextCallNumber += 1
   return {
     tool: 'write',
     sessionID: 'session-1',
     agent: 'plan',
     messageID: 'message-1',
-    id: 'call-1',
+    id: `call-${nextCallNumber}`,
     status: 'completed',
     ...overrides,
   }
@@ -402,11 +409,14 @@ test('a plan path starting with a tilde expands to the home directory and compac
   const planDirectory = join(workspace.homeDirectory, 'plan')
   await mkdir(planDirectory)
   const fake = createWatchedFakeApi(t)
-  const autoCompact = createAutoCompact({
-    planDirectory,
-    homeDirectory: workspace.homeDirectory,
-    confirmationTimeoutMs: WAIT_LIMIT_MS,
-  })
+  const autoCompact = createAutoCompact(
+    {
+      planDirectory,
+      homeDirectory: workspace.homeDirectory,
+      confirmationTimeoutMs: WAIT_LIMIT_MS,
+    },
+    createProcessState(),
+  )
   await writePlan(planDirectory, 'design.md', 'plan')
 
   await autoCompact.handleExecuteAfter(
@@ -870,6 +880,7 @@ async function setupWithConfig(
   failingSubscriptions?: number,
   statusPathOverride?: (root: string) => string,
   existingStatus?: string,
+  processState: ProcessState = createProcessState(),
 ): Promise<SetupHarness> {
   const root = await mkdtemp(join(tmpdir(), 'auto-compact-setup-'))
   t.after(() => rm(root, { recursive: true, force: true }))
@@ -883,11 +894,11 @@ async function setupWithConfig(
   }
   const fake = createWatchedFakeApi(t, { stream, failingSubscriptions })
   const logs: string[] = []
-  await setupAutoCompact(fake.api, {
-    configPath,
-    statusPath,
-    log: (message) => logs.push(message),
-  })
+  await setupAutoCompact(
+    fake.api,
+    { configPath, statusPath, log: (message) => logs.push(message) },
+    processState,
+  )
   return { fake, logs, configPath, statusPath }
 }
 
@@ -1262,4 +1273,145 @@ test('a failed clear at setup still starts the threshold watcher', async (t) => 
   )
 
   assert.equal(fake.subscriptions.length, 1)
+})
+
+const THRESHOLD_CONFIG = { compactAtPercentOfInputLimit: CONFIGURED_THRESHOLD_PERCENT }
+
+function setupSharingState(
+  t: TestContext,
+  processState: ProcessState,
+  config: unknown = THRESHOLD_CONFIG,
+): Promise<SetupHarness> {
+  return setupWithConfig(t, config, undefined, undefined, undefined, undefined, processState)
+}
+
+function runningSubscriptionCount(...harnesses: SetupHarness[]): number {
+  return harnesses
+    .flatMap(({ fake }) => fake.subscriptions)
+    .filter((subscription) => !subscription.signal.aborted).length
+}
+
+test('a second setup sharing the state leaves one running watcher', async (t) => {
+  const processState = createProcessState()
+  const first = await setupSharingState(t, processState)
+  const second = await setupSharingState(t, processState)
+
+  assert.equal(runningSubscriptionCount(first, second), 1)
+})
+
+test('one threshold crossing seen by two setups sharing the state requests one compaction', async (t) => {
+  const processState = createProcessState()
+  const first = await setupSharingState(t, processState)
+  const second = await setupSharingState(t, processState)
+
+  for (const { fake } of [first, second]) {
+    emitStepAtPercent(fake, 90)
+  }
+  await settleEventLoop()
+
+  const requests = [first, second].flatMap(({ fake }) => compactCalls(fake.calls))
+  assert.equal(requests.length, 1)
+})
+
+test('two instances sharing a state do not both compact the same session', async (t) => {
+  const workspace = await createWorkspace(t)
+  const processState = createProcessState()
+  const options = { ...workspace, confirmationTimeoutMs: WAIT_LIMIT_MS }
+  const first = createAutoCompact(options, processState)
+  const second = createAutoCompact(options, processState)
+  const fake = createWatchedFakeApi(t)
+
+  await first.startThresholdCompaction(fake.api, 'session-1', 80)
+  await second.startThresholdCompaction(fake.api, 'session-1', 80)
+
+  assert.equal(compactCalls(fake.calls).length, 1)
+})
+
+test('a new setup with the threshold off stops the previous watcher and starts none', async (t) => {
+  const processState = createProcessState()
+  const first = await setupSharingState(t, processState)
+  const second = await setupSharingState(t, processState, {})
+
+  assert.equal(runningSubscriptionCount(first, second), 0)
+})
+
+test('setting the threshold after the watcher gave up leaves one running watcher', async (t) => {
+  const harness = await setupWithConfig(t, THRESHOLD_CONFIG, undefined, 2)
+  await waitForFailedStatus(harness.statusPath)
+
+  await runCommand(harness, '50')
+
+  assert.equal(runningSubscriptionCount(harness), 1)
+})
+
+async function createInstancesSharingState(t: TestContext, count: number) {
+  const workspace = await createWorkspace(t)
+  const processState = createProcessState()
+  const options = { ...workspace, confirmationTimeoutMs: WAIT_LIMIT_MS }
+  const instances = Array.from({ length: count }, () => createAutoCompact(options, processState))
+  return { workspace, processState, instances }
+}
+
+test('two instances seeing the same plan write request one compaction', async (t) => {
+  const { workspace, instances } = await createInstancesSharingState(t, 2)
+  const fake = createWatchedFakeApi(t)
+  const planPath = await writePlan(workspace.planDirectory, 'design.md', 'plan')
+
+  await Promise.all(
+    instances.map((instance) =>
+      instance.handleExecuteAfter(
+        fake.api,
+        writeExecution({ id: 'call-1', input: { path: planPath } }),
+      ),
+    ),
+  )
+
+  assert.equal(compactCalls(fake.calls).length, 1)
+})
+
+test('two instances seeing the same unreadable plan write post one notice', async (t) => {
+  const { workspace, instances } = await createInstancesSharingState(t, 2)
+  const fake = createWatchedFakeApi(t)
+  const missingPath = join(workspace.planDirectory, 'missing.md')
+
+  await Promise.all(
+    instances.map((instance) =>
+      instance.handleExecuteAfter(
+        fake.api,
+        writeExecution({ id: 'call-1', input: { path: missingPath } }),
+      ),
+    ),
+  )
+
+  assert.equal(syntheticTexts(fake.calls).length, 1)
+})
+
+test('a plan write with a new call ID is handled after an earlier call ID was claimed', async (t) => {
+  const { workspace, instances } = await createInstancesSharingState(t, 2)
+  const fake = createWatchedFakeApi(t)
+  const missingPath = join(workspace.planDirectory, 'missing.md')
+
+  await instances[0]?.handleExecuteAfter(
+    fake.api,
+    writeExecution({ id: 'call-1', input: { path: missingPath } }),
+  )
+  await instances[1]?.handleExecuteAfter(
+    fake.api,
+    writeExecution({ id: 'call-2', input: { path: missingPath } }),
+  )
+
+  assert.equal(syntheticTexts(fake.calls).length, 2)
+})
+
+test('a write outside the plan directory does not claim its call ID', async (t) => {
+  const { workspace, processState, instances } = await createInstancesSharingState(t, 1)
+  const fake = createWatchedFakeApi(t)
+  const outsidePath = join(workspace.homeDirectory, 'notes.md')
+
+  await instances[0]?.handleExecuteAfter(
+    fake.api,
+    writeExecution({ id: 'call-1', input: { path: outsidePath } }),
+  )
+
+  assert.equal(processState.handledPlanWriteIds.has('call-1'), false)
 })

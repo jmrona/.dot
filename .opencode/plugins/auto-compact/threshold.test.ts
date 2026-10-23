@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { test, type TestContext } from 'node:test'
 
 import { createAutoCompact, type AutoCompactSession } from './index.ts'
+import { createProcessState } from './process-state.ts'
 import {
   startThresholdWatcher,
   type ThresholdApi,
@@ -186,11 +187,14 @@ async function createHarness(t: TestContext, options: HarnessOptions = {}): Prom
   const planPath = join(root, 'design.md')
   await writeFile(planPath, 'plan')
   const fake = createFakeApi(options)
-  const autoCompact = createAutoCompact({
-    planDirectory: root,
-    homeDirectory: root,
-    confirmationTimeoutMs: 1000,
-  })
+  const autoCompact = createAutoCompact(
+    {
+      planDirectory: root,
+      homeDirectory: root,
+      confirmationTimeoutMs: 1000,
+    },
+    createProcessState(),
+  )
   const logs: string[] = []
   const giveUpCalls = { count: 0 }
   const watcher = startThresholdWatcher({
