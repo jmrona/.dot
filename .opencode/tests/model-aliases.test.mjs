@@ -11,8 +11,8 @@ const expectedInstructions = readdirSync(join(configRoot, 'rules', 'common'), { 
   .map((file) => resolve(configRoot, 'rules', 'common', file.name))
   .sort()
 
-test('uses the easy alias by default and loads every common rule by explicit path and no language rule', () => {
-  assert.equal(config.model, 'openai/easy')
+test('uses the routine alias by default and loads every common rule by explicit path and no language rule', () => {
+  assert.equal(config.model, 'openai/routine')
   assert.deepEqual(config.instructions, expectedInstructions)
   assert.ok(config.instructions.every((instruction) => instruction.includes(`${sep}rules${sep}common${sep}`)))
   assert.ok(config.instructions.every((instruction) => existsSync(instruction)))

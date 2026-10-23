@@ -52,7 +52,7 @@ test('retires the old routing plugin and moves v1-format plugins and commands ou
     'node_modules',
   ])
 
-  assert.equal(config.model, 'openai/easy')
+  assert.equal(config.model, 'openai/routine')
   assert.ok(config.providers.openai.models.routine)
   assert.ok(config.providers.openai.models.easy)
   assert.ok(config.providers.openai.models.hard)
