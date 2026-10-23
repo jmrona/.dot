@@ -9,8 +9,6 @@ import autoCompactPlugin, {
   type AutoCompactApi,
   type AutoCompactEvent,
   type AutoCompactSession,
-  type CompactionInput,
-  type CompactionMessage,
   type CommandDraft,
   type ExecuteAfterInput,
   type PluginApi,
@@ -33,6 +31,7 @@ interface Subscription {
 type StreamBehaviour = 'events' | 'throws' | 'endsEarly' | 'ignoresSignal'
 
 interface FakeApiOptions {
+  readonly onCompact?: (subscriptions: readonly Subscription[]) => void
   readonly session?: AutoCompactSession
   readonly stream?: StreamBehaviour
   readonly failingSubscriptions?: number
@@ -64,6 +63,8 @@ interface HarnessOptions {
   readonly confirmationTimeoutMs?: number
   readonly session?: AutoCompactSession
   readonly stream?: StreamBehaviour
+  readonly onCompact?: (subscriptions: readonly Subscription[]) => void
+  readonly holdCompact?: Promise<void>
 }
 
 const ROOT_SESSION: AutoCompactSession = { id: 'session-1' }
@@ -76,6 +77,11 @@ const THRESHOLD_MODEL = {
   limit: { context: 2000, input: 1000, output: 100 },
 }
 const CONFIGURED_THRESHOLD_PERCENT = 80
+const CONFIRMATION_CAP_MS = 60 * 60 * 1000
+const STEP_ENDED_EVENT: AutoCompactEvent = {
+  type: 'session.step.ended',
+  data: { sessionID: 'session-1' },
+}
 const ENDED_EVENT: AutoCompactEvent = {
   type: 'session.compaction.ended',
   data: { sessionID: 'session-1' },
@@ -160,7 +166,11 @@ function createFakeApi(options: FakeApiOptions = {}): FakeApi {
         await record('session.get', input)
         return options.session ?? ROOT_SESSION
       },
-      compact: (input) => record('session.compact', input),
+      compact: async (input) => {
+        await record('session.compact', input)
+        options.onCompact?.(subscriptions)
+        await options.holdCompact
+      },
       synthetic: (input) => record('session.synthetic', input),
       hook: async (name, handler) => {
         await record('session.hook', { name })
@@ -175,6 +185,7 @@ function createFakeApi(options: FakeApiOptions = {}): FakeApi {
     },
     event: {
       subscribe: ({ signal }) => {
+        calls.push({ method: 'event.subscribe' })
         subscriptionCount += 1
         if (subscriptionCount <= (options.failingSubscriptions ?? 0)) {
           subscriptions.push({ signal, emit: () => undefined })
@@ -218,7 +229,12 @@ async function createWorkspace(t: TestContext): Promise<Workspace> {
 
 async function createHarness(t: TestContext, options: HarnessOptions = {}): Promise<Harness> {
   const workspace = await createWorkspace(t)
-  const fake = createWatchedFakeApi(t, { session: options.session, stream: options.stream })
+  const fake = createWatchedFakeApi(t, {
+    session: options.session,
+    stream: options.stream,
+    onCompact: options.onCompact,
+    holdCompact: options.holdCompact,
+  })
   const autoCompact = createAutoCompact(
     {
       ...workspace,
@@ -259,13 +275,8 @@ async function savePlan(harness: Harness, planPath: string): Promise<void> {
   )
 }
 
-async function runCompactionHook(
-  harness: Harness,
-  messages: CompactionMessage[] = [],
-): Promise<CompactionInput> {
-  const input: CompactionInput = { sessionID: 'session-1', messages }
-  await harness.autoCompact.handleCompaction(input)
-  return input
+function postCompactionPlanNoticeFor(planPath: string): string {
+  return `The session was compacted after the plan was saved to ${planPath}. Skill instructions loaded before the compaction are no longer in context. Read the plan from that file. Do not restart the design skill: continue with its handoff step. In a ticket run, invoke subagent-driven-development with skill, even if you invoked it before this notice. Otherwise, ask whether to create tickets or implement, unless the user has already answered.`
 }
 
 function emitEvent(fake: FakeApi, event: AutoCompactEvent): void {
@@ -306,10 +317,6 @@ function syntheticCalls(calls: readonly RecordedCall[]): RecordedCall[] {
 
 function syntheticTexts(calls: readonly RecordedCall[]): string[] {
   return syntheticCalls(calls).map((call) => (call.args as { text: string }).text)
-}
-
-function compactionNoticeFor(planPath: string): string {
-  return `Plan saved to ${planPath} and the session was compacted. Read the plan from that file. Continue with the next step of the design skill: ask whether to create tickets or implement. If the user picks implementation, invoke subagent-driven-development now, even if Plan mode is still active.`
 }
 
 test('a new plan saved in the plan directory compacts the session once with steer delivery', async (t) => {
@@ -465,18 +472,6 @@ test('the save handler returns before the compaction is confirmed', async (t) =>
   )
 })
 
-test('the compaction hook adds the plan notice while a compaction is in flight', async (t) => {
-  const harness = await createHarness(t)
-  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
-  await savePlan(harness, planPath)
-
-  const input = await runCompactionHook(harness)
-
-  assert.deepEqual(input.messages, [
-    { role: 'user', content: [{ type: 'text', text: compactionNoticeFor(planPath) }] },
-  ])
-})
-
 test('a compaction failure event posts the failure notice', async (t) => {
   const harness = await createHarness(t)
   const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
@@ -537,6 +532,7 @@ test('a missing end event posts the timeout notice', async (t) => {
   const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
 
   await savePlan(harness, planPath)
+  emitEvent(harness.fake, STEP_ENDED_EVENT)
   await waitFor(() => syntheticTexts(harness.fake.calls).length === 1)
 
   assert.deepEqual(syntheticTexts(harness.fake.calls), [
@@ -548,6 +544,7 @@ test('a save of the same content after the confirmation timeout compacts the ses
   const harness = await createHarness(t, { confirmationTimeoutMs: CONFIRMATION_TIMEOUT_MS })
   const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
   await savePlan(harness, planPath)
+  emitEvent(harness.fake, STEP_ENDED_EVENT)
   await waitFor(() => syntheticTexts(harness.fake.calls).length === 1)
 
   await savePlan(harness, planPath)
@@ -589,7 +586,7 @@ test('setup registers an execute.after handler that reaches the plugin', async (
   assert.ok(notice?.startsWith(`Plan saved to ${missingPath}, but it could not be read`), notice)
 })
 
-test('an end event for another session does not end the watched compaction', async (t) => {
+test('a failure event for another session posts no failure notice for the watched compaction', async (t) => {
   const harness = await createHarness(t)
   const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
   await savePlan(harness, planPath)
@@ -601,7 +598,7 @@ test('an end event for another session does not end the watched compaction', asy
   emitEvent(harness.fake, ENDED_EVENT)
   await waitForUnsubscribe(harness.fake)
 
-  assert.deepEqual(syntheticTexts(harness.fake.calls), [])
+  assert.deepEqual(syntheticTexts(harness.fake.calls), [postCompactionPlanNoticeFor(planPath)])
 })
 
 test('a plan path that escapes the plan directory with dot-dot does not compact the session', async (t) => {
@@ -644,28 +641,6 @@ test('an unreadable plan notice is sent to the saving session without resuming i
   })
 })
 
-test('a compaction hook for another session leaves the messages unchanged', async (t) => {
-  const harness = await createHarness(t)
-  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
-  await savePlan(harness, planPath)
-  const otherInput: CompactionInput = { sessionID: 'session-2', messages: [] }
-
-  await harness.autoCompact.handleCompaction(otherInput)
-
-  assert.deepEqual(otherInput.messages, [])
-})
-
-test('a second compaction hook call leaves the messages unchanged', async (t) => {
-  const harness = await createHarness(t)
-  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
-  await savePlan(harness, planPath)
-  await runCompactionHook(harness)
-
-  const secondInput = await runCompactionHook(harness)
-
-  assert.deepEqual(secondInput.messages, [])
-})
-
 test('a rejected synthetic notice does not reject the save handler', async (t) => {
   const harness = await createHarness(t)
   harness.fake.failures.set('session.synthetic', 'notice rejected')
@@ -676,6 +651,12 @@ test('a rejected synthetic notice does not reject the save handler', async (t) =
 
 test('the same content saved in another session compacts that session', async (t) => {
   const harness = await createHarness(t)
+  t.after(() =>
+    harness.fake.subscriptions[1]?.emit({
+      type: 'session.compaction.ended',
+      data: { sessionID: 'session-2' },
+    }),
+  )
   const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
   await savePlan(harness, planPath)
   emitEvent(harness.fake, ENDED_EVENT)
@@ -727,14 +708,16 @@ test('an event stream that ends without an event posts the unconfirmed notice wi
 })
 
 test('an event stream that ignores the abort signal still posts the timeout notice', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
   const harness = await createHarness(t, { stream: 'ignoresSignal', confirmationTimeoutMs: CONFIRMATION_TIMEOUT_MS })
   const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
-
   await savePlan(harness, planPath)
-  await waitFor(() => syntheticTexts(harness.fake.calls).length === 1)
+
+  t.mock.timers.tick(CONFIRMATION_CAP_MS)
+  await waitForTurns(() => syntheticTexts(harness.fake.calls).length > 0)
 
   assert.deepEqual(syntheticTexts(harness.fake.calls), [
-    `Plan saved to ${planPath}, but the compaction could not be confirmed within 0.02 seconds. Run /compact to compact the session manually.`,
+    `Plan saved to ${planPath}, but the compaction could not be confirmed within 3600 seconds. Run /compact to compact the session manually.`,
   ])
 })
 
@@ -800,24 +783,6 @@ test('a plan save does not compact while a threshold compaction is in flight', a
   assert.equal(compactCalls(harness.fake.calls).length, 1)
 })
 
-test('the compaction hook adds no plan notice to a threshold run', async (t) => {
-  const harness = await createHarness(t)
-  await startThreshold(harness)
-
-  const input = await runCompactionHook(harness)
-
-  assert.deepEqual(input.messages, [])
-})
-
-test('a threshold run stays in flight after the compaction hook runs', async (t) => {
-  const harness = await createHarness(t)
-  await startThreshold(harness)
-
-  await runCompactionHook(harness)
-
-  assert.equal(harness.autoCompact.isCompactionInFlight('session-1'), true)
-})
-
 test('a failed threshold compaction posts the threshold failure notice', async (t) => {
   const harness = await createHarness(t)
   await startThreshold(harness)
@@ -848,6 +813,7 @@ test('an unconfirmed threshold compaction posts the threshold timeout notice', a
   const harness = await createHarness(t, { confirmationTimeoutMs: CONFIRMATION_TIMEOUT_MS })
 
   await startThreshold(harness)
+  emitEvent(harness.fake, STEP_ENDED_EVENT)
   await waitFor(() => syntheticTexts(harness.fake.calls).length === 1)
 
   assert.deepEqual(syntheticTexts(harness.fake.calls), [
@@ -935,6 +901,8 @@ test('setupAutoCompact uses the configured confirmation timeout', async (t) => {
     fake.subscriptions[0]?.emit(event)
   }
   await waitForImmediates(() => compactCalls(fake.calls).length === 1)
+  fake.subscriptions[1]?.emit(STEP_ENDED_EVENT)
+  await waitForTurns(() => false)
 
   t.mock.timers.tick(7000)
   await waitForImmediates(() => syntheticTexts(fake.calls).length === 1)
@@ -949,10 +917,10 @@ test('setupAutoCompact does not register the plan trigger when compactOnPlanSave
   assert.equal(fake.hooks.has('execute.after'), false)
 })
 
-test('setupAutoCompact registers the compaction hook when compactOnPlanSave is false', async (t) => {
+test('setupAutoCompact registers no compaction hook', async (t) => {
   const { fake } = await setupWithConfig(t, { compactOnPlanSave: false })
 
-  assert.equal(fake.hooks.has('compaction'), true)
+  assert.equal(fake.hooks.has('compaction'), false)
 })
 
 test('setupAutoCompact starts no threshold watcher when no threshold is configured', async (t) => {
@@ -991,16 +959,6 @@ test('setupAutoCompact reads the config file only at setup', async (t) => {
   await handler(writeExecution({ input: { path: missingPath } }))
 
   assert.equal(syntheticTexts(fake.calls).length, 1)
-})
-
-test('a plan run stays in flight after the compaction hook runs', async (t) => {
-  const harness = await createHarness(t)
-  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
-  await savePlan(harness, planPath)
-
-  await runCompactionHook(harness)
-
-  assert.equal(harness.autoCompact.isCompactionInFlight('session-1'), true)
 })
 
 test('setupAutoCompact registers a command named auto-compact', async (t) => {
@@ -1414,4 +1372,243 @@ test('a write outside the plan directory does not claim its call ID', async (t) 
   )
 
   assert.equal(processState.handledPlanWriteIds.has('call-1'), false)
+})
+
+async function waitForTurns(condition: () => boolean): Promise<void> {
+  for (let turn = 0; turn < 200 && !condition(); turn += 1) {
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+}
+
+test('the confirmation timeout does not expire before a step or execution ends', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const harness = await createHarness(t, { confirmationTimeoutMs: CONFIRMATION_TIMEOUT_MS })
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  await savePlan(harness, planPath)
+
+  t.mock.timers.tick(CONFIRMATION_TIMEOUT_MS * 10)
+  await waitForTurns(() => syntheticTexts(harness.fake.calls).length > 0)
+
+  assert.deepEqual(syntheticTexts(harness.fake.calls), [])
+})
+
+test('the sixty minute cap posts the timeout notice and releases the session', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const harness = await createHarness(t, { confirmationTimeoutMs: CONFIRMATION_TIMEOUT_MS })
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  await savePlan(harness, planPath)
+
+  t.mock.timers.tick(CONFIRMATION_CAP_MS)
+  await waitForTurns(() => syntheticTexts(harness.fake.calls).length > 0)
+
+  assert.deepEqual(syntheticTexts(harness.fake.calls), [
+    `Plan saved to ${planPath}, but the compaction could not be confirmed within 3600 seconds. Run /compact to compact the session manually.`,
+  ])
+  assert.equal(harness.autoCompact.isCompactionInFlight('session-1'), false)
+})
+
+test('the confirmation timeout expires after a step ends', async (t) => {
+  const harness = await createHarness(t, { confirmationTimeoutMs: CONFIRMATION_TIMEOUT_MS })
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  await savePlan(harness, planPath)
+
+  emitEvent(harness.fake, STEP_ENDED_EVENT)
+  await waitFor(() => syntheticTexts(harness.fake.calls).length === 1)
+
+  assert.deepEqual(syntheticTexts(harness.fake.calls), [
+    `Plan saved to ${planPath}, but the compaction could not be confirmed within 0.02 seconds. Run /compact to compact the session manually.`,
+  ])
+})
+
+test('the confirmation subscribes before it calls compact', async (t) => {
+  const harness = await createHarness(t)
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+
+  await savePlan(harness, planPath)
+
+  const methods = harness.fake.calls.map((call) => call.method)
+  assert.ok(methods.indexOf('event.subscribe') < methods.indexOf('session.compact'), methods.join())
+})
+
+test('an execution end during the compact call starts the confirmation timer', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const harness = await createHarness(t, {
+    confirmationTimeoutMs: CONFIRMATION_TIMEOUT_MS,
+    onCompact: (subscriptions) => {
+      const subscription = subscriptions[0]
+      if (subscription === undefined) {
+        throw new Error('no subscription was open during compact')
+      }
+      subscription.emit({ type: 'session.execution.succeeded', data: { sessionID: 'session-1' } })
+    },
+  })
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  await savePlan(harness, planPath)
+  await waitForTurns(() => false)
+
+  t.mock.timers.tick(CONFIRMATION_TIMEOUT_MS)
+  await waitForTurns(() => syntheticTexts(harness.fake.calls).length > 0)
+
+  assert.deepEqual(syntheticTexts(harness.fake.calls), [
+    `Plan saved to ${planPath}, but the compaction could not be confirmed within 0.02 seconds. Run /compact to compact the session manually.`,
+  ])
+})
+
+test('a throwing compact aborts the early subscription', async (t) => {
+  const harness = await createHarness(t)
+  harness.fake.failures.set('session.compact', 'compact rejected')
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+
+  await savePlan(harness, planPath)
+
+  assert.equal(harness.fake.subscriptions[0]?.signal.aborted, true)
+})
+
+test('a throwing compact releases the in-flight entry', async (t) => {
+  const harness = await createHarness(t)
+  harness.fake.failures.set('session.compact', 'compact rejected')
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+
+  await savePlan(harness, planPath)
+
+  assert.equal(harness.autoCompact.isCompactionInFlight('session-1'), false)
+})
+
+test('a deleted session releases the in-flight entry without a notice', async (t) => {
+  const harness = await createHarness(t)
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  await savePlan(harness, planPath)
+
+  emitEvent(harness.fake, { type: 'session.deleted', data: { sessionID: 'session-1' } })
+  await waitFor(() => !harness.autoCompact.isCompactionInFlight('session-1'))
+
+  assert.deepEqual(syntheticTexts(harness.fake.calls), [])
+})
+
+test('a finished plan compaction posts the post-compaction plan notice without resuming', async (t) => {
+  const harness = await createHarness(t)
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  await savePlan(harness, planPath)
+
+  emitEvent(harness.fake, ENDED_EVENT)
+  await waitFor(() => syntheticCalls(harness.fake.calls).length === 1)
+
+  assert.deepEqual(syntheticCalls(harness.fake.calls), [
+    {
+      method: 'session.synthetic',
+      args: {
+        sessionID: 'session-1',
+        resume: false,
+        text: postCompactionPlanNoticeFor(planPath),
+      },
+    },
+  ])
+})
+
+test('a finished threshold compaction posts the post-compaction threshold notice without resuming', async (t) => {
+  const harness = await createHarness(t)
+  await startThreshold(harness)
+
+  emitEvent(harness.fake, ENDED_EVENT)
+  await waitFor(() => syntheticCalls(harness.fake.calls).length === 1)
+
+  assert.deepEqual(syntheticCalls(harness.fake.calls), [
+    {
+      method: 'session.synthetic',
+      args: {
+        sessionID: 'session-1',
+        resume: false,
+        text: `The session was compacted at ${THRESHOLD_PERCENT}% of the input limit. Skill instructions loaded before the compaction are no longer in context. Invoke the skill whose procedure you are following again with skill before your next step.`,
+      },
+    },
+  ])
+})
+
+function holdCompactUntilReleased(): { readonly gate: Promise<void>; release(): void } {
+  let release: () => void = () => undefined
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  return { gate, release }
+}
+
+test('a deleted session releases the in-flight entry while compact has not returned', async (t) => {
+  const { gate, release } = holdCompactUntilReleased()
+  t.after(release)
+  const harness = await createHarness(t, { holdCompact: gate })
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  const saving = savePlan(harness, planPath)
+  await waitFor(() => compactCalls(harness.fake.calls).length === 1)
+
+  emitEvent(harness.fake, { type: 'session.deleted', data: { sessionID: 'session-1' } })
+  await waitFor(() => !harness.autoCompact.isCompactionInFlight('session-1'))
+
+  release()
+  await saving
+  assert.deepEqual(syntheticTexts(harness.fake.calls), [])
+})
+
+test('the sixty minute cap posts the timeout notice while compact has not returned', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const { gate, release } = holdCompactUntilReleased()
+  t.after(release)
+  const harness = await createHarness(t, { holdCompact: gate })
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  const saving = savePlan(harness, planPath)
+  await waitForTurns(() => compactCalls(harness.fake.calls).length === 1)
+
+  t.mock.timers.tick(CONFIRMATION_CAP_MS)
+  await waitForTurns(() => syntheticTexts(harness.fake.calls).length > 0)
+
+  assert.equal(syntheticTexts(harness.fake.calls).length, 1)
+  assert.equal(harness.autoCompact.isCompactionInFlight('session-1'), false)
+  release()
+  await saving
+})
+
+test('a throwing compact posts only the failure notice', async (t) => {
+  const harness = await createHarness(t)
+  harness.fake.failures.set('session.compact', 'compact rejected')
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+
+  await savePlan(harness, planPath)
+  await waitForTurns(() => false)
+
+  assert.equal(syntheticTexts(harness.fake.calls).length, 1)
+})
+
+test('an event from another session does not start the step timer', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const harness = await createHarness(t, { confirmationTimeoutMs: CONFIRMATION_TIMEOUT_MS })
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  await savePlan(harness, planPath)
+
+  emitEvent(harness.fake, { type: 'session.step.ended', data: { sessionID: 'session-2' } })
+  await waitForTurns(() => false)
+  t.mock.timers.tick(CONFIRMATION_TIMEOUT_MS * 10)
+  await waitForTurns(() => syntheticTexts(harness.fake.calls).length > 0)
+
+  assert.deepEqual(syntheticTexts(harness.fake.calls), [])
+})
+
+test('a deleted session closes the event subscription', async (t) => {
+  const harness = await createHarness(t)
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  await savePlan(harness, planPath)
+
+  emitEvent(harness.fake, { type: 'session.deleted', data: { sessionID: 'session-1' } })
+
+  await waitForUnsubscribe(harness.fake)
+})
+
+test('the sixty minute cap aborts the event subscription', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const harness = await createHarness(t)
+  const planPath = await writePlan(harness.workspace.planDirectory, 'design.md', 'plan one')
+  await savePlan(harness, planPath)
+
+  t.mock.timers.tick(CONFIRMATION_CAP_MS)
+  await waitForTurns(() => harness.fake.subscriptions[0]?.signal.aborted === true)
+
+  assert.equal(harness.fake.subscriptions[0]?.signal.aborted, true)
 })

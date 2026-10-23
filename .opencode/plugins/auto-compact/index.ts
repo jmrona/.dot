@@ -14,6 +14,15 @@ import {
   type ThresholdDependencies,
 } from './threshold.ts'
 
+const CONFIRMATION_CAP_MS = 60 * 60 * 1000
+
+const EXECUTION_PROGRESS_EVENTS: ReadonlySet<string> = new Set([
+  'session.step.ended',
+  'session.execution.succeeded',
+  'session.execution.failed',
+  'session.execution.interrupted',
+])
+
 const PLAN_DIRECTORY = '/Users/jose.romero/.opencode/plan'
 
 export interface AutoCompactSession {
@@ -38,22 +47,11 @@ export interface ExecuteAfterInput {
   readonly error?: unknown
 }
 
-export interface CompactionMessage {
-  readonly role: string
-  readonly content: Array<{ readonly type: string; readonly text?: string }>
-}
-
-export interface CompactionInput {
-  readonly sessionID: string
-  readonly messages: CompactionMessage[]
-}
-
 export interface AutoCompactApi {
   readonly session: {
     get(input: { sessionID: string }): Promise<AutoCompactSession>
     compact(input: { sessionID: string; delivery: 'steer' }): Promise<unknown>
     synthetic(input: { sessionID: string; text: string; resume: boolean }): Promise<unknown>
-    hook(name: 'compaction', handler: (input: CompactionInput) => Promise<void>): Promise<void>
   }
   readonly tool: {
     hook(name: 'execute.after', handler: (input: ExecuteAfterInput) => Promise<void>): Promise<void>
@@ -77,11 +75,12 @@ interface AutoCompactState {
   readonly handledPlanWriteIds: Set<string>
   readonly inFlightBySession: Map<string, CompactionRun>
   readonly hashesBySession: Map<string, Map<string, string>>
-  readonly noticedRuns: WeakSet<CompactionRun>
 }
 
 type CompactionOutcome =
   | { readonly kind: 'ended' }
+  | { readonly kind: 'deleted' }
+  | { readonly kind: 'cancelled' }
   | { readonly kind: 'failed'; readonly error: unknown }
   | { readonly kind: 'timedOut'; readonly confirmationTimeoutMs: number }
   | { readonly kind: 'interrupted'; readonly error: unknown }
@@ -91,7 +90,6 @@ export function createAutoCompact(options: AutoCompactOptions, processState: Pro
     inFlightBySession: processState.inFlightBySession,
     hashesBySession: processState.hashesBySession,
     handledPlanWriteIds: processState.handledPlanWriteIds,
-    noticedRuns: new WeakSet<CompactionRun>(),
   }
   return {
     async handleExecuteAfter(api: AutoCompactApi, input: ExecuteAfterInput): Promise<void> {
@@ -123,17 +121,6 @@ export function createAutoCompact(options: AutoCompactOptions, processState: Pro
     },
     isCompactionInFlight(sessionID: string): boolean {
       return state.inFlightBySession.has(sessionID)
-    },
-    async handleCompaction(input: CompactionInput): Promise<void> {
-      const run = state.inFlightBySession.get(input.sessionID)
-      if (run === undefined || run.kind !== 'plan' || state.noticedRuns.has(run)) {
-        return
-      }
-      state.noticedRuns.add(run)
-      input.messages.push({
-        role: 'user',
-        content: [{ type: 'text', text: compactionNoticeText(run.planPath) }],
-      })
     },
   }
 }
@@ -265,41 +252,72 @@ async function startCompaction(
   confirmationTimeoutMs: number,
 ): Promise<void> {
   state.inFlightBySession.set(sessionID, run)
+  const confirmation = openConfirmation(api, sessionID, confirmationTimeoutMs)
+  void confirmation.outcome.then((outcome) => settleCompaction(api, sessionID, run, state, outcome))
   try {
     await api.session.compact({ sessionID, delivery: 'steer' })
   } catch (error: unknown) {
+    confirmation.cancel()
     releaseInFlight(state, sessionID, run)
     forgetRunHash(state, sessionID, run)
     await recordNotice(api, sessionID, failureTextOf(run, error))
-    return
   }
-  void watchCompaction(api, sessionID, run, state, confirmationTimeoutMs)
 }
 
-async function watchCompaction(
+interface Confirmation {
+  readonly outcome: Promise<CompactionOutcome>
+  cancel(): void
+}
+
+function openConfirmation(
   api: AutoCompactApi,
   sessionID: string,
-  run: CompactionRun,
-  state: AutoCompactState,
   confirmationTimeoutMs: number,
-): Promise<void> {
+): Confirmation {
   const controller = new AbortController()
-  let isTimedOut = false
-  const timer = setTimeout(() => {
-    isTimedOut = true
-    controller.abort()
-  }, confirmationTimeoutMs)
-  const observed = await Promise.race([
-    nextCompactionOutcome(api, sessionID, controller.signal),
+  const timers = armConfirmationTimers(controller, confirmationTimeoutMs)
+  let isCancelled = false
+  const outcome = Promise.race([
+    nextCompactionOutcome(api, sessionID, controller.signal, timers.startStepTimer),
     untilAborted(controller.signal),
-  ]).catch((error: unknown): CompactionOutcome => ({ kind: 'interrupted', error }))
-  clearTimeout(timer)
-  controller.abort()
-  const outcome: CompactionOutcome =
-    isTimedOut && observed.kind === 'interrupted'
-      ? { kind: 'timedOut', confirmationTimeoutMs }
-      : observed
-  await settleCompaction(api, sessionID, run, state, outcome)
+  ])
+    .catch((error: unknown): CompactionOutcome => ({ kind: 'interrupted', error }))
+    .then((observed): CompactionOutcome => {
+      timers.clear()
+      controller.abort()
+      return isCancelled ? { kind: 'cancelled' } : timers.expire(observed)
+    })
+  return {
+    outcome,
+    cancel: () => {
+      isCancelled = true
+      controller.abort()
+    },
+  }
+}
+
+function armConfirmationTimers(controller: AbortController, confirmationTimeoutMs: number) {
+  let expiredAfterMs: number | undefined
+  const expireAfter = (afterMs: number): ReturnType<typeof setTimeout> =>
+    setTimeout(() => {
+      expiredAfterMs = afterMs
+      controller.abort()
+    }, afterMs)
+  const capTimer = expireAfter(CONFIRMATION_CAP_MS)
+  let stepTimer: ReturnType<typeof setTimeout> | undefined
+  return {
+    startStepTimer: (): void => {
+      stepTimer ??= expireAfter(confirmationTimeoutMs)
+    },
+    clear: (): void => {
+      clearTimeout(capTimer)
+      clearTimeout(stepTimer)
+    },
+    expire: (observed: CompactionOutcome): CompactionOutcome =>
+      expiredAfterMs !== undefined && observed.kind === 'interrupted'
+        ? { kind: 'timedOut', confirmationTimeoutMs: expiredAfterMs }
+        : observed,
+  }
 }
 
 async function settleCompaction(
@@ -309,17 +327,30 @@ async function settleCompaction(
   state: AutoCompactState,
   outcome: CompactionOutcome,
 ): Promise<void> {
+  if (outcome.kind === 'cancelled') {
+    return
+  }
   releaseInFlight(state, sessionID, run)
+  if (outcome.kind === 'deleted') {
+    return
+  }
   if (outcome.kind === 'ended') {
+    await recordNotice(api, sessionID, postCompactionTextOf(run))
     return
   }
   forgetRunHash(state, sessionID, run)
   await recordNotice(api, sessionID, settlementText(run, outcome))
 }
 
+function postCompactionTextOf(run: CompactionRun): string {
+  return run.kind === 'plan'
+    ? `The session was compacted after the plan was saved to ${run.planPath}. Skill instructions loaded before the compaction are no longer in context. Read the plan from that file. Do not restart the design skill: continue with its handoff step. In a ticket run, invoke subagent-driven-development with skill, even if you invoked it before this notice. Otherwise, ask whether to create tickets or implement, unless the user has already answered.`
+    : `The session was compacted at ${run.percent}% of the input limit. Skill instructions loaded before the compaction are no longer in context. Invoke the skill whose procedure you are following again with skill before your next step.`
+}
+
 function settlementText(
   run: CompactionRun,
-  outcome: Exclude<CompactionOutcome, { readonly kind: 'ended' }>,
+  outcome: Exclude<CompactionOutcome, { readonly kind: 'ended' | 'deleted' | 'cancelled' }>,
 ): string {
   if (outcome.kind === 'failed') {
     return failureTextOf(run, outcome.error)
@@ -352,6 +383,7 @@ async function nextCompactionOutcome(
   api: AutoCompactApi,
   sessionID: string,
   signal: AbortSignal,
+  onExecutionProgress: () => void,
 ): Promise<CompactionOutcome> {
   for await (const event of api.event.subscribe({ signal })) {
     if (event.data.sessionID !== sessionID) {
@@ -359,6 +391,12 @@ async function nextCompactionOutcome(
     }
     if (event.type === 'session.compaction.ended') {
       return { kind: 'ended' }
+    }
+    if (event.type === 'session.deleted') {
+      return { kind: 'deleted' }
+    }
+    if (EXECUTION_PROGRESS_EVENTS.has(event.type)) {
+      onExecutionProgress()
     }
     if (event.type === 'session.compaction.failed') {
       return { kind: 'failed', error: event.data.error }
@@ -386,10 +424,6 @@ async function recordNotice(api: AutoCompactApi, sessionID: string, text: string
   } catch {
     return
   }
-}
-
-function compactionNoticeText(planPath: string): string {
-  return `Plan saved to ${planPath} and the session was compacted. Read the plan from that file. Continue with the next step of the design skill: ask whether to create tickets or implement. If the user picks implementation, invoke subagent-driven-development now, even if Plan mode is still active.`
 }
 
 function unreadableText(planPath: string, error: unknown): string {
@@ -473,7 +507,6 @@ export async function setupAutoCompact(
   if (config.compactOnPlanSave) {
     await api.tool.hook('execute.after', (input) => autoCompact.handleExecuteAfter(api, input))
   }
-  await api.session.hook('compaction', (input) => autoCompact.handleCompaction(input))
   const threshold: ThresholdControl = {
     processState,
     percent: config.compactAtPercentOfInputLimit,
