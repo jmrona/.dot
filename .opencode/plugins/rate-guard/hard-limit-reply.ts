@@ -1,14 +1,9 @@
+import { INFO_REPLY_PATTERN, SAVE_FAILURE_PREFIX, USAGE_TEXT } from './reply-texts.ts'
+
 export interface HardLimitReply {
   readonly message: string
   readonly variant: 'info' | 'error'
 }
-
-const ERROR_REPLY_PREFIXES = [
-  'Could not save the hard subagent limit',
-  'Use /hard-limit to show the limit',
-]
-
-const INFO_REPLY_PATTERN = /^At most \d+ openai\/hard subagents/
 
 export function hardLimitReplyOf(
   event: unknown,
@@ -29,7 +24,7 @@ export function hardLimitReplyOf(
 }
 
 function classifyReply(text: string): HardLimitReply | undefined {
-  if (ERROR_REPLY_PREFIXES.some((prefix) => text.startsWith(prefix))) {
+  if (text.startsWith(SAVE_FAILURE_PREFIX) || text === USAGE_TEXT) {
     return { message: text, variant: 'error' }
   }
   if (INFO_REPLY_PATTERN.test(text)) {

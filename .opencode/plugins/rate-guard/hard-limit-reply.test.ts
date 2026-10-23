@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 
 import { hardLimitReplyOf } from './hard-limit-reply.ts'
+import { createLimitCommand } from './limit-command.ts'
+import type { SlotSemaphore } from './semaphore.ts'
 
 const SESSION = 'ses_current'
 
@@ -11,6 +16,44 @@ function enqueued(text: unknown, sessionID = SESSION, itemType = 'synthetic'): u
     data: { sessionID, item: { type: itemType, payload: { text } } },
   }
 }
+
+function fakeSemaphore(limit: number): SlotSemaphore {
+  return { limit: () => limit, setLimit: () => {} } as unknown as SlotSemaphore
+}
+
+async function repliesSentFor(promptText: string, configPath: string): Promise<string[]> {
+  const sentTexts: string[] = []
+  const command = createLimitCommand({
+    semaphore: fakeSemaphore(3),
+    configPath,
+    notify: async (_sessionID, text) => {
+      sentTexts.push(text)
+    },
+  })
+  await command({ sessionID: SESSION, prompt: { text: promptText } })
+  return sentTexts
+}
+
+function variantOfReply(text: string): string | undefined {
+  return hardLimitReplyOf(enqueued(text), SESSION)?.variant
+}
+
+test('classifies every reply the limit command sends', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'rate-guard-limit-reply-'))
+  try {
+    const writableConfigPath = join(directory, 'config.json')
+    const unwritableConfigPath = join(directory, 'missing-directory', 'config.json')
+    const replies = [
+      ...(await repliesSentFor('', writableConfigPath)),
+      ...(await repliesSentFor('4', writableConfigPath)),
+      ...(await repliesSentFor('abc', writableConfigPath)),
+      ...(await repliesSentFor('4', unwritableConfigPath)),
+    ]
+    assert.deepEqual(replies.map(variantOfReply), ['info', 'info', 'error', 'error'])
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
 
 test('show reply is classified as info', () => {
   const text = 'At most 3 openai/hard subagents run at once.'

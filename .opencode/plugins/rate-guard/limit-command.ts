@@ -1,4 +1,5 @@
 import { parseLimitArgument, saveLimit } from './command.ts'
+import { SAVE_FAILURE_PREFIX, setLimitText, showLimitText, USAGE_TEXT } from './reply-texts.ts'
 import type { SlotSemaphore } from './semaphore.ts'
 
 export interface LimitInvocation {
@@ -15,8 +16,6 @@ export interface LimitCommandDependencies {
 export const LIMIT_COMMAND_DESCRIPTION =
   'Show or set how many openai/hard subagents run at once (only openai/hard subagents are limited): /hard-limit [1-10]'
 
-const USAGE_TEXT = 'Use /hard-limit to show the limit or /hard-limit <1-10> to set it.'
-
 export function createLimitCommand(
   dependencies: LimitCommandDependencies,
 ): (invocation: LimitInvocation) => Promise<void> {
@@ -24,7 +23,7 @@ export function createLimitCommand(
   return async (invocation) => {
     const argument = parseLimitArgument(invocation.prompt.text)
     if (argument.kind === 'show') {
-      await notify(invocation.sessionID, `At most ${semaphore.limit()} openai/hard subagents run at once.`)
+      await notify(invocation.sessionID, showLimitText(semaphore.limit()))
     } else if (argument.kind === 'invalid') {
       await notify(invocation.sessionID, USAGE_TEXT)
     } else {
@@ -44,10 +43,10 @@ async function changeLimit(
     const reason = error instanceof Error ? error.message : String(error)
     await dependencies.notify(
       sessionID,
-      `Could not save the hard subagent limit: ${reason}. The limit is unchanged.`,
+      `${SAVE_FAILURE_PREFIX}: ${reason}. The limit is unchanged.`,
     )
     return
   }
   dependencies.semaphore.setLimit(limit)
-  await dependencies.notify(sessionID, `At most ${limit} openai/hard subagents now run at once.`)
+  await dependencies.notify(sessionID, setLimitText(limit))
 }
