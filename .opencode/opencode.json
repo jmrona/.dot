@@ -21,6 +21,7 @@
 		"/Users/jose.romero/.config/opencode/rules/common/verification.md",
 		"/Users/jose.romero/.config/opencode/rules/common/workflow.md"
 	],
+	"experimental": { "todo": true },
 	"model": "openai/routine",
 	"agents": {
 		"build": { "model": "openai/routine" },

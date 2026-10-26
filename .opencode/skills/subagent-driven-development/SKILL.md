@@ -104,7 +104,15 @@ A wave holds at most 4 implementers. Split a wider wave in plan order.
 
 ### Task Tracker Output
 
-Produce a `todowrite` with every task. Each entry includes:
+Before the first dispatch, write the whole wave plan in one `todowrite` call. Use the wave layout of the `todo-lists` skill:
+
+- One parent per wave: `W1. Wave 1: <short goal>`
+- One child per task: `└─ 1.1 <task name>`
+- A last child per wave: `└─ 1.N Gate, checkpoint and commits`
+
+Each `content` is one short line that names the task. It carries no details.
+
+Put the task record in the plan file when one exists (see "Plan File"). Otherwise keep it in your own notes. The record keeps these fields:
 
 - Task name and description
 - Wave number
@@ -113,6 +121,10 @@ Produce a `todowrite` with every task. Each entry includes:
 - Acceptance criteria
 - Dependencies on other tasks
 - Scene-setting context describing where the task fits in the overall design
+
+Mark each task child `in_progress` when its implementer is dispatched. Mark it `completed` when its reviewer returns `[PASS]`. The `todo-lists` skill owns the remaining status rules.
+
+If `todowrite` is not available, keep the same layout as a numbered checklist in your replies.
 
 ## Per-Wave Pipeline
 
