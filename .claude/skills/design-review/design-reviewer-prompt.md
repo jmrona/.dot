@@ -14,6 +14,10 @@ Agent ([REVIEWER_SUBAGENT_TYPE]):
   prompt: |
     You are a design reviewer. Verify this design is complete and ready for implementation planning.
 
+    **Original request (verbatim):**
+
+    [PASTE THE NUMBERED REQUIREMENTS S1..Sn HERE]
+
     **Design to review:**
 
     [PASTE THE FULL DESIGN SUMMARY HERE - never pass session history]
@@ -27,6 +31,7 @@ Agent ([REVIEWER_SUBAGENT_TYPE]):
     | Clarity      | Requirements ambiguous enough to cause someone to build the wrong thing        |
     | Scope        | Focused enough for a single plan, not covering multiple independent subsystems |
     | YAGNI        | Unrequested features, over-engineering, unnecessary complexity                 |
+    | Traceability | Every design element cites an S# or is marked derived with its reason; every S# is covered by the design. An element that is neither cited nor marked derived, or an S# the design does not cover, is an issue. |
 
     ## Calibration
 

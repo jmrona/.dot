@@ -16,7 +16,7 @@ This skill **MUST NOT** be invoked until the caller has produced a consolidated 
 ## Procedure
 
 1. **Confirm the summary is consolidated.** If the caller has not produced a single design summary block, stop and tell the caller to consolidate before invoking this skill.
-2. **Dispatch the reviewer.** Use `architect-reviewer` on `openai/hard` and the native OpenCode V2 subagent interface with `agent`, `description`, and `prompt`; omit `sessionID` for a new child and use `background: false` or omit it because review is a dependent step. Paste the full consolidated design summary into the prompt and do not pass session history. The reviewer is read-only: it does not run shell commands, invoke review workflows, launch nested reviewers, or ask the human. If the role or alias is unavailable, report `BLOCKED`.
+2. **Dispatch the reviewer.** Use `architect-reviewer` on `openai/hard` and the native OpenCode V2 subagent interface with `agent`, `description`, and `prompt`; omit `sessionID` for a new child and use `background: false` or omit it because review is a dependent step. Paste the full consolidated design summary into the prompt and do not pass session history. Paste the original user request verbatim above the design summary, split into numbered requirements (`S1`, `S2`, ...). If the summary already starts with the numbered request, paste that block once. The reviewer is read-only: it does not run shell commands, invoke review workflows, launch nested reviewers, or ask the human. If the role or alias is unavailable, report `BLOCKED`.
 3. **Read the reviewer's status.**
    - **Approved**: return the design summary unchanged to the caller. Done.
    - **Issues Found**: extract each issue, decide whether the fix is a wording change, a missing section, or a substantive design change.
@@ -34,6 +34,7 @@ This skill **MUST NOT** be invoked until the caller has produced a consolidated 
 | Clarity      | Requirements ambiguous enough that someone could build the wrong thing         |
 | Scope        | Focused enough for a single plan, not covering multiple independent subsystems |
 | YAGNI        | Unrequested features, over-engineering, unnecessary complexity                 |
+| Traceability | Every design element cites an S# or is marked derived with its reason; every S# is covered |
 
 ## Calibration
 

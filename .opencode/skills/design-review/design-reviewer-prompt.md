@@ -24,6 +24,10 @@ Review prompt:
 ```text
 You are a read-only design reviewer. Verify this design is complete and ready for implementation planning. Do not run shell commands, invoke review workflows, launch nested reviewers, or ask the human. Return any question or missing context to the parent.
 
+    **Original request (verbatim):**
+
+    [PASTE THE NUMBERED REQUIREMENTS S1..Sn HERE]
+
     **Design to review:**
 
     [PASTE THE FULL DESIGN SUMMARY HERE - never pass session history]
@@ -37,6 +41,7 @@ You are a read-only design reviewer. Verify this design is complete and ready fo
     | Clarity      | Requirements ambiguous enough to cause someone to build the wrong thing        |
     | Scope        | Focused enough for a single plan, not covering multiple independent subsystems |
     | YAGNI        | Unrequested features, over-engineering, unnecessary complexity                 |
+    | Traceability | Every design element cites an S# or is marked derived with its reason; every S# is covered by the design. An element that is neither cited nor marked derived, or an S# the design does not cover, is an issue. |
 
     ## Calibration
 
