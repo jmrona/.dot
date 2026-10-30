@@ -28,9 +28,11 @@ test('defines routine, easy and hard aliases with valid OpenAI catalogue metadat
 
   assert.ok(aliases.every((model) => typeof model.modelID === 'string' && model.modelID.length > 0))
   assert.notEqual(models.easy.modelID, models.hard.modelID)
-  assert.equal(models.routine.modelID, models.easy.modelID)
+  assert.notEqual(models.routine.modelID, models.easy.modelID)
   assert.equal(models.routine.settings.reasoningEffort, 'medium')
-  assert.equal(models.easy.settings.reasoningEffort, 'high')
+  assert.equal(models.easy.modelID, 'gpt-6.1-terra')
+  assert.equal(models.easy.family, 'gpt-terra')
+  assert.equal(models.easy.settings.reasoningEffort, 'medium')
   assert.equal(models.hard.settings.reasoningEffort, 'high')
   assert.deepEqual(models.routine.capabilities.reasoning.effort, ['medium'])
   assert.equal(models.routine.name, 'Routine work')
@@ -38,7 +40,7 @@ test('defines routine, easy and hard aliases with valid OpenAI catalogue metadat
 
   for (const model of aliases) {
     assert.equal(model.package, '@opencode/ai/providers/openai')
-    assert.equal(model.settings.reasoningEffort, model === models.routine ? 'medium' : 'high')
+    assert.equal(model.settings.reasoningEffort, model === models.hard ? 'high' : 'medium')
     assert.equal(model.capabilities.tools, true)
     assert.ok(['text', 'image', 'pdf'].every((input) => model.capabilities.input.includes(input)))
     assert.ok(model.capabilities.output.includes('text'))

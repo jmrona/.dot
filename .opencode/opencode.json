@@ -68,26 +68,26 @@
 					}
 				},
 				"easy": {
-					"modelID": "gpt-6-luna",
+					"modelID": "gpt-6.1-terra",
 					"name": "Bounded work",
-					"family": "gpt-luna",
+					"family": "gpt-terra",
 					"package": "@opencode/ai/providers/openai",
 					"settings": {
-						"reasoningEffort": "high",
+						"reasoningEffort": "medium",
 						"reasoningSummary": "auto",
 						"include": ["reasoning.encrypted_content"]
 					},
 					"cost": [
 						{
-							"input": 0.1,
-							"output": 0.5,
-							"cache": { "read": 0.01, "write": 0.125 }
+							"input": 2,
+							"output": 12,
+							"cache": { "read": 0.2, "write": 2.5 }
 						},
 						{
 							"tier": { "type": "context", "size": 272000 },
-							"input": 0.2,
-							"output": 0.75,
-							"cache": { "read": 0.02, "write": 0.25 }
+							"input": 4,
+							"output": 18,
+							"cache": { "read": 0.4, "write": 5 }
 						}
 					],
 					"limit": { "context": 1050000, "input": 922000, "output": 128000 },
@@ -95,7 +95,7 @@
 						"tools": true,
 						"input": ["text", "image", "pdf"],
 						"output": ["text"],
-						"reasoning": { "supported": true, "effort": ["high"] }
+						"reasoning": { "supported": true, "effort": ["medium"] }
 					}
 				},
 				"hard": {
