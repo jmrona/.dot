@@ -64,3 +64,15 @@ test('skill table lists the Traceability check', () => {
   assert.ok(row, 'SKILL.md has no Traceability row')
   assert.ok(row.includes(skillTraceabilityText))
 })
+
+test('dispatch step starts the reviewer at the Standard escalation tier', () => {
+  const step = dispatchStep()
+  assert.ok(step.includes('Start at the Standard escalation tier'))
+  assert.ok(!step.includes('Start at the Low-cost default tier'))
+})
+
+test('reviewer prompt starts the reviewer at the Standard escalation tier', () => {
+  const prompt = readSkillFile('design-reviewer-prompt.md')
+  assert.ok(prompt.includes('Start at the Standard escalation tier'))
+  assert.ok(!prompt.includes('Start at the Low-cost default tier'))
+})

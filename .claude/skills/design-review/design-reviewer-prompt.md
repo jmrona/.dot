@@ -6,7 +6,7 @@ Use this template when dispatching a design reviewer subagent.
 
 **Dispatch after:** Design summary has been consolidated from the brainstorming conversation.
 
-**Subagent type selection:** Replace `[REVIEWER_SUBAGENT_TYPE]` with the most specific reviewer type that the session lists as available, selected per `../_shared/subagent-dispatch.md`. If none fits, use `general-purpose` with this template as its full instruction. The reviewer reads and reports. It **MUST NOT** edit files. Do not pre-escalate the model: start at the Low-cost default tier and escalate only on evidence to Standard escalation, resolving each per `../_shared/subagent-dispatch.md`.
+**Subagent type selection:** Replace `[REVIEWER_SUBAGENT_TYPE]` with the most specific reviewer type that the session lists as available, selected per `../_shared/subagent-dispatch.md`. If none fits, use `general-purpose` with this template as its full instruction. The reviewer reads and reports. It **MUST NOT** edit files. Start at the Standard escalation tier and escalate only on evidence to High-capability, resolving each per `../_shared/subagent-dispatch.md`.
 
 ```
 Agent ([REVIEWER_SUBAGENT_TYPE]):
