@@ -23,14 +23,23 @@ For the rule that no implementation may begin until the user has approved a desi
 
 3. **Check substantive judgement with the planner.** If acceptance criteria or a design decision require judgement, choose who checks them. Delegate to `stack-planner` unless your instructions say that you author design content yourself. In that case, you author the design content directly. When you delegate, send the full user statement and relevant context to `stack-planner` on `openai/hard`. The planner checks for ambiguity and drafts the concise plan without inventing requirements or proposing alternatives, and it returns questions to the parent. When you author design content yourself, you perform that check and draft the plan directly. Ask at most one targeted follow-up when genuinely needed. If the user's statement is already clear, capture the user's statement verbatim and do not ask the user to repeat it.
 
+   Copy the user's statement verbatim into **Requirements (verbatim)**, one `S#` per requirement sentence, without paraphrasing. Any acceptance criterion that the user's words do not state goes under **Derived criteria**, each with its reason. A derived criterion **MUST NOT** appear among the requirements. Every bullet under **Design** ends with `[S#]` (one or more) or `[derived: <reason>]`. A derived design element also appears under **Derived criteria**.
+
 4. **Present the captured design via plan mode.** The parent uses `exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)` to present the user's statement, or the faithful summary when judgement was needed, as the plan content. The parent checks that no unapproved requirement was added. Format:
 
    ```
    ## Approved Design (skip mode)
 
-   **What to build:** [user's statement]
+   **What to build:** [one-sentence summary]
 
-   **Acceptance criteria:** [bullets derived from the statement, or "as described above" if a short change]
+   **Requirements (verbatim):**
+   - S1: "[the user's words, quoted exactly]"
+
+   **Design:**
+   - [design element] [S1]
+   - [design element] [derived: reason]
+
+   **Derived criteria:** [each criterion the user did not state, as "- [criterion] (derived: [reason])", or "None"]
 
    **Out of scope:** [anything the user explicitly excluded, or "nothing flagged"]
    ```
@@ -74,10 +83,15 @@ The user and the agent already discussed a design earlier in the conversation ("
 
 **What to build:** Add a `--dry-run` flag to the deploy script that prints the actions it would take without executing them.
 
-**Acceptance criteria:**
-- The deploy script accepts a `--dry-run` flag
-- When the flag is set, the script prints each action it would take
-- When the flag is set, no actual deploy actions are executed
+**Requirements (verbatim):**
+- S1: "let's add a `--dry-run` flag to the deploy script that prints what it would do"
+
+**Design:**
+- The deploy script accepts a `--dry-run` flag [S1]
+- When the flag is set, the script prints each action it would take [S1]
+- When the flag is set, no actual deploy actions are executed [S1]
+
+**Derived criteria:** None
 
 **Out of scope:** Nothing flagged.
 
@@ -98,11 +112,19 @@ User: Add a --dry-run flag to the deploy script that prints what it would do wit
 
 **What to build:** Add a `--dry-run` flag to the deploy script that prints the actions it would take without executing them.
 
-**Acceptance criteria:**
-- The deploy script accepts a `--dry-run` flag
-- When the flag is set, the script prints each action it would take, prefixed with `[dry-run]`
-- When the flag is set, no actual deploy actions are executed
-- The flag is documented in `--help` output
+**Requirements (verbatim):**
+- S1: "Add a --dry-run flag to the deploy script that prints what it would do without actually doing it."
+
+**Design:**
+- The deploy script accepts a `--dry-run` flag [S1]
+- When the flag is set, the script prints each action it would take [S1]
+- When the flag is set, no actual deploy actions are executed [S1]
+- Each printed action is prefixed with `[dry-run]` [derived: consistent output marker]
+- The flag is documented in `--help` output [derived: flags in this script are documented in --help]
+
+**Derived criteria:**
+- Each printed action is prefixed with `[dry-run]` (derived: consistent output marker)
+- The flag is documented in `--help` output (derived: flags in this script are documented in --help)
 
 **Out of scope:** Nothing flagged.
 
@@ -136,3 +158,4 @@ If any one of these is false, the gate has not been crossed, and you **MUST NOT*
 | Routing to skip yourself instead of letting the user pick        | The router asks; the user picks. You **MUST NOT** invoke this skill except as a hand-off from the router after the user explicitly picks skip. |
 | Asking "what would you like to build" when a design was already discussed in the conversation | Re-check context first. Making the user repeat an already-stated design defeats the point of skip mode and ignores the spirit of prior discussion. |
 | Asking a follow-up question to confirm something already unambiguous in context | Only ask when something is genuinely ambiguous or missing, not as a reflexive double-check. |
+| Listing a derived criterion as a requirement                     | The requirements are the user's words. Anything you add is derived and carries its reason. |
