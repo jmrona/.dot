@@ -49,6 +49,8 @@ Start at the Low-cost default tier. Escalate exactly one tier at a time, and onl
 
 Within `subagent-driven-development`, a task whose difficulty is unsure starts at the Standard escalation tier, as a scoped exception to that ban. The reason is that a wave lasts as long as its slowest task, so one failed inexpensive attempt costs a whole wave round. The High-capability tier is still reached only by escalation on evidence.
 
+Within `design-review`, the reviewer starts at the Standard escalation tier, as a second scoped exception, because the Low-cost default tier blocked clean designs.
+
 If an implementer returns `BLOCKED` with a reasoning-capacity cause, dispatch a new `Agent` one tier up in the same wave. `SendMessage` continues an agent on its own model. The new agent's brief states that the partial edits in its `writes` are still in the tree.
 
 Some tasks are complexity signals: copying, moving, backing up or restructuring files across more than one directory. Rewriting an existing file whose full contents the subagent was not given is another. Start those tasks at the Standard escalation tier. A subagent can need one rework for a structural error, such as a flattened layout, a whole-file overwrite after a failed edit or lost numbering. In that case, escalate one tier for the retry. Do not dispatch the same tier again.

@@ -71,6 +71,20 @@ test('dispatch step starts the reviewer at the Standard escalation tier', () => 
   assert.ok(!step.includes('Start at the Low-cost default tier'))
 })
 
+test('shared dispatch escalation triggers records the design-review Standard tier exception', () => {
+  const triggers = readFileSync(
+    new URL('../skills/_shared/subagent-dispatch.md', import.meta.url),
+    'utf8',
+  )
+    .split('### Escalation Triggers')[1]
+    .split('\n### ')[0]
+  assert.ok(
+    triggers.includes(
+      'Within `design-review`, the reviewer starts at the Standard escalation tier, as a second scoped exception, because the Low-cost default tier blocked clean designs.',
+    ),
+  )
+})
+
 test('reviewer prompt starts the reviewer at the Standard escalation tier', () => {
   const prompt = readSkillFile('design-reviewer-prompt.md')
   assert.ok(prompt.includes('Start at the Standard escalation tier'))
