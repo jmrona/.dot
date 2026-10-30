@@ -101,10 +101,10 @@ test('TDD prune section asks the user the removal question before applying appro
 
   for (const anchor of [
     '`AskUserQuestion`',
-    'Apply all removals',
+    'Apply all removals and merges',
     'Choose which to apply',
     'Apply none',
-    'ask a follow-up for the REMOVE numbers',
+    'ask a follow-up for the REMOVE and MERGE numbers',
     'Apply nothing until that reply arrives',
     'Remove nothing until your human partner answers',
     '**Apply the approved removals.**',

@@ -56,7 +56,7 @@ Present the changes to the user:
 
 ### 5. Feature Test Prune
 
-After the user checkpoint, run the `## Feature Test Prune` section of `../subagent-driven-development/SKILL.md` once, with the prune base that the caller recorded. Its removal handling, extra commit and restore on failure apply unchanged. Then report completion. No review follows the prune. Each removal already passed the auditor on `openai/hard`, the user's approval, and a re-run of the tests and the linter.
+After the user checkpoint, run the `## Feature Test Prune` section of `../subagent-driven-development/SKILL.md` once, with the prune base that the caller recorded. Its removal handling, extra commit and restore on failure apply unchanged. Then report completion. No review follows the prune. Each removal and merge already passed the auditor on `openai/hard`, the user's approval, and a re-run of the tests and the linter.
 
 ## Process Flow
 

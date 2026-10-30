@@ -229,10 +229,10 @@ The rules in `../_shared/subagent-dispatch.md` forbid ignoring an escalation or 
 After the last wave's checkpoint, run the PRUNE stage of `../test-driven-development/SKILL.md` once for the whole feature. Implementers do not prune. The prune covers every touched file of the feature since the prune base that you recorded at session start.
 
 - If there is no touched test file, skip the prune and say so in the completion report. In the no-git flow, this applies when `diff -rqN` reports no test file.
-- If the audit has no REMOVE, nothing changes and nothing is asked.
-- If the user approves one or more REMOVE, apply them as the PRUNE procedure says. Then re-run the project's full test command and linter, and cite the output.
-- If that re-run passes, commit the removals as one extra commit under the session's commit preference. Under auto-commit, commit without asking. Under "Ask me each time", ask one commit question. Follow the path-limited commit rules of `## User Checkpoint`.
-- If that re-run fails, restore the removed tests from the restore record and report the failure. Then continue to the final review without the removals.
+- If the audit has no REMOVE and no MERGE, nothing changes and nothing is asked.
+- If the user approves one or more REMOVE or MERGE, apply them as the PRUNE procedure says. Then re-run the project's full test command and linter, and cite the output.
+- If that re-run passes, commit the removals and merges as one extra commit under the session's commit preference. Under auto-commit, commit without asking. Under "Ask me each time", ask one commit question. Follow the path-limited commit rules of `## User Checkpoint`.
+- If that re-run fails, restore the removed tests from the restore record, drop the assertions that each MERGE added, and report the failure. Then continue to the final review without the removals.
 - If the audit reports an uncovered behaviour, write its test in a new single-task wave through an implementer. The wave uses the full per-wave pipeline: review, gate, checkpoint, and commit under the session's commit preference. The orchestrator does not write the test itself. Then audit again with `[SCOPE]` limited to the tests that wave added. Handle the results of that audit under the bullets above, and treat the prune as resolved when it ends.
 
 ## Final Feature-Level Review
@@ -295,7 +295,7 @@ User: Commit all tasks
 
 [Wave 2: record base, dispatch implementer 3, review, gate, checkpoint, commit]
 
-[Feature test prune: the audit has no REMOVE, so nothing is asked]
+[Feature test prune: the audit has no REMOVE and no MERGE, so nothing is asked]
 
 [Final feature-level review: requesting-code-review, then verification-before-completion]
 

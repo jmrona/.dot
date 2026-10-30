@@ -59,19 +59,19 @@ test('TDD prune section asks the user the removal question before applying appro
 
   for (const anchor of [
     '`question`',
-    'Apply all removals',
+    'Apply all removals and merges',
     'Choose which to apply',
     'Apply none',
     'Remove nothing until your human partner answers',
-    'ask a follow-up for the REMOVE numbers',
+    'ask a follow-up for the REMOVE and MERGE numbers',
     'Apply nothing until that reply arrives',
     '**Apply the approved removals.**',
   ]) {
     assert.ok(prune.includes(anchor), `PRUNE section contains ${anchor}`)
   }
-  const askIndex = prune.indexOf('Apply all removals')
+  const askIndex = prune.indexOf('Apply all removals and merges')
   const applyIndex = prune.indexOf('**Apply the approved removals.**')
-  assert.ok(askIndex < applyIndex, 'Apply all removals is asked before the approved removals are applied')
+  assert.ok(askIndex < applyIndex, 'Apply all removals and merges is asked before the approved removals are applied')
 })
 
 test('auditor prompt template exists with every placeholder and read-only constraints', () => {
