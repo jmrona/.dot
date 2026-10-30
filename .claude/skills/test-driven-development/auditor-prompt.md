@@ -11,7 +11,7 @@ The parent fills every placeholder in this template and sends the text under `##
 | `[TOUCHED_FILES]`      | The touched-file list from step 1 of the prune procedure.                                                                                                   |
 | `[SCOPE]`              | `every test in the files above` on the first audit. After a return to RED, the names of the tests added since the previous audit.                           |
 | `[TEST_VALUE_RULE]`    | The Meaningful Assertions section of `../../rules/common/testing.md`, pasted whole. That rule file is always loaded, so its text is in context at dispatch. |
-| `[PROJECT_TEST_RULES]` | The project's test-value section, pasted whole, or `none` when the project has no such section.                                                             |
+| `[PROJECT_TEST_RULES]` | Step 2 of the prune procedure names the source. Paste it whole, or write `none` when there is no source.                                                             |
 | `[VERIFICATION]`       | The output of the latest full-suite GREEN run.                                                                                                              |
 
 ## Prompt
