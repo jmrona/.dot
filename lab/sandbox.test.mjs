@@ -497,3 +497,46 @@ test('createSandbox writes no hooks key when the harness has no Bash PreToolUse 
   const settings = readSandboxSettings(sandboxFromHarness())
   assert.deepEqual(Object.keys(settings), ['permissions'])
 })
+
+const STOP_AFTER_FIRST_EVENT = (events) => events.length > 0
+
+test('runSandboxed stops claude once the stopWhen predicate accepts the events', async () => {
+  const binDir = installShellClaude(`echo '{"type":"a"}'\nsleep 60`)
+  const { events, stoppedEarly, timedOut } = await runWithPath(
+    `${binDir}${path.delimiter}${process.env.PATH}`,
+    { timeoutMs: 3000, stopWhen: STOP_AFTER_FIRST_EVENT },
+  )
+  assert.deepEqual({ events, stoppedEarly, timedOut }, {
+    events: [{ type: 'a' }],
+    stoppedEarly: true,
+    timedOut: false,
+  })
+})
+
+test('runSandboxed reports stoppedEarly false when no stopWhen predicate is given', async () => {
+  const { stoppedEarly } = await runFakeClaude('process.exit(0)')
+  assert.equal(stoppedEarly, false)
+})
+
+test('runSandboxed lets claude finish when the stopWhen predicate never accepts', async () => {
+  const { exitCode, stoppedEarly } = await runWithPath(
+    `${installFakeClaude('process.exit(4)')}${path.delimiter}${process.env.PATH}`,
+    { stopWhen: () => false },
+  )
+  assert.deepEqual({ exitCode, stoppedEarly }, { exitCode: 4, stoppedEarly: false })
+})
+
+test('runSandboxed rejects and kills claude when the stopWhen predicate throws', async () => {
+  const pidFile = path.join(makeTempDir(), 'pid')
+  const binDir = installShellClaude(`echo $$ > ${pidFile}\necho '{"type":"a"}'\nsleep 60`)
+  const failing = () => {
+    throw new Error('predicate broke')
+  }
+  await assert.rejects(
+    runWithPath(`${binDir}${path.delimiter}${process.env.PATH}`, { timeoutMs: 3000, stopWhen: failing }),
+    /predicate broke/,
+  )
+  const pid = Number(fs.readFileSync(pidFile, 'utf8'))
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' })
+})

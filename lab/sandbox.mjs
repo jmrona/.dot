@@ -98,7 +98,11 @@ function killProcessGroup(child) {
   child.stdout.destroy()
 }
 
-export function runSandboxed({ cwd, prompt, model, tools, maxTurns, timeoutMs = 300000 }) {
+function outcomeOf({ exitCode, timedOut, output, stoppedEarly = false }) {
+  return { exitCode, timedOut, stoppedEarly, events: parseJsonLines(output) }
+}
+
+export function runSandboxed({ cwd, prompt, model, tools, maxTurns, timeoutMs = 300000, stopWhen }) {
   return new Promise((resolve, reject) => {
     const args = buildClaudeArgs({ prompt, model, tools, maxTurns })
     const child = spawn('claude', args, {
@@ -117,15 +121,26 @@ export function runSandboxed({ cwd, prompt, model, tools, maxTurns, timeoutMs = 
     }
     const timer = setTimeout(() => {
       killProcessGroup(child)
-      settle(() => resolve({ exitCode: null, timedOut: true, events: parseJsonLines(output) }))
+      settle(() => resolve(outcomeOf({ exitCode: null, timedOut: true, output })))
     }, timeoutMs)
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', (chunk) => {
       output += chunk
+      if (stopWhen && !settled) {
+        try {
+          if (!stopWhen(parseJsonLines(output))) return
+        } catch (error) {
+          killProcessGroup(child)
+          settle(() => reject(error))
+          return
+        }
+        killProcessGroup(child)
+        settle(() => resolve(outcomeOf({ exitCode: null, timedOut: false, output, stoppedEarly: true })))
+      }
     })
     child.on('error', (error) => settle(() => reject(describeSpawnFailure(error))))
     child.on('close', (exitCode) =>
-      settle(() => resolve({ exitCode, timedOut: false, events: parseJsonLines(output) })),
+      settle(() => resolve(outcomeOf({ exitCode, timedOut: false, output }))),
     )
   })
 }

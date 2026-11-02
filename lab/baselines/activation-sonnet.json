@@ -1,0 +1,140 @@
+{
+  "claudeCodeVersion": "2.1.316",
+  "model": "sonnet",
+  "cases": {
+    "brainstorming": {
+      "positivePasses": 9,
+      "positiveRuns": 9,
+      "positiveRate": 1,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {},
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    },
+    "debugging": {
+      "positivePasses": 9,
+      "positiveRuns": 9,
+      "positiveRate": 1,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {},
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    },
+    "work-on-ticket": {
+      "positivePasses": 9,
+      "positiveRuns": 9,
+      "positiveRate": 1,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {},
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    },
+    "pick-up-jira-work": {
+      "positivePasses": 9,
+      "positiveRuns": 9,
+      "positiveRate": 1,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {},
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    },
+    "verification-before-completion": {
+      "positivePasses": 9,
+      "positiveRuns": 9,
+      "positiveRate": 1,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {},
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    },
+    "requesting-code-review": {
+      "positivePasses": 6,
+      "positiveRuns": 9,
+      "positiveRate": 0.6666666666666666,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {
+        "code-review": 3
+      },
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    },
+    "receiving-code-review": {
+      "positivePasses": 9,
+      "positiveRuns": 9,
+      "positiveRate": 1,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {},
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    },
+    "commit-msg": {
+      "positivePasses": 9,
+      "positiveRuns": 9,
+      "positiveRate": 1,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {},
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    },
+    "summarize-diff": {
+      "positivePasses": 9,
+      "positiveRuns": 9,
+      "positiveRate": 1,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {},
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    },
+    "create-tickets": {
+      "positivePasses": 9,
+      "positiveRuns": 9,
+      "positiveRate": 1,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {},
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    },
+    "codebase-memory": {
+      "positivePasses": 9,
+      "positiveRuns": 9,
+      "positiveRate": 1,
+      "nearMissPasses": 6,
+      "nearMissRuns": 6,
+      "nearMissFalseActivations": 0,
+      "falseActivationRate": 0,
+      "winners": {},
+      "environmentFailures": 0,
+      "environmentFailureReasons": []
+    }
+  }
+}
