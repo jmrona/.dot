@@ -1,0 +1,500 @@
+{
+  "entries": {
+    ".mcp.json": {
+      "sha256": "86bda9c8e2eefca43d302e45b6fbf38eea343e38da38ca19d076a554e074eb3a",
+      "words": 10,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "hooks/cbm-code-discovery-gate": {
+      "sha256": "be3cd7e4f809207c3fc222e69b29e1059086a5d604702e7ce89939270415fae7",
+      "words": 56,
+      "alwaysLoaded": false,
+      "executable": true
+    },
+    "hooks/cbm-session-reminder": {
+      "sha256": "979d5df97601673c08f5276c090f1ecc509c9b057e1a175d5bb25c8a1a4e7617",
+      "words": 116,
+      "alwaysLoaded": false,
+      "executable": true
+    },
+    "rules/common/ambiguity.md": {
+      "sha256": "fc05bc2020f361fd2352fee92bb98eeac3b0f9c4149f0f3666f1eec01f03d0f0",
+      "words": 341,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/code-organisation.md": {
+      "sha256": "88734ec5f434d08b628635cc3772cb09bba8bd86c9a02fed0c9688e3c74d0a2c",
+      "words": 161,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/code-review.md": {
+      "sha256": "dffd834e2a49741a8266b494c1e00aac2aa9c553a2a745b814672ca70d7484b0",
+      "words": 333,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/coding-style.md": {
+      "sha256": "440d6e522b9afacefc2551bf8d40d5333667818b2b23ec0e5bfe131275fc3e5b",
+      "words": 707,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/consistency.md": {
+      "sha256": "280861d85661e56a0b97b92def838efa1287bb2a935fa2ae539424cb5d1ad801",
+      "words": 115,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/debugging.md": {
+      "sha256": "614e1c7cb95e230b33016c43e5696fa6903b8dfce2a1b74dba1fcd45f92ca906",
+      "words": 387,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/documentation.md": {
+      "sha256": "1732fc36eae87a34452964b2d00cf7315ad9e84338a9edc1c51636315a2e47d4",
+      "words": 50,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/errors.md": {
+      "sha256": "ca1451f68a110c18d31ffe8c9703d89a7bd5a129d41d90c6fb3a3a37e7ff46c9",
+      "words": 98,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/git.md": {
+      "sha256": "1931e35b14845e4f00aaa67304d0e8a360f2ce99dce8c20dd4f50f0fbe3a248e",
+      "words": 448,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/language.md": {
+      "sha256": "533ca3796663b77bdebecb281e8b46628d8d10cb3616b38a160213b073677c69",
+      "words": 264,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/performance.md": {
+      "sha256": "cfb185b73922877dd7f99f23959847cabbbd5c00d59edcc2dab1fbd4e3b254eb",
+      "words": 100,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/prose-style.md": {
+      "sha256": "a8e684f5e387a0909ac9f8c508b4117f4029b82618bf302ec29ab7b3d68df380",
+      "words": 428,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/security.md": {
+      "sha256": "e4733aeb7b1d3eee35baa5642ab2429e1e3d2e823e35f565addce2ba0e83f073",
+      "words": 147,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/skills-policy.md": {
+      "sha256": "2472530cdbb01dbab786611eff8eafa8cd53b53e126a70e67df11a6a458a28ea",
+      "words": 999,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/subagents.md": {
+      "sha256": "ae2291a07822e288703639512b49fd2ce56ba1292f7a10b900352e9478f4d9c6",
+      "words": 369,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/testing.md": {
+      "sha256": "47fcb8614d1c2b1f71d5ee4c6706a45de68d3e6ede0500043195b5d9e30d9f29",
+      "words": 577,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/verification.md": {
+      "sha256": "dec70dcdd51591449aa39d9cf5e63bc6f25c0951da1a1061adbbb0673691f7d7",
+      "words": 357,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/common/workflow.md": {
+      "sha256": "68205cf941d591dbe1235a1a87563ea6a7b3f5e5f32f333e8c040c4117b688d1",
+      "words": 634,
+      "alwaysLoaded": true,
+      "executable": false
+    },
+    "rules/go/coding-style.md": {
+      "sha256": "075b2e00508c0db8bd376bae54bb613d139c892c28b50914577c1de2c08bc311",
+      "words": 263,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/go/testing.md": {
+      "sha256": "a141ed1989082fcf38d9da77fcc0afc80806e5d8c192cbcd6f02ab3236584ab7",
+      "words": 202,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/go/tooling.md": {
+      "sha256": "e4b528e755e0457ccbb80c01d29d1833cd0e2cbe37c37a597d7b6c76c88ce010",
+      "words": 190,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/javascript/coding-style.md": {
+      "sha256": "3f24a45f547ac3a01db4fcbdf7458cf74102d4c55bc26f97f20e7177a99415f1",
+      "words": 470,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/javascript/testing.md": {
+      "sha256": "1c5e8ae424d5583be03d057f020e934380a4e089732cec9782e8328fadec0de0",
+      "words": 206,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/javascript/tooling.md": {
+      "sha256": "75120a7ed5f153b00679dc6083065e507e5decf6eb2432ebb57ab694acb1a8b9",
+      "words": 192,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/php/coding-style.md": {
+      "sha256": "dab59b05823082530255e1caec8e47576c6b654f32e23128ee04840d2e7d6bfe",
+      "words": 596,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/php/testing.md": {
+      "sha256": "ac19090161148ca0f7bd73694010344c603c5a88a1597af2fc965ac58ddc1d5b",
+      "words": 223,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/php/tooling.md": {
+      "sha256": "4d78f21139580db07857d0842df2e0240e72e7632b3b60ebacd56ef26ea95790",
+      "words": 213,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/python/coding-style.md": {
+      "sha256": "46781ac60deba57231d7fcb6d6ed70c9cdf6eb41d8c9f27c8b5da8140faaf08c",
+      "words": 234,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/python/testing.md": {
+      "sha256": "a804bbb9e12b92cdc424ac20dc6616feaff9d5981723ca71e273f1cbf42081c7",
+      "words": 177,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/python/tooling.md": {
+      "sha256": "890fbe98851a1c830f16947b78da070cee0732197839132e0531f82265700fc0",
+      "words": 214,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/rust/coding-style.md": {
+      "sha256": "0a4a7c13dcf71eff505814191e6c31e0744b16405a95e3874152c5c0c05ab357",
+      "words": 298,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/rust/testing.md": {
+      "sha256": "dc3b956d987da741f5d52081bdb2cc2797b6e6f0e80e007bea64eed72f71ebd4",
+      "words": 239,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/rust/tooling.md": {
+      "sha256": "d1105e2cd62497d524a4e08cc8dc8f3d634f178e85d48f11b800e51a34f9b837",
+      "words": 219,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/typescript/coding-style.md": {
+      "sha256": "4540297f3565c11942c36be8b8c27c3bf53d6a1debd9d6a2fde2e0a6293a339e",
+      "words": 559,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/typescript/testing.md": {
+      "sha256": "46f56d4b7ac1f1e9178383db17196b5c0fe85fe36c3366301f02b1d00663084f",
+      "words": 248,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "rules/typescript/tooling.md": {
+      "sha256": "ae2b7567582ce82c81edfc9dd3094a22535f9c4dfe434d74ea17042a468691eb",
+      "words": 241,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "settings.json": {
+      "sha256": "3ad290a657856e3b3a1c345ee3c6d39f18d87f8ce2cd96da9ca2e16e6c88e958",
+      "words": 202,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/_shared/code-review.md": {
+      "sha256": "c51dfaecdd9ec39f164f5ce3d8f71efafaeeaedb56c46e47dbc36d656bcfff10",
+      "words": 632,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/_shared/no-git-flow.md": {
+      "sha256": "659bfcf687ee6fe1fde69d654f2e9f3ea04cf5c8dfeeae3a338eb3b69c943275",
+      "words": 414,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/_shared/subagent-dispatch.md": {
+      "sha256": "63b1db4cce6e4c2bf543ea392224b64617089ab958e6cac6e189aee677298132",
+      "words": 1292,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/_shared/tickets.md": {
+      "sha256": "ef12b61aa752149a3f569eb30671ed1e8a7e5bfe6d5a810010402761f482e701",
+      "words": 1712,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/brainstorming-committee/SKILL.md": {
+      "sha256": "0550c64a6f25503a367ff05ab238272b28fb55ef13b640f8b2c65e6418d28fd3",
+      "words": 1280,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Turns an idea into an approved design through autonomous deliberation by three subagents with different perspectives, who debate decisions and converge on consensus without user involvement until the final design is ready for review. Then runs design-review and hands off to create-tickets or subagent-driven-development."
+    },
+    "skills/brainstorming-committee/committee-member-prompt.md": {
+      "sha256": "a61410ccfc7d990073ba5c40719f16ade0836cb92409d177c4ca84b333a2bdde",
+      "words": 907,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/brainstorming-skip/SKILL.md": {
+      "sha256": "44e6c44b0c4ab23f096c4486cb36e334dc7229fcac6cbbdcea38a78a65475798",
+      "words": 1593,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Lightweight design capture for cases where structured brainstorming would be overkill. Reuses a design already discussed in context when present, otherwise asks the user for a brief design statement; presents it for explicit approval and hands off to create-tickets or subagent-driven-development. Only invoked from the brainstorming router when the user picks the skip option."
+    },
+    "skills/brainstorming-standard/SKILL.md": {
+      "sha256": "c8395b07243be0ef47e177b0b0ab53a20d3f2bdc2e1472bce1cda01f8868f253",
+      "words": 1045,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Turns an idea into an approved design through interactive dialogue with a user who already knows the codebase. Explores context, asks one question at a time, proposes alternatives, presents the design in sections, runs design-review, and hands off to create-tickets or subagent-driven-development."
+    },
+    "skills/brainstorming/SKILL.md": {
+      "sha256": "403677f25fe1998223d5a9833e42b82d20bf288dd1b4ca2eb2c5ad4f3827718d",
+      "words": 870,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "You MUST use this before any code edit: creating features, fixing bugs, building components, adding functionality, refactoring, or modifying behaviour. Routes the design step to standard, committee, or skip mode based on a single user choice, then hands off to the chosen mode skill."
+    },
+    "skills/codebase-memory/SKILL.md": {
+      "sha256": "182bc7a066c96ead8cfb47c5e3845f0fb11f4107b438a21b7129b268c95d4efe",
+      "words": 370,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Use the codebase knowledge graph for structural code queries. Triggers on: explore the codebase, understand the architecture, what functions exist, show me the structure, who calls this function, what does X call, trace the call chain, find callers of, show dependencies, impact analysis, dead code, unused functions, high fan-out, refactor candidates, code quality audit, graph query syntax, Cypher query examples, edge types, how to use search_graph."
+    },
+    "skills/commit-msg/SKILL.md": {
+      "sha256": "7b55ac59489cc813c70f835f864b86368f7f860d2a171ffd8d0fb3ccf2ef598a",
+      "words": 173,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Generate a conventional commit message from a diff or change description. Use when the user asks for a commit message. The caller must include the ticket key from the branch name, if any."
+    },
+    "skills/complexity-triage/SKILL.md": {
+      "sha256": "a0b3ea6fb52bb4e9c2f2e1414b9ed1f6eeb01740ede2a834a994d2924b2e3fd5",
+      "words": 890,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Classifies a unit of implementation work as SIMPLE or COMPLEX against six strict binary criteria with mandatory evidence. Defaults to COMPLEX; SIMPLE must be proven with specific observations from the design."
+    },
+    "skills/create-tickets/SKILL.md": {
+      "sha256": "73480acf4e52343d05c10928ea61c61ee684e96e5cf74f48d5363121b2ad0fdf",
+      "words": 2152,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Turns an approved design into tickets in the project's ticketing system, or into a structured Markdown document when no ticketing system is available. Decomposes the design into right-sized child tickets under a single parent epic whose body carries the full design for future sessions to recover."
+    },
+    "skills/debugging/RULES.md": {
+      "sha256": "4c29ab34db47d68ead18d792e95f01338cf7189f73451624251218250e6c1973",
+      "words": 933,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/debugging/SKILL.md": {
+      "sha256": "9bf618d6ac521052ffd347b7b29c416089f7d8e3da1b1e668460869f45d53b0b",
+      "words": 1364,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Runs a disciplined, evidence-driven investigation to reproduce a bug, identify its root cause, and deliver a minimal verified fix. Triggered by bugs, errors, failing tests, unexpected behaviour, or anything described as not working. Enforces the hard gate (no fix without reproduction and identified root cause), scope discipline, the investigation budget, and the minimal fix principle."
+    },
+    "skills/debugging/investigator-prompt.md": {
+      "sha256": "7196233fe5c560dbdf256d31052483b92d3408c1072b17721a67a1d76d759971",
+      "words": 294,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/design-review/SKILL.md": {
+      "sha256": "80c3982f1d5625b1d5a550d52ebdf28690d5f073a2497a8e535cc8d6896cd4c2",
+      "words": 929,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Reviews a consolidated design summary for completeness, consistency, clarity, scope, and YAGNI issues by dispatching a reviewer subagent against the summary text and iterating until the design is approved or escalated."
+    },
+    "skills/design-review/design-reviewer-prompt.md": {
+      "sha256": "ece6053e45157c590f21642a26d50b9216e12adf381373ca5d48b3ce8c041043",
+      "words": 360,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/detect-ticketing-system/SKILL.md": {
+      "sha256": "b3c0bd5dd91827e16bc2740c77a389050a6537855c0c7faaeac3aa9a09ec754b",
+      "words": 571,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Identifies which ticketing system the current project uses (GitHub Issues, Jira, GitLab, Linear, or none) by scanning available MCP tools, git remotes, and CLI binaries. Returns the detected system so a caller can pick the right API, or reports that no system is available so the caller can fall back."
+    },
+    "skills/dispatching-parallel-agents/SKILL.md": {
+      "sha256": "422e0ad321dab8968e59d97d8b005662bba9805aefeb658afff32e5c2e039ee0",
+      "words": 977,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Dispatches multiple focused subagents concurrently in a single message when a problem decomposes into independent domains. Each agent gets isolated context and a self-contained task; the orchestrator reconciles their outputs."
+    },
+    "skills/fast-path-implementation/SKILL.md": {
+      "sha256": "1c163c3515bbfa8dfeaf6b9349d765a1bb399dddf8a44189e7abd269d9bed6bb",
+      "words": 1050,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Implements a batch of uniformly simple changes via a single implementer dispatch and a single combined review. Only invoked when complexity-triage has classified the work as SIMPLE."
+    },
+    "skills/fast-path-implementation/fast-path-reviewer-prompt.md": {
+      "sha256": "8ba2062796e358af1c83cc6e5387146fd6b275a6fb8664fba89aa5ca5faf3970",
+      "words": 410,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/pick-up-jira-work/SKILL.md": {
+      "sha256": "a3e9356efbb3a3d6f1ea02373cc17a608fb39e7d10e9fc02571d97670a964d03",
+      "words": 2974,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Use when the user asks what Jira work to pick up next without providing a ticket key. Research-only: searches EMBER Scrum active sprint work first, asks before checking the EMBER backlog, recovers hierarchy and dependency context, summarises the recommendation, and stops without implementation."
+    },
+    "skills/receiving-code-review/SKILL.md": {
+      "sha256": "6c5dc8db96e53c331309ac7ce79e6101145dda915f691144cf3823e64b049214",
+      "words": 829,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Processes incoming code review feedback by verifying each item against the codebase, clarifying anything unclear, and implementing in severity order. Enforces the forbidden-response rules and the pushback requirement when a suggestion is technically wrong."
+    },
+    "skills/requesting-code-review/SKILL.md": {
+      "sha256": "6d8584b1ba6729e41090f4b9c2e564d1445c1517964de363f703cd0173e0af10",
+      "words": 609,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Dispatches a reviewer subagent against a specific git range with the context it needs to assess production readiness. Selects the most specific reviewer type available, starts on the cheapest capable model, and applies severity discipline to the result."
+    },
+    "skills/requesting-code-review/code-reviewer.md": {
+      "sha256": "a6f92c6f5f28f427f1bc712c3dd478476700d93531eec5a558e6b66562f5ad31",
+      "words": 542,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/subagent-driven-development/SKILL.md": {
+      "sha256": "212e738b4696f13f6f0b7ffbba844755bbf313f03c771063ebe5175f12023ee8",
+      "words": 3881,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Implements an approved design by decomposing it into tasks and grouping independent tasks into parallel waves. Each task gets a fresh subagent and a combined review, with one user checkpoint per wave. Delegates uniformly simple work to fast-path-implementation via complexity-triage."
+    },
+    "skills/subagent-driven-development/implementer-prompt.md": {
+      "sha256": "853e7c3492d76fc12ac4488e5c00ecc81ed45eb276d45f6956f5a131a1d93e22",
+      "words": 2124,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/subagent-driven-development/reviewer-prompt.md": {
+      "sha256": "acd5ca5d6c5f782deef0cf016f48432e1d00075484455d9bad24899a759764b5",
+      "words": 588,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/summarize-diff/SKILL.md": {
+      "sha256": "6d598c1cbd25b8176529e7f8e17ef719e4b700005cf4f14008fba972dd1f5865",
+      "words": 129,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Summarize a git diff or code change. Use when the user asks \"what changed\", wants a change summary for a PR description, or needs risks flagged in a diff."
+    },
+    "skills/test-driven-development/RULES.md": {
+      "sha256": "fc501655c38add57247ce7ff37359fb0ccb4edd139e925280bb801a60389d2aa",
+      "words": 352,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/test-driven-development/SKILL.md": {
+      "sha256": "1c131872c2e2844ec66dc4fe5578e9922624a5647a4d962dce2eaa91c34a40fe",
+      "words": 2253,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Runs the red-green-refactor cycle. Writes a failing test, verifies it fails for the right reason, writes minimal code to pass, then refactors while green. Enforces the iron law that no production code is written without a failing test first. Each piece of work ends with a test prune, in which a read-only auditor finds tests that catch no defect another test misses and the user decides which to remove."
+    },
+    "skills/test-driven-development/auditor-prompt.md": {
+      "sha256": "d778d57e270a444efb2c97b6311f4285f647b8b749c59099449f406dc21ddea4",
+      "words": 960,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/test-driven-development/ember-platform-test-value.md": {
+      "sha256": "f6525a511f74ded932e68e795afbe9d88b98977a89c34ca5753374458919fea5",
+      "words": 363,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/test-driven-development/testing-anti-patterns.md": {
+      "sha256": "0c15de84a7d8ea139a255e63d961c9649966a9cbbb8350fcb23a4850a336d306",
+      "words": 521,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/verification-before-completion/RULES.md": {
+      "sha256": "ba0158adae6470fb06ff9816d0e4751ef103a516bbd983a28ab225445cf80ef2",
+      "words": 481,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "skills/verification-before-completion/SKILL.md": {
+      "sha256": "c63181d50f7ad4b8a1b9daa9a16511f47f6da12e6e607287a38b0dd294a6f108",
+      "words": 883,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Runs the gate function that produces fresh verification evidence before a completion claim. Identifies the proving command, runs it fresh in the current message, reads the output, and only states the claim with cited evidence."
+    },
+    "skills/work-on-ticket/SKILL.md": {
+      "sha256": "bbdbc24290d9be9c2dc8bd8d556ce98f8b1495923e5ea617699ce7ead71a9001",
+      "words": 1529,
+      "alwaysLoaded": false,
+      "executable": false,
+      "description": "Picks up a ticket from the project's ticketing system, fetches its parent epic, recovers the embedded design context, presents the scope to the user for confirmation, and hands off to subagent-driven-development with the recovered design as the approved input. The re-entry point for work planned in a previous session via brainstorming and create-tickets."
+    },
+    "statusline-command.sh": {
+      "sha256": "fb7e3a4824bb6ccd3a2ede4fdb93c6bd22a9e1a8963df61079b9fa2c3990f016",
+      "words": 420,
+      "alwaysLoaded": false,
+      "executable": false
+    }
+  },
+  "alwaysLoadedWords": 6515
+}
