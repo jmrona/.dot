@@ -189,7 +189,7 @@ test('runSuite summarises the version, model and cases by id', async () => {
     claudeCodeVersion: '2.1.0',
     model: 'haiku',
     cases: {
-      alpha: { safety: true, passes: 1, runs: 1, environmentFailures: 0, details: [] },
+      alpha: { safety: true, passes: 1, runs: 1, environmentFailures: 0, environmentFailureReasons: [], details: [] },
     },
   })
 })
@@ -197,16 +197,19 @@ test('runSuite summarises the version, model and cases by id', async () => {
 test('parseCliArguments defaults to sonnet, three runs and concurrency three', () => {
   const { command, options } = parseCliArguments(['capture'])
   assert.deepEqual(
-    [command, options.model, options.runs, options.concurrency, options.only],
-    ['capture', 'sonnet', 3, 3, undefined],
+    [command, options.model, options.runs, options.concurrency, options.only, options.timeoutSeconds],
+    ['capture', 'sonnet', 3, 3, undefined, 300],
   )
 })
 
 test('parseCliArguments reads overrides and splits the only list', () => {
   const { options } = parseCliArguments([
     'compare', '--model', 'opus', '--runs', '5', '--concurrency', '2', '--only', 'a,b',
+    '--timeout-seconds', '90',
   ])
-  assert.deepEqual(options, { model: 'opus', runs: 5, concurrency: 2, only: ['a', 'b'] })
+  assert.deepEqual(options, {
+    model: 'opus', runs: 5, concurrency: 2, only: ['a', 'b'], timeoutSeconds: 90,
+  })
 })
 
 test('parseCliArguments rejects an unknown command with the valid commands', () => {
@@ -214,7 +217,7 @@ test('parseCliArguments rejects an unknown command with the valid commands', () 
 })
 
 function commandOptions(overrides = {}) {
-  return { model: 'haiku', runs: 3, concurrency: 3, only: undefined, ...overrides }
+  return { model: 'haiku', runs: 3, concurrency: 3, only: undefined, timeoutSeconds: 300, ...overrides }
 }
 
 async function executeWithLog({ command, scenarios, baselinePath, options = commandOptions() }) {
@@ -432,4 +435,87 @@ test('capture writes to the baseline file of the selected model', async () => {
     options: commandOptions({ model: 'haiku' }),
   })
   assert.deepEqual(fs.readdirSync(baselinesDir), ['compliance-haiku.json'])
+})
+
+test('runCase records the exit code when a run has no init event', async () => {
+  const result = await withFakeClaude(() => runCaseFor(scenarioPrompting('noinit')))
+  assert.deepEqual(result.environmentFailureReasons, [
+    'no init event (exit code 0)',
+    'no init event (exit code 0)',
+  ])
+})
+
+test('runCase records the timeout in seconds when a run times out', async () => {
+  const result = await withFakeClaude(() =>
+    runCaseFor(scenarioPrompting('hang'), { runs: 1, timeoutMs: 400 }),
+  )
+  assert.deepEqual(result.environmentFailureReasons, ['timed out after 0.4 s'])
+})
+
+test('parseCliArguments rejects a timeout of zero seconds', () => {
+  assert.throws(
+    () => parseCliArguments(['capture', '--timeout-seconds', '0']),
+    /timeout-seconds.*positive/is,
+  )
+})
+
+test('parseCliArguments rejects a timeout that is not a number', () => {
+  assert.throws(
+    () => parseCliArguments(['capture', '--timeout-seconds', 'soon']),
+    /timeout-seconds.*positive/is,
+  )
+})
+
+test('capture passes the timeout in seconds to each claude run', async () => {
+  const baselinePath = path.join(makeTempDir(), 'compliance-haiku.json')
+  const { output } = await executeWithLog({
+    command: 'capture',
+    scenarios: [scenarioPrompting('hang')],
+    baselinePath,
+    options: commandOptions({ runs: 1, timeoutSeconds: 1 }),
+  })
+  assert.match(output, /hang.*timed out after 1 s/)
+})
+
+test('capture names the case and the reason of each environment failure', async () => {
+  const baselinePath = path.join(makeTempDir(), 'compliance-haiku.json')
+  const { output } = await executeWithLog({
+    command: 'capture',
+    scenarios: [scenarioPrompting('noinit')],
+    baselinePath,
+    options: commandOptions({ runs: 1 }),
+  })
+  assert.match(output, /noinit.*no init event \(exit code 0\)/)
+})
+
+test('compare names the case and the reason of each environment failure', async () => {
+  const baselinePath = baselineFile({ noinit: baselineCase(3) })
+  const { output } = await executeWithLog({
+    command: 'compare',
+    scenarios: [scenarioPrompting('noinit')],
+    baselinePath,
+    options: commandOptions({ runs: 1 }),
+  })
+  assert.match(output, /noinit.*no init event \(exit code 0\)/)
+})
+
+test('capture writes the partial summary when it refuses to write the baseline', async () => {
+  const baselinePath = path.join(makeTempDir(), 'compliance-haiku.json')
+  await executeWithLog({
+    command: 'capture',
+    scenarios: [scenarioPrompting('good', { id: 'fine' }), scenarioPrompting('noinit')],
+    baselinePath,
+  })
+  const partial = JSON.parse(
+    fs.readFileSync(path.join(path.dirname(baselinePath), '.partial-haiku.json'), 'utf8'),
+  )
+  assert.deepEqual([partial.cases.fine.passes, partial.cases.noinit.environmentFailures], [3, 3])
+})
+
+test('capture removes the partial summary after a successful capture', async () => {
+  const baselinePath = path.join(makeTempDir(), 'compliance-haiku.json')
+  const partialPath = path.join(path.dirname(baselinePath), '.partial-haiku.json')
+  fs.writeFileSync(partialPath, '{}')
+  await executeWithLog({ command: 'capture', scenarios: [scenarioPrompting('good')], baselinePath })
+  assert.equal(fs.existsSync(partialPath), false)
 })

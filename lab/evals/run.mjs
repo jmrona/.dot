@@ -6,7 +6,14 @@ import { createSandbox, runSandboxed } from '../sandbox.mjs'
 import { assertComparable, findRegressions, findUncomparedCases } from './compare.mjs'
 
 const COMMANDS = ['capture', 'compare']
-const DEFAULT_OPTIONS = { model: 'sonnet', runs: 3, concurrency: 3, only: undefined }
+const DEFAULT_TIMEOUT_SECONDS = 300
+const DEFAULT_OPTIONS = {
+  model: 'sonnet',
+  runs: 3,
+  concurrency: 3,
+  only: undefined,
+  timeoutSeconds: DEFAULT_TIMEOUT_SECONDS,
+}
 
 const runImmediately = (task) => task()
 
@@ -30,9 +37,16 @@ function findInitEvent(events) {
   return events.find((event) => event.type === 'system' && event.subtype === 'init')
 }
 
-function assessRun({ scenario, result, dir }) {
+function describeEnvironmentFailure({ result, timeoutMs }) {
+  if (result.timedOut) return `timed out after ${timeoutMs / 1000} s`
+  return `no init event (exit code ${result.exitCode})`
+}
+
+function assessRun({ scenario, result, dir, timeoutMs }) {
   const initEvent = findInitEvent(result.events)
-  if (result.timedOut || !initEvent) return { environmentFailure: true }
+  if (result.timedOut || !initEvent) {
+    return { environmentFailure: true, reason: describeEnvironmentFailure({ result, timeoutMs }) }
+  }
   const { passed, detail } = scenario.score({ events: result.events, dir })
   return {
     environmentFailure: false,
@@ -50,7 +64,7 @@ async function executeRun({ scenario, harnessDir, model, timeoutMs }) {
     const prompt = scenario.prompt(dir)
     const { tools, maxTurns } = scenario
     const result = await runSandboxed({ cwd: dir, prompt, model, tools, maxTurns, timeoutMs })
-    return assessRun({ scenario, result, dir })
+    return assessRun({ scenario, result, dir, timeoutMs })
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
@@ -63,6 +77,9 @@ function summariseOutcomes({ scenario, outcomes }) {
     passes: scored.filter((outcome) => outcome.passed).length,
     runs: scored.length,
     environmentFailures: outcomes.length - scored.length,
+    environmentFailureReasons: outcomes
+      .filter((outcome) => outcome.environmentFailure)
+      .map((outcome) => outcome.reason),
     details: scored.filter((outcome) => !outcome.passed).map((outcome) => outcome.detail),
     claudeCodeVersion: scored[0]?.claudeCodeVersion ?? null,
   }
@@ -74,7 +91,7 @@ export async function runCase({
   model,
   runs,
   limit = runImmediately,
-  timeoutMs,
+  timeoutMs = DEFAULT_TIMEOUT_SECONDS * 1000,
 }) {
   const attempts = Array.from({ length: runs }, () =>
     limit(() => executeRun({ scenario, harnessDir, model, timeoutMs })),
@@ -86,10 +103,10 @@ function withoutVersion({ claudeCodeVersion: _version, ...caseResult }) {
   return caseResult
 }
 
-export async function runSuite({ scenarios, harnessDir, model, runs, concurrency }) {
+export async function runSuite({ scenarios, harnessDir, model, runs, concurrency, timeoutMs }) {
   const limit = createLimiter(concurrency)
   const results = await Promise.all(
-    scenarios.map((scenario) => runCase({ scenario, harnessDir, model, runs, limit })),
+    scenarios.map((scenario) => runCase({ scenario, harnessDir, model, runs, limit, timeoutMs })),
   )
   return {
     claudeCodeVersion: results.find((result) => result.claudeCodeVersion)?.claudeCodeVersion ?? null,
@@ -108,10 +125,10 @@ function readOptionValue({ argv, index }) {
   return value
 }
 
-function parsePositiveInteger(value) {
+function parsePositiveInteger({ name, value }) {
   const number = Number(value)
   if (!Number.isInteger(number) || number < 1) {
-    throw new Error(`The --concurrency value ${value} is not a positive integer. Use 1 or more.`)
+    throw new Error(`The ${name} value ${value} is not a positive integer. Use 1 or more.`)
   }
   return number
 }
@@ -119,9 +136,12 @@ function parsePositiveInteger(value) {
 function applyOption({ options, name, value }) {
   if (name === '--model') return { ...options, model: value }
   if (name === '--runs') return { ...options, runs: Number(value) }
-  if (name === '--concurrency') return { ...options, concurrency: parsePositiveInteger(value) }
+  if (name === '--concurrency') return { ...options, concurrency: parsePositiveInteger({ name, value }) }
+  if (name === '--timeout-seconds') {
+    return { ...options, timeoutSeconds: parsePositiveInteger({ name, value }) }
+  }
   if (name === '--only') return { ...options, only: value.split(',') }
-  throw new Error(`Unknown option ${name}. Use --model, --runs, --concurrency or --only.`)
+  throw new Error(`Unknown option ${name}. Use --model, --runs, --concurrency, --timeout-seconds or --only.`)
 }
 
 export function parseCliArguments(argv) {
@@ -167,19 +187,35 @@ function mergeIntoExisting({ baselinePath, summary }) {
   return { ...summary, cases: { ...existing.cases, ...summary.cases } }
 }
 
+function reportEnvironmentFailures({ summary, log }) {
+  for (const [id, entry] of Object.entries(summary.cases)) {
+    for (const reason of entry.environmentFailureReasons) log(`Environment failure in ${id}: ${reason}`)
+  }
+}
+
 function countEnvironmentFailures(summary) {
   return Object.values(summary.cases).reduce((sum, entry) => sum + entry.environmentFailures, 0)
+}
+
+function partialPathFor({ baselinePath, model }) {
+  return path.join(path.dirname(baselinePath), `.partial-${model}.json`)
+}
+
+function refuseToWriteBaseline({ summary, baselinePath, failures, log }) {
+  reportEnvironmentFailures({ summary, log })
+  const partialPath = partialPathFor({ baselinePath, model: summary.model })
+  writeBaseline({ baselinePath: partialPath, summary })
+  log(`Not writing the baseline: ${failures} environment failure(s). Partial results are in ${partialPath}.`)
+  return 1
 }
 
 async function executeCapture({ suiteInput, only, baselinePath, log }) {
   const summary = await runSuite(suiteInput)
   const failures = countEnvironmentFailures(summary)
-  if (failures > 0) {
-    log(`Not writing the baseline: ${failures} environment failure(s). Fix the environment and rerun.`)
-    return 1
-  }
+  if (failures > 0) return refuseToWriteBaseline({ summary, baselinePath, failures, log })
   const toWrite = only ? mergeIntoExisting({ baselinePath, summary }) : summary
   writeBaseline({ baselinePath, summary: toWrite })
+  fs.rmSync(partialPathFor({ baselinePath, model: summary.model }), { force: true })
   log(`Captured ${Object.keys(summary.cases).length} case(s) to ${baselinePath}`)
   return 0
 }
@@ -232,11 +268,13 @@ async function executeCompare({ suiteInput, only, baselinePath, log }) {
   const baseline = restrictBaseline({ baseline: readBaseline(baselinePath), only })
   const current = await runSuite(suiteInput)
   renderTable({ baseline, current }).forEach((line) => log(line))
+  reportEnvironmentFailures({ summary: current, log })
   const firstFailures = countEnvironmentFailures(current)
   if (firstFailures > 0) return reportUnassessable({ failures: firstFailures, log })
   assertComparable({ baseline, current })
   const candidates = findRegressions({ baseline, current })
   const { confirmed, rerun } = await confirmRegressions({ candidates, baseline, suiteInput })
+  if (rerun) reportEnvironmentFailures({ summary: rerun, log })
   const rerunFailures = rerun ? countEnvironmentFailures(rerun) : 0
   if (rerunFailures > 0) return reportUnassessable({ failures: rerunFailures, log })
   const uncompared = findUncomparedCases({ baseline, current })
@@ -264,9 +302,16 @@ export async function executeCommand({
   baselinesDir,
   log = console.log,
 }) {
-  const { model, runs, concurrency, only } = options
+  const { model, runs, concurrency, only, timeoutSeconds } = options
   const baselinePath = baselinePathFor({ baselinesDir, model })
-  const suiteInput = { scenarios: selectScenarios({ scenarios, only }), harnessDir, model, runs, concurrency }
+  const suiteInput = {
+    scenarios: selectScenarios({ scenarios, only }),
+    harnessDir,
+    model,
+    runs,
+    concurrency,
+    timeoutMs: timeoutSeconds * 1000,
+  }
   const execute = command === 'capture' ? executeCapture : executeCompare
   return execute({ suiteInput, only, baselinePath, log })
 }
