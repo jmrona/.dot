@@ -9,13 +9,25 @@
       "Bash(git checkout .:*)",
       "Bash(git restore .:*)",
       "Bash(git branch -D:*)",
-      "Bash(git rebase:*)"
+      "Bash(git rebase:*)",
+      "Bash(git push:*)"
     ],
     "defaultMode": "bypassPermissions"
   },
   "model": "opus",
   "hooks": {
     "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/block-git-commands",
+            "timeout": 5,
+            "onFailure": "block"
+          }
+        ]
+      },
       {
         "matcher": "Grep|Glob",
         "hooks": [

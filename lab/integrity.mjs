@@ -12,10 +12,15 @@ export const REQUIRED_DENY_ENTRIES = [
   'Bash(git restore .:*)',
   'Bash(git branch -D:*)',
   'Bash(git rebase:*)',
+  'Bash(git push:*)',
 ]
 
 const HOOK_TIMEOUT_MILLISECONDS = 5000
+const BENIGN_HOOK_PAYLOAD = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'true' } })
 const RELATIVE_REFERENCE = /^\.{1,2}\/[^\s`()<>*{}]*\.md$/
+const BLOCK_HOOK_COMMAND = /(^|\/)block-git-commands(\s|$)/
+const MISSING_BASH_BLOCK_HOOK =
+  'settings.json has no PreToolUse Bash hook with onFailure block that runs block-git-commands'
 const HOOK_COMMAND = /^~\/\.claude\/hooks\/([^\s/]+)(\s.*)?$/
 
 function listMarkdownFiles(directory) {
@@ -123,7 +128,7 @@ function hookFailureFor(harnessDir, command) {
   const hookPath = path.join(harnessDir, 'hooks', match[1])
   if (!fs.existsSync(hookPath)) return `hook ${command} has no file at ${hookPath}`
   if (!(fs.statSync(hookPath).mode & 0o111)) return `hook ${command} is not executable`
-  const result = spawnSync(hookPath, [], { input: '', timeout: HOOK_TIMEOUT_MILLISECONDS })
+  const result = spawnSync(hookPath, [], { input: BENIGN_HOOK_PAYLOAD, timeout: HOOK_TIMEOUT_MILLISECONDS })
   return describeRunFailure(command, result)
 }
 
@@ -141,6 +146,7 @@ function runAllChecks(harnessDir) {
     ...findInvalidRuleFrontmatter(harnessDir),
     ...findMissingDenyEntries(harnessDir, REQUIRED_DENY_ENTRIES),
     ...findBrokenHooks(harnessDir),
+    ...findMissingBashBlockHook(harnessDir),
   ]
 }
 
@@ -157,3 +163,13 @@ function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main()
+
+export function findMissingBashBlockHook(harnessDir) {
+  const { settings, failure } = loadSettings(harnessDir)
+  if (failure) return [failure]
+  const blocksOnFailure = (settings.hooks?.PreToolUse ?? [])
+    .filter((group) => group.matcher === 'Bash')
+    .flatMap((group) => group.hooks ?? [])
+    .some((hook) => hook.onFailure === 'block' && BLOCK_HOOK_COMMAND.test(hook.command ?? ''))
+  return blocksOnFailure ? [] : [MISSING_BASH_BLOCK_HOOK]
+}

@@ -6,6 +6,12 @@
       "alwaysLoaded": false,
       "executable": false
     },
+    "hooks/block-git-commands": {
+      "sha256": "bc7efa2d74291131766bc45a5bdc790d113923735cccdfa048da5133f4642452",
+      "words": 1836,
+      "alwaysLoaded": false,
+      "executable": true
+    },
     "hooks/cbm-code-discovery-gate": {
       "sha256": "be3cd7e4f809207c3fc222e69b29e1059086a5d604702e7ce89939270415fae7",
       "words": 56,
@@ -235,8 +241,8 @@
       "executable": false
     },
     "settings.json": {
-      "sha256": "3ad290a657856e3b3a1c345ee3c6d39f18d87f8ce2cd96da9ca2e16e6c88e958",
-      "words": 202,
+      "sha256": "02904b6dc1546eecea5ab83707206e2f534fea7b14bc8caadb3d5f67867b6f57",
+      "words": 221,
       "alwaysLoaded": false,
       "executable": false
     },

@@ -7,6 +7,7 @@ import {
   REQUIRED_DENY_ENTRIES,
   findBrokenHooks,
   findBrokenReferences,
+  findMissingBashBlockHook,
   findInvalidRuleFrontmatter,
   findMissingDenyEntries,
 } from './integrity.mjs'
@@ -140,7 +141,7 @@ test('settings without a deny list report every required entry', () => {
   assert.equal(findMissingDenyEntries(harnessDir, ['Bash(a)', 'Bash(b)']).length, 2)
 })
 
-test('the required deny entries are exactly the eight destructive git commands', () => {
+test('the required deny entries are exactly the eight destructive git commands and git push', () => {
   assert.deepEqual(REQUIRED_DENY_ENTRIES, [
     'Bash(git push --force:*)',
     'Bash(git push -f:*)',
@@ -150,6 +151,7 @@ test('the required deny entries are exactly the eight destructive git commands',
     'Bash(git restore .:*)',
     'Bash(git branch -D:*)',
     'Bash(git rebase:*)',
+    'Bash(git push:*)',
   ])
 })
 
@@ -271,4 +273,58 @@ test('a language rule using globs is reported', () => {
   const harnessDir = makeHarnessDir()
   writeFile(harnessDir, 'rules/go/style.md', '---\nglobs:\n  - "*.go"\n---\n# Go')
   assert.ok(findInvalidRuleFrontmatter(harnessDir).some((failure) => /globs/.test(failure)))
+})
+
+test('findBrokenHooks sends a benign Bash payload on stdin', () => {
+  const harnessDir = makeHarnessDir()
+  const script = '#!/usr/bin/env node\nconst input = require("node:fs").readFileSync(0, "utf8")\nprocess.exit(JSON.parse(input).tool_input.command === "true" ? 0 : 2)\n'
+  writeFile(harnessDir, 'hooks/strict', script, 0o755)
+  writeSettings(harnessDir, settingsWithHook('~/.claude/hooks/strict'))
+  assert.deepEqual(findBrokenHooks(harnessDir), [])
+})
+
+function settingsWithBashHook(hook) {
+  return { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: '~/.claude/hooks/block-git-commands', ...hook }] }] } }
+}
+
+test('a PreToolUse Bash hook with onFailure block produces no failure', () => {
+  const harnessDir = makeHarnessDir()
+  writeSettings(harnessDir, settingsWithBashHook({ onFailure: 'block' }))
+  assert.deepEqual(findMissingBashBlockHook(harnessDir), [])
+})
+
+test('a PreToolUse Bash hook without onFailure block is reported by name', () => {
+  const harnessDir = makeHarnessDir()
+  writeSettings(harnessDir, settingsWithBashHook({}))
+  const failures = findMissingBashBlockHook(harnessDir)
+  assert.equal(failures.length, 1)
+  assert.match(failures[0], /PreToolUse Bash hook with onFailure block/)
+})
+
+test('settings without any hooks report the missing PreToolUse Bash hook', () => {
+  const harnessDir = makeHarnessDir()
+  writeSettings(harnessDir, {})
+  assert.equal(findMissingBashBlockHook(harnessDir).length, 1)
+})
+
+test('a Grep matcher hook does not satisfy the PreToolUse Bash hook check', () => {
+  const harnessDir = makeHarnessDir()
+  const settings = settingsWithBashHook({ onFailure: 'block' })
+  settings.hooks.PreToolUse[0].matcher = 'Grep|Glob'
+  writeSettings(harnessDir, settings)
+  assert.equal(findMissingBashBlockHook(harnessDir).length, 1)
+})
+
+test('a missing settings file yields a Bash hook failure instead of throwing', () => {
+  const failures = findMissingBashBlockHook(makeHarnessDir())
+  assert.equal(failures.length, 1)
+  assert.match(failures[0], /settings\.json/)
+})
+
+test('a Bash hook with onFailure block that runs another script is reported', () => {
+  const harnessDir = makeHarnessDir()
+  writeSettings(harnessDir, settingsWithBashHook({ onFailure: 'block', command: '~/.claude/hooks/other-guard' }))
+  const failures = findMissingBashBlockHook(harnessDir)
+  assert.equal(failures.length, 1)
+  assert.match(failures[0], /block-git-commands/)
 })

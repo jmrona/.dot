@@ -10,17 +10,46 @@ export function createSandbox({ harnessDir, targetDir }) {
   for (const entry of COPIED_HARNESS_ENTRIES) {
     fs.cpSync(path.join(harnessDir, entry), path.join(claudeDir, entry), { recursive: true })
   }
-  writeDenyOnlySettings({ harnessDir, claudeDir })
+  writeSandboxSettings({ harnessDir, claudeDir })
 }
 
-function readDenyList(harnessDir) {
+function readHarnessSettings(harnessDir) {
   const settingsPath = path.join(harnessDir, 'settings.json')
-  if (!fs.existsSync(settingsPath)) return []
-  return JSON.parse(fs.readFileSync(settingsPath, 'utf8')).permissions?.deny ?? []
+  return fs.existsSync(settingsPath) ? JSON.parse(fs.readFileSync(settingsPath, 'utf8')) : {}
 }
 
-function writeDenyOnlySettings({ harnessDir, claudeDir }) {
-  const settings = { permissions: { deny: readDenyList(harnessDir) } }
+function hookScriptName(command) {
+  return path.basename(command.split(/\s+/)[0])
+}
+
+function copyHookScript({ harnessDir, claudeDir, scriptName }) {
+  const hooksDir = path.join(claudeDir, 'hooks')
+  fs.mkdirSync(hooksDir, { recursive: true })
+  const target = path.join(hooksDir, scriptName)
+  fs.copyFileSync(path.join(harnessDir, 'hooks', scriptName), target)
+  fs.chmodSync(target, fs.statSync(path.join(harnessDir, 'hooks', scriptName)).mode)
+  return target
+}
+
+function sandboxBashHookEntry({ harnessDir, claudeDir, entry }) {
+  const hooks = entry.hooks.map((hook) => {
+    const scriptName = hookScriptName(hook.command)
+    return { ...hook, command: copyHookScript({ harnessDir, claudeDir, scriptName }) }
+  })
+  return { ...entry, hooks }
+}
+
+function sandboxBashHookEntries({ harnessDir, claudeDir, settings }) {
+  return (settings.hooks?.PreToolUse ?? [])
+    .filter((entry) => entry.matcher === 'Bash')
+    .map((entry) => sandboxBashHookEntry({ harnessDir, claudeDir, entry }))
+}
+
+function writeSandboxSettings({ harnessDir, claudeDir }) {
+  const harnessSettings = readHarnessSettings(harnessDir)
+  const settings = { permissions: { deny: harnessSettings.permissions?.deny ?? [] } }
+  const bashHooks = sandboxBashHookEntries({ harnessDir, claudeDir, settings: harnessSettings })
+  if (bashHooks.length > 0) settings.hooks = { PreToolUse: bashHooks }
   fs.writeFileSync(path.join(claudeDir, 'settings.json'), `${JSON.stringify(settings, null, 2)}\n`)
 }
 
