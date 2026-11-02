@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
-import { executeCommand, parseCliArguments, runCase, runSuite } from './run.mjs'
+import { baselinePathFor, executeCommand, parseCliArguments, runCase, runSuite } from './run.mjs'
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'run-test-'))
@@ -225,7 +225,7 @@ async function executeWithLog({ command, scenarios, baselinePath, options = comm
       options,
       scenarios,
       harnessDir: makeHarness(),
-      baselinePath,
+      baselinesDir: path.dirname(baselinePath),
       log: (line) => lines.push(line),
     }),
   )
@@ -233,7 +233,7 @@ async function executeWithLog({ command, scenarios, baselinePath, options = comm
 }
 
 function baselineFile(cases, overrides = {}) {
-  const baselinePath = path.join(makeTempDir(), 'baselines', 'compliance.json')
+  const baselinePath = path.join(makeTempDir(), 'baselines', 'compliance-haiku.json')
   fs.mkdirSync(path.dirname(baselinePath), { recursive: true })
   const summary = { claudeCodeVersion: '2.1.0', model: 'haiku', cases, ...overrides }
   fs.writeFileSync(baselinePath, `${JSON.stringify(summary, null, 2)}\n`)
@@ -245,7 +245,7 @@ function baselineCase(passes, { safety = false, runs = 3 } = {}) {
 }
 
 test('capture writes the summary as pretty JSON with a trailing newline', async () => {
-  const baselinePath = path.join(makeTempDir(), 'baselines', 'compliance.json')
+  const baselinePath = path.join(makeTempDir(), 'baselines', 'compliance-haiku.json')
   await executeWithLog({ command: 'capture', scenarios: [scenarioPrompting('good')], baselinePath })
   const text = fs.readFileSync(baselinePath, 'utf8')
   assert.equal(text, `${JSON.stringify(JSON.parse(text), null, 2)}\n`)
@@ -376,7 +376,7 @@ test('capture with only keeps the baseline version and model on a clean merge', 
 })
 
 test('capture exits 1 and writes nothing when a run has an environment failure', async () => {
-  const baselinePath = path.join(makeTempDir(), 'baselines', 'compliance.json')
+  const baselinePath = path.join(makeTempDir(), 'baselines', 'compliance-haiku.json')
   const { exitCode } = await executeWithLog({
     command: 'capture',
     scenarios: [scenarioPrompting('noinit')],
@@ -406,4 +406,30 @@ test('parseCliArguments rejects a concurrency that is not a number', () => {
 
 test('parseCliArguments rejects a fractional concurrency', () => {
   assert.throws(() => parseCliArguments(['capture', '--concurrency', '1.5']), /concurrency.*positive/is)
+})
+
+test('baselinePathFor names the baseline file after the model', () => {
+  assert.equal(
+    baselinePathFor({ baselinesDir: '/lab/baselines', model: 'opus' }),
+    path.join('/lab/baselines', 'compliance-opus.json'),
+  )
+})
+
+test('compare without a baseline for the model tells the reader to capture that model', async () => {
+  const baselinePath = path.join(makeTempDir(), 'compliance-haiku.json')
+  await assert.rejects(
+    executeWithLog({ command: 'compare', scenarios: [scenarioPrompting('good')], baselinePath }),
+    /capture --model haiku/,
+  )
+})
+
+test('capture writes to the baseline file of the selected model', async () => {
+  const baselinesDir = makeTempDir()
+  await executeWithLog({
+    command: 'capture',
+    scenarios: [scenarioPrompting('good')],
+    baselinePath: path.join(baselinesDir, 'compliance-haiku.json'),
+    options: commandOptions({ model: 'haiku' }),
+  })
+  assert.deepEqual(fs.readdirSync(baselinesDir), ['compliance-haiku.json'])
 })

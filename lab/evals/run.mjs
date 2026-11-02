@@ -148,7 +148,10 @@ function selectScenarios({ scenarios, only }) {
 
 function readBaseline(baselinePath) {
   if (!fs.existsSync(baselinePath)) {
-    throw new Error(`No baseline found at ${baselinePath}. Run the capture command first.`)
+    const model = path.basename(baselinePath, '.json').replace(/^compliance-/, '')
+    throw new Error(
+      `No baseline found at ${baselinePath}. Run capture --model ${model} to create it.`,
+    )
   }
   return JSON.parse(fs.readFileSync(baselinePath, 'utf8'))
 }
@@ -249,15 +252,20 @@ function concludeComparison({ confirmed, rerun, uncompared, only, log }) {
   return fails ? 1 : 0
 }
 
+export function baselinePathFor({ baselinesDir, model }) {
+  return path.join(baselinesDir, `compliance-${model}.json`)
+}
+
 export async function executeCommand({
   command,
   options,
   scenarios,
   harnessDir,
-  baselinePath,
+  baselinesDir,
   log = console.log,
 }) {
   const { model, runs, concurrency, only } = options
+  const baselinePath = baselinePathFor({ baselinesDir, model })
   const suiteInput = { scenarios: selectScenarios({ scenarios, only }), harnessDir, model, runs, concurrency }
   const execute = command === 'capture' ? executeCapture : executeCompare
   return execute({ suiteInput, only, baselinePath, log })
@@ -272,7 +280,7 @@ async function main() {
     options,
     scenarios,
     harnessDir: path.resolve(labDir, '..', '.claude'),
-    baselinePath: path.join(labDir, 'baselines', 'compliance.json'),
+    baselinesDir: path.join(labDir, 'baselines'),
   })
 }
 
