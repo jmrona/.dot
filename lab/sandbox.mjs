@@ -40,7 +40,7 @@ export function buildClaudeArgs({ prompt, model, tools = ['Read'], maxTurns = 8 
 
 export function buildClaudeEnv(env) {
   const { CLAUDECODE: _nestingMarker, ...remaining } = env
-  return remaining
+  return { ...remaining, CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '0' }
 }
 
 function parseJsonLines(output) {

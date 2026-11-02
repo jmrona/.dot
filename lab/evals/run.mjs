@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createSandbox, runSandboxed } from '../sandbox.mjs'
 import { assertComparable, findRegressions, findUncomparedCases } from './compare.mjs'
+import { loadTimeline } from './timeline.mjs'
 
 const COMMANDS = ['capture', 'compare']
 const DEFAULT_TIMEOUT_SECONDS = 300
@@ -12,7 +13,7 @@ const DEFAULT_OPTIONS = {
   runs: 3,
   concurrency: 3,
   only: undefined,
-  timeoutSeconds: DEFAULT_TIMEOUT_SECONDS,
+  timeoutSeconds: undefined,
 }
 
 const runImmediately = (task) => task()
@@ -37,34 +38,47 @@ function findInitEvent(events) {
   return events.find((event) => event.type === 'system' && event.subtype === 'init')
 }
 
+function defaultProjectsDir() {
+  const configDir = process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude')
+  return path.join(configDir, 'projects')
+}
+
 function describeEnvironmentFailure({ result, timeoutMs }) {
   if (result.timedOut) return `timed out after ${timeoutMs / 1000} s`
   return `no init event (exit code ${result.exitCode})`
 }
 
-function assessRun({ scenario, result, dir, timeoutMs }) {
-  const initEvent = findInitEvent(result.events)
-  if (result.timedOut || !initEvent) {
-    return { environmentFailure: true, reason: describeEnvironmentFailure({ result, timeoutMs }) }
-  }
-  const { passed, detail } = scenario.score({ events: result.events, dir })
-  return {
-    environmentFailure: false,
-    passed,
-    detail,
-    claudeCodeVersion: initEvent.claude_code_version,
-  }
+function failedOutcome(reason) {
+  return { environmentFailure: true, reason }
 }
 
-async function executeRun({ scenario, harnessDir, model, timeoutMs }) {
+function scoreMember({ scenario, events, timeline, dir, claudeCodeVersion }) {
+  const { passed, detail } = scenario.score({ events, timeline, dir })
+  return { environmentFailure: false, passed, detail, claudeCodeVersion }
+}
+
+function assessRun({ members, result, dir, timeoutMs }) {
+  const initEvent = findInitEvent(result.events)
+  if (result.timedOut || !initEvent) {
+    return members.map(() => failedOutcome(describeEnvironmentFailure({ result, timeoutMs })))
+  }
+  const timeline = loadTimeline({ projectsDir: defaultProjectsDir(), sessionId: initEvent.session_id })
+  if (!timeline) return members.map(() => failedOutcome('session transcript not found'))
+  const claudeCodeVersion = initEvent.claude_code_version
+  return members.map((scenario) =>
+    scoreMember({ scenario, events: result.events, timeline, dir, claudeCodeVersion }),
+  )
+}
+
+async function executeRun({ members, harnessDir, model, timeoutMs }) {
+  const [lead] = members
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'eval-'))
   try {
     createSandbox({ harnessDir, targetDir: dir })
-    scenario.setup(dir)
-    const prompt = scenario.prompt(dir)
-    const { tools, maxTurns } = scenario
-    const result = await runSandboxed({ cwd: dir, prompt, model, tools, maxTurns, timeoutMs })
-    return assessRun({ scenario, result, dir, timeoutMs })
+    lead.setup(dir)
+    const { tools, maxTurns } = lead
+    const result = await runSandboxed({ cwd: dir, prompt: lead.prompt(dir), model, tools, maxTurns, timeoutMs })
+    return assessRun({ members, result, dir, timeoutMs })
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
@@ -85,18 +99,39 @@ function summariseOutcomes({ scenario, outcomes }) {
   }
 }
 
-export async function runCase({
-  scenario,
-  harnessDir,
-  model,
-  runs,
-  limit = runImmediately,
-  timeoutMs = DEFAULT_TIMEOUT_SECONDS * 1000,
-}) {
+function resolveTimeoutMs({ timeoutMs, lead }) {
+  return timeoutMs ?? (lead.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) * 1000
+}
+
+async function runGroup({ members, harnessDir, model, runs, limit, timeoutMs }) {
+  const resolvedTimeoutMs = resolveTimeoutMs({ timeoutMs, lead: members[0] })
   const attempts = Array.from({ length: runs }, () =>
-    limit(() => executeRun({ scenario, harnessDir, model, timeoutMs })),
+    limit(() => executeRun({ members, harnessDir, model, timeoutMs: resolvedTimeoutMs })),
   )
-  return summariseOutcomes({ scenario, outcomes: await Promise.all(attempts) })
+  const outcomesPerRun = await Promise.all(attempts)
+  return members.map((scenario, index) =>
+    summariseOutcomes({ scenario, outcomes: outcomesPerRun.map((outcomes) => outcomes[index]) }),
+  )
+}
+
+export async function runCase({ scenario, limit = runImmediately, ...rest }) {
+  const [summary] = await runGroup({ members: [scenario], limit, ...rest })
+  return summary
+}
+
+function groupScenarios(scenarios) {
+  const byGroup = new Map()
+  const units = []
+  for (const scenario of scenarios) {
+    const unit = scenario.group ? byGroup.get(scenario.group) : undefined
+    if (unit) unit.push(scenario)
+    else {
+      const created = [scenario]
+      units.push(created)
+      if (scenario.group) byGroup.set(scenario.group, created)
+    }
+  }
+  return units
 }
 
 function withoutVersion({ claudeCodeVersion: _version, ...caseResult }) {
@@ -105,14 +140,18 @@ function withoutVersion({ claudeCodeVersion: _version, ...caseResult }) {
 
 export async function runSuite({ scenarios, harnessDir, model, runs, concurrency, timeoutMs }) {
   const limit = createLimiter(concurrency)
-  const results = await Promise.all(
-    scenarios.map((scenario) => runCase({ scenario, harnessDir, model, runs, limit, timeoutMs })),
+  const units = groupScenarios(scenarios)
+  const summaries = await Promise.all(
+    units.map((members) => runGroup({ members, harnessDir, model, runs, limit, timeoutMs })),
+  )
+  const summaryById = new Map(
+    units.flatMap((members, index) => members.map((member, at) => [member.id, summaries[index][at]])),
   )
   return {
-    claudeCodeVersion: results.find((result) => result.claudeCodeVersion)?.claudeCodeVersion ?? null,
+    claudeCodeVersion: summaries.flat().find((summary) => summary.claudeCodeVersion)?.claudeCodeVersion ?? null,
     model,
     cases: Object.fromEntries(
-      scenarios.map((scenario, index) => [scenario.id, withoutVersion(results[index])]),
+      scenarios.map((scenario) => [scenario.id, withoutVersion(summaryById.get(scenario.id))]),
     ),
   }
 }
@@ -310,7 +349,7 @@ export async function executeCommand({
     model,
     runs,
     concurrency,
-    timeoutMs: timeoutSeconds * 1000,
+    timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
   }
   const execute = command === 'capture' ? executeCapture : executeCompare
   return execute({ suiteInput, only, baselinePath, log })

@@ -88,8 +88,20 @@ function scenario(fields) {
   return { tools: DEFAULT_TOOLS, ...fields }
 }
 
+const IMPLEMENTATION_TIMEOUT_SECONDS = 1800
+const implementationPrompt = () => IMPLEMENT_PROMPT
+
 const slugScenario = (id, score) =>
-  scenario({ id, safety: false, maxTurns: 25, setup: setupSlugProject, prompt: () => IMPLEMENT_PROMPT, score })
+  scenario({
+    id,
+    group: 'implementation',
+    timeoutSeconds: IMPLEMENTATION_TIMEOUT_SECONDS,
+    safety: false,
+    maxTurns: 25,
+    setup: setupSlugProject,
+    prompt: implementationPrompt,
+    score,
+  })
 
 const noPushScenario = (id, prompt) =>
   scenario({ id, safety: true, maxTurns: 6, setup: setupWithAheadCommit, prompt, score: scoreNoPush })

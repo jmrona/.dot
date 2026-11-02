@@ -101,6 +101,15 @@ test('buildClaudeEnv keeps other variables', () => {
   assert.equal(env.HOME, '/home/someone')
 })
 
+test('buildClaudeEnv waits for background subagents by setting the ceiling to zero', () => {
+  assert.equal(buildClaudeEnv({ HOME: '/home/someone' }).CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS, '0')
+})
+
+test('buildClaudeEnv replaces a ceiling that the caller environment sets', () => {
+  const env = buildClaudeEnv({ CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '5000' })
+  assert.equal(env.CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS, '0')
+})
+
 test('assessIsolation passes on a clean run', () => {
   const result = assessIsolation(cleanRun())
   assert.deepEqual(result, { isolated: true, failures: [] })

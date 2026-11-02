@@ -21,7 +21,15 @@ function fakeClaudeSource({ stateDir }) {
 const fs = require('node:fs')
 const prompt = process.argv[3]
 const state = ${JSON.stringify(stateDir)}
-const init = { type: 'system', subtype: 'init', claude_code_version: '2.1.0' }
+const sessionId = 'session-' + process.pid + '-' + Date.now()
+const init = { type: 'system', subtype: 'init', claude_code_version: '2.1.0', session_id: sessionId }
+function writeTranscript() {
+  const project = process.env.CLAUDE_CONFIG_DIR + '/projects/fake-project'
+  fs.mkdirSync(project, { recursive: true })
+  const toolUse = { type: 'tool_use', id: 'u1', name: 'Bash', input: { command: prompt } }
+  const line = { type: 'assistant', timestamp: '2026-01-01T00:00:00Z', message: { content: [toolUse] } }
+  fs.writeFileSync(project + '/' + sessionId + '.jsonl', JSON.stringify(line) + '\\n')
+}
 const say = (text) => console.log(JSON.stringify({ type: 'assistant', text }))
 function nextFlakyCount() {
   const file = state + '/flaky'
@@ -31,6 +39,7 @@ function nextFlakyCount() {
 }
 if (prompt === 'noinit') process.exit(0)
 console.log(JSON.stringify(init))
+if (prompt !== 'notranscript') writeTranscript()
 if (prompt === 'hang') setTimeout(() => {}, 60000)
 else if (prompt === 'slow') {
   fs.appendFileSync(state + '/log', 'start\\n')
@@ -47,11 +56,15 @@ async function withFakeClaude(body) {
   fs.writeFileSync(executable, fakeClaudeSource({ stateDir }))
   fs.chmodSync(executable, 0o755)
   const originalPath = process.env.PATH
+  const originalConfigDir = process.env.CLAUDE_CONFIG_DIR
   process.env.PATH = `${binDir}${path.delimiter}${originalPath}`
+  process.env.CLAUDE_CONFIG_DIR = makeTempDir()
   try {
     return await body({ stateDir })
   } finally {
     process.env.PATH = originalPath
+    if (originalConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
+    else process.env.CLAUDE_CONFIG_DIR = originalConfigDir
   }
 }
 
@@ -194,11 +207,11 @@ test('runSuite summarises the version, model and cases by id', async () => {
   })
 })
 
-test('parseCliArguments defaults to sonnet, three runs and concurrency three', () => {
+test('parseCliArguments defaults to sonnet, three runs, concurrency three and no timeout override', () => {
   const { command, options } = parseCliArguments(['capture'])
   assert.deepEqual(
     [command, options.model, options.runs, options.concurrency, options.only, options.timeoutSeconds],
-    ['capture', 'sonnet', 3, 3, undefined, 300],
+    ['capture', 'sonnet', 3, 3, undefined, undefined],
   )
 })
 
@@ -518,4 +531,167 @@ test('capture removes the partial summary after a successful capture', async () 
   fs.writeFileSync(partialPath, '{}')
   await executeWithLog({ command: 'capture', scenarios: [scenarioPrompting('good')], baselinePath })
   assert.equal(fs.existsSync(partialPath), false)
+})
+
+test('runCase counts a run without a session transcript as an environment failure', async () => {
+  const result = await withFakeClaude(() => runCaseFor(scenarioPrompting('notranscript'), { runs: 1 }))
+  assert.deepEqual(result.environmentFailureReasons, ['session transcript not found'])
+})
+
+test('runCase does not score a run without a session transcript', async () => {
+  let scoreCalls = 0
+  const scenario = scenarioPrompting('notranscript', {
+    score: () => {
+      scoreCalls += 1
+      return { passed: true, detail: '' }
+    },
+  })
+  await withFakeClaude(() => runCaseFor(scenario, { runs: 1 }))
+  assert.equal(scoreCalls, 0)
+})
+
+test('runCase hands the scorer the timeline of the session transcript', async () => {
+  const commands = []
+  const scenario = scenarioPrompting('good', {
+    score: ({ timeline }) => {
+      commands.push(...timeline.map((entry) => entry.input.command))
+      return { passed: true, detail: '' }
+    },
+  })
+  await withFakeClaude(() => runCaseFor(scenario, { runs: 1 }))
+  assert.deepEqual(commands, ['good'])
+})
+
+function groupMembers(ids, { prompt = 'good', onSetup = () => {}, scores = {} } = {}) {
+  const setup = (dir) => onSetup(dir)
+  const promptOf = () => prompt
+  return ids.map((id) =>
+    scenarioPrompting(prompt, {
+      id,
+      group: 'shared',
+      setup,
+      prompt: promptOf,
+      score: scores[id] ?? (() => ({ passed: true, detail: `${id} scored` })),
+    }),
+  )
+}
+
+test('runSuite runs a group once for each repetition', async () => {
+  let setups = 0
+  const scenarios = groupMembers(['a', 'b', 'c'], { onSetup: () => (setups += 1) })
+  await withFakeClaude(() =>
+    runSuite({ scenarios, harnessDir: makeHarness(), model: 'haiku', runs: 2, concurrency: 3 }),
+  )
+  assert.equal(setups, 2)
+})
+
+test('runSuite reports the full number of runs for every member of a group', async () => {
+  const scenarios = groupMembers(['a', 'b'])
+  const summary = await withFakeClaude(() =>
+    runSuite({ scenarios, harnessDir: makeHarness(), model: 'haiku', runs: 3, concurrency: 3 }),
+  )
+  assert.deepEqual([summary.cases.a.runs, summary.cases.b.runs], [3, 3])
+})
+
+test('runSuite scores each member of a group with its own scorer', async () => {
+  const scores = { b: () => ({ passed: false, detail: 'b failed' }) }
+  const scenarios = groupMembers(['a', 'b'], { scores })
+  const summary = await withFakeClaude(() =>
+    runSuite({ scenarios, harnessDir: makeHarness(), model: 'haiku', runs: 2, concurrency: 3 }),
+  )
+  assert.deepEqual([summary.cases.a.passes, summary.cases.b.passes], [2, 0])
+})
+
+test('runSuite scores every member of a group against the same working directory', async () => {
+  const seen = { a: [], b: [] }
+  const scores = {
+    a: ({ dir }) => (seen.a.push(dir), { passed: true, detail: '' }),
+    b: ({ dir }) => (seen.b.push(dir), { passed: true, detail: '' }),
+  }
+  await withFakeClaude(() =>
+    runSuite({
+      scenarios: groupMembers(['a', 'b'], { scores }),
+      harnessDir: makeHarness(),
+      model: 'haiku',
+      runs: 2,
+      concurrency: 3,
+    }),
+  )
+  assert.deepEqual(seen.a, seen.b)
+})
+
+test('runSuite counts an environment failure of a group run against every member', async () => {
+  const scenarios = groupMembers(['a', 'b'], { prompt: 'noinit' })
+  const summary = await withFakeClaude(() =>
+    runSuite({ scenarios, harnessDir: makeHarness(), model: 'haiku', runs: 2, concurrency: 3 }),
+  )
+  assert.deepEqual([summary.cases.a.environmentFailures, summary.cases.b.environmentFailures], [2, 2])
+})
+
+test('runSuite keeps the scenario order of the cases when groups interleave', async () => {
+  const [first, second] = groupMembers(['a', 'c'])
+  const between = scenarioPrompting('good', { id: 'b' })
+  const summary = await withFakeClaude(() =>
+    runSuite({
+      scenarios: [first, between, second],
+      harnessDir: makeHarness(),
+      model: 'haiku',
+      runs: 1,
+      concurrency: 3,
+    }),
+  )
+  assert.deepEqual(Object.keys(summary.cases), ['a', 'b', 'c'])
+})
+
+test('runSuite runs scenarios without a group once each for every repetition', async () => {
+  let setups = 0
+  const countSetup = () => (setups += 1)
+  const scenarios = ['a', 'b'].map((id) => scenarioPrompting('good', { id, setup: countSetup }))
+  await withFakeClaude(() =>
+    runSuite({ scenarios, harnessDir: makeHarness(), model: 'haiku', runs: 2, concurrency: 3 }),
+  )
+  assert.equal(setups, 4)
+})
+
+test('runSuite limits concurrency by real runs and not by group members', async () => {
+  const peak = await withFakeClaude(async ({ stateDir }) => {
+    const scenarios = groupMembers(['a', 'b', 'c'], { prompt: 'slow' })
+    await runSuite({ scenarios, harnessDir: makeHarness(), model: 'haiku', runs: 4, concurrency: 2 })
+    return maxInFlight(fs.readFileSync(path.join(stateDir, 'log'), 'utf8'))
+  })
+  assert.equal(peak, 2)
+})
+
+test('compare reruns a regressed group once for all of its regressed members', async () => {
+  let setups = 0
+  const failing = () => ({ passed: false, detail: 'failed' })
+  const scenarios = groupMembers(['a', 'b'], {
+    onSetup: () => (setups += 1),
+    scores: { a: failing, b: failing },
+  }).map((scenario) => ({ ...scenario, safety: true }))
+  const baselinePath = baselineFile({ a: baselineCase(3, { safety: true }), b: baselineCase(3, { safety: true }) })
+  await executeWithLog({
+    command: 'compare',
+    scenarios,
+    baselinePath,
+    options: commandOptions({ runs: 2, concurrency: 1 }),
+  })
+  assert.equal(setups, 4)
+})
+
+test('runCase uses the timeout of the scenario when the caller gives none', async () => {
+  const scenario = scenarioPrompting('hang', { timeoutSeconds: 0.4 })
+  const result = await withFakeClaude(() => runCaseFor(scenario, { runs: 1 }))
+  assert.deepEqual(result.environmentFailureReasons, ['timed out after 0.4 s'])
+})
+
+test('capture lets the timeout option override the timeout of the scenario', async () => {
+  const baselinePath = path.join(makeTempDir(), 'compliance-haiku.json')
+  const { output } = await executeWithLog({
+    command: 'capture',
+    scenarios: [scenarioPrompting('hang', { timeoutSeconds: 1800 })],
+    baselinePath,
+    options: commandOptions({ runs: 1, timeoutSeconds: 1 }),
+  })
+  assert.match(output, /hang.*timed out after 1 s/)
 })

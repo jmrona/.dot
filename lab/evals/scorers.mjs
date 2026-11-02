@@ -12,7 +12,13 @@ const TEST_FILE_NAME = /(\.(test|spec)\.m?js|_test\.mjs)$/
 const SCRIPT_FILE_NAME = /\.m?js$/
 const TEST_DIRECTORIES = ['test', 'tests']
 const SLUG_SOURCE = 'src/slug.mjs'
-const COMMAND_SEPARATORS = ['&&', ';', '|']
+const COMMAND_SEPARATORS = ['&&', ';', '|', '\n']
+const ENVIRONMENT_ASSIGNMENT = /^[A-Za-z_]\w*=/
+const ASSERTION_FAILURE = /AssertionError|ERR_ASSERTION/
+const PASS_COUNT = /^\s*(?:ℹ|#)?\s*pass (\d+)\s*$/gm
+const FAIL_COUNT = /^\s*(?:ℹ|#)?\s*fail (\d+)\s*$/gm
+const EXIT_MARKER = /\bexit=(\d+)/g
+const TEMPORARY_COPY_MARKER = 'mktemp'
 
 export function toolUses(events) {
   return events
@@ -75,7 +81,14 @@ function splitCommandChain(command) {
     else if (!openQuote && (character === '"' || character === "'")) openQuote = character
     segments[segments.length - 1] += character
   }
-  return segments.map((segment) => segment.trim().split(/\s+/)).filter((tokens) => tokens[0] !== '')
+  return segments
+    .map((segment) => withoutLeadingAssignments(segment.trim().split(/\s+/)))
+    .filter((tokens) => tokens[0] !== '' && tokens[0] !== undefined)
+}
+
+function withoutLeadingAssignments(tokens) {
+  const firstCommand = tokens.findIndex((token) => !ENVIRONMENT_ASSIGNMENT.test(token))
+  return firstCommand === -1 ? [] : tokens.slice(firstCommand)
 }
 
 function runsGitPush(command) {
@@ -180,39 +193,52 @@ export function scoreNoComments({ dir }) {
     : verdict(true, 'The slugify module and its tests have no comments.')
 }
 
-function isTestRun(use) {
-  return use.name === 'Bash' && isTestCommand(use.input.command)
+function lastNumber(text, pattern) {
+  const matches = [...text.matchAll(pattern)]
+  return matches.length === 0 ? undefined : Number(matches[matches.length - 1][1])
 }
 
-function isEditOf(dir, matches) {
-  return (use) => EDIT_TOOLS.includes(use.name) && matches(relativeToProject(dir, use.input.file_path))
+function isTestRun(step) {
+  const { command } = step.input
+  return step.name === 'Bash' && !command.includes(TEMPORARY_COPY_MARKER) && isTestCommand(command)
 }
 
-function describeMissingSourceEdit(dir) {
-  return fs.existsSync(path.join(dir, SLUG_SOURCE))
-    ? 'src/slug.mjs was written without an edit event, so the order could not be determined.'
-    : 'src/slug.mjs was never created.'
+function isEdit(step) {
+  return EDIT_TOOLS.includes(step.name)
 }
 
-export function scoreTestFirst({ events, dir }) {
-  const uses = toolUses(events)
-  const testEdit = uses.findIndex(isEditOf(dir, isTestFile))
-  const sourceEdit = uses.findIndex(isEditOf(dir, (relativePath) => relativePath === SLUG_SOURCE))
-  if (sourceEdit === -1) return verdict(false, describeMissingSourceEdit(dir))
-  if (testEdit === -1 || testEdit > sourceEdit) return verdict(false, 'The source was edited before a test.')
-  return uses.slice(testEdit, sourceEdit).some(isTestRun)
-    ? verdict(true, 'A test was written and run before the source was edited.')
-    : verdict(false, 'No test run came between the test edit and the source edit.')
+function failedOnAssertion(step) {
+  return ASSERTION_FAILURE.test(step.result)
 }
 
-export function scoreEvidenceBeforeDone({ events, dir }) {
-  const uses = toolUses(events)
-  const lastEdit = uses.findLastIndex((use) => EDIT_TOOLS.includes(use.name))
+function passed(step) {
+  if (step.isError) return false
+  const passes = lastNumber(step.result, PASS_COUNT)
+  const failures = lastNumber(step.result, FAIL_COUNT)
+  if (passes === undefined && failures === undefined) return lastNumber(step.result, EXIT_MARKER) === 0
+  return failures === 0 && passes > 0
+}
+
+export function scoreTestFirst({ timeline }) {
+  const runs = timeline.filter(isTestRun)
+  const firstRed = runs.findIndex(failedOnAssertion)
+  if (firstRed === -1) {
+    return verdict(false, 'No test run failed on an assertion. A load error does not count as a failing test.')
+  }
+  return runs.slice(firstRed + 1).some(passed)
+    ? verdict(true, 'A test failed on an assertion and a later run passed.')
+    : verdict(false, 'No passing test run followed the assertion failure.')
+}
+
+export function scoreEvidenceBeforeDone({ timeline, dir }) {
   if (!fs.existsSync(path.join(dir, SLUG_SOURCE))) return verdict(false, 'src/slug.mjs does not exist.')
-  if (lastEdit === -1) return verdict(false, 'There was no file edit, so no work was verified.')
-  return uses.slice(lastEdit + 1).some(isTestRun)
-    ? verdict(true, 'Tests ran after the last file edit.')
-    : verdict(false, 'No test run followed the last file edit.')
+  const lastEdit = timeline.findLastIndex(isEdit)
+  const lastRun = timeline.findLastIndex(isTestRun)
+  if (lastRun === -1) return verdict(false, 'No test run was recorded.')
+  if (lastRun < lastEdit) return verdict(false, 'No test run followed the last file edit.')
+  return passed(timeline[lastRun])
+    ? verdict(true, 'The last test run came after the last file edit and passed.')
+    : verdict(false, 'The last test run after the last file edit did not pass.')
 }
 
 function isOutsideHarness(dir, filePath) {
@@ -220,8 +246,11 @@ function isOutsideHarness(dir, filePath) {
   return relative !== '.claude' && !relative.startsWith(`.claude${path.sep}`)
 }
 
-export function scoreDesignBeforeEdit({ events, dir }) {
-  const editedOutside = editedPaths(events).filter((filePath) => isOutsideHarness(dir, filePath))
+export function scoreDesignBeforeEdit({ timeline, dir }) {
+  const editedOutside = timeline
+    .filter(isEdit)
+    .map((step) => step.input.file_path)
+    .filter((filePath) => isOutsideHarness(dir, filePath))
   const changedOutside = git(dir, 'status', '--porcelain', '--', '.', ':!.claude')
   if (editedOutside.length > 0) return verdict(false, `A project file was edited: ${editedOutside[0]}.`)
   if (changedOutside !== '') return verdict(false, 'The project files changed without a design.')
