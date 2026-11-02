@@ -66,11 +66,6 @@ test('createSandbox copies the skills directory', () => {
   assert.equal(fs.readFileSync(path.join(claudeDir, 'skills/demo/SKILL.md'), 'utf8'), 'skill')
 })
 
-test('createSandbox omits settings.json', () => {
-  const claudeDir = sandboxFromHarness()
-  assert.equal(fs.existsSync(path.join(claudeDir, 'settings.json')), false)
-})
-
 test('createSandbox omits the hooks directory', () => {
   const claudeDir = sandboxFromHarness()
   assert.equal(fs.existsSync(path.join(claudeDir, 'hooks')), false)
@@ -233,6 +228,14 @@ function installFakeClaude(scriptBody) {
   return binDir
 }
 
+function installShellClaude(scriptBody) {
+  const binDir = makeTempDir()
+  const executable = path.join(binDir, 'claude')
+  fs.writeFileSync(executable, `#!/bin/sh\n${scriptBody}\n`)
+  fs.chmodSync(executable, 0o755)
+  return binDir
+}
+
 async function runWithPath(pathValue, options) {
   const originalPath = process.env.PATH
   process.env.PATH = pathValue
@@ -303,4 +306,99 @@ test('buildClaudeArgs limits the run to eight turns', () => {
 test('buildClaudeArgs allows only the Read tool', () => {
   const args = buildClaudeArgs({ prompt: 'hello', model: 'haiku' })
   assert.equal(args[args.indexOf('--allowedTools') + 1], 'Read')
+})
+
+test('buildClaudeArgs joins the requested tools with commas', () => {
+  const args = buildClaudeArgs({ prompt: 'hello', model: 'haiku', tools: ['Read', 'Write'] })
+  assert.equal(args[args.indexOf('--allowedTools') + 1], 'Read,Write')
+})
+
+test('buildClaudeArgs passes the requested maximum turns as a string', () => {
+  const args = buildClaudeArgs({ prompt: 'hello', model: 'haiku', maxTurns: 3 })
+  assert.equal(args[args.indexOf('--max-turns') + 1], '3')
+})
+
+test('runSandboxed reports timedOut false when claude finishes in time', async () => {
+  const { timedOut } = await runFakeClaude('process.exit(0)')
+  assert.equal(timedOut, false)
+})
+
+test('runSandboxed reports a timeout with no exit code when claude runs too long', async () => {
+  const binDir = installShellClaude('sleep 60')
+  const { exitCode, timedOut } = await runWithPath(`${binDir}${path.delimiter}${process.env.PATH}`, {
+    timeoutMs: 500,
+  })
+  assert.deepEqual({ exitCode, timedOut }, { exitCode: null, timedOut: true })
+})
+
+test('runSandboxed keeps the events that claude wrote before the timeout', async () => {
+  const binDir = installShellClaude(`echo '{"type":"a"}'\nsleep 60`)
+  const { events } = await runWithPath(`${binDir}${path.delimiter}${process.env.PATH}`, {
+    timeoutMs: 3000,
+  })
+  assert.deepEqual(events, [{ type: 'a' }])
+})
+
+function sandboxWithSettings(settings) {
+  const harnessDir = makeHarness()
+  writeFile(path.join(harnessDir, 'settings.json'), JSON.stringify(settings))
+  const targetDir = makeTempDir()
+  createSandbox({ harnessDir, targetDir })
+  return path.join(targetDir, '.claude', 'settings.json')
+}
+
+test('createSandbox writes only the permission deny list into settings.json', () => {
+  const settingsPath = sandboxWithSettings({
+    permissions: { deny: ['Read(.env)'], defaultMode: 'bypassPermissions', allow: ['Bash'] },
+    hooks: { Stop: [] },
+    enabledPlugins: { figma: true },
+  })
+  assert.deepEqual(JSON.parse(fs.readFileSync(settingsPath, 'utf8')), {
+    permissions: { deny: ['Read(.env)'] },
+  })
+})
+
+test('createSandbox writes an empty deny list when the harness has no settings.json', () => {
+  const harnessDir = makeHarness()
+  fs.rmSync(path.join(harnessDir, 'settings.json'))
+  const targetDir = makeTempDir()
+  createSandbox({ harnessDir, targetDir })
+  const written = fs.readFileSync(path.join(targetDir, '.claude', 'settings.json'), 'utf8')
+  assert.deepEqual(JSON.parse(written), { permissions: { deny: [] } })
+})
+
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function waitUntilDead(pid) {
+  for (let attempt = 0; attempt < 20 && isProcessAlive(pid); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  return !isProcessAlive(pid)
+}
+
+test('runSandboxed on timeout kills a grandchild that holds the output pipe', async () => {
+  const pidFile = path.join(makeTempDir(), 'grandchild.pid')
+  const binDir = installShellClaude(`sleep 60 &\necho $! > ${pidFile}\nsleep 60`)
+  try {
+    const startedAt = Date.now()
+    const result = await runWithPath(`${binDir}${path.delimiter}${process.env.PATH}`, {
+      timeoutMs: 2000,
+    })
+    assert.ok(Date.now() - startedAt < 20000, 'timeout did not resolve while a grandchild held the pipe')
+    assert.equal(result.timedOut, true)
+    assert.equal(await waitUntilDead(Number(fs.readFileSync(pidFile, 'utf8'))), true)
+  } finally {
+    if (fs.existsSync(pidFile)) {
+      try {
+        process.kill(Number(fs.readFileSync(pidFile, 'utf8')), 'SIGKILL')
+      } catch {}
+    }
+  }
 })
