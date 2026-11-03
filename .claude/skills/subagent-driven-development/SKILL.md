@@ -55,7 +55,7 @@ A task whose difficulty is unsure goes to the Standard escalation tier. This is 
 
 ### File Structure
 
-Map out which files will be created or modified and what each file is responsible for. Lock these decisions in before any code is written. Each file should have one clear responsibility with a well-defined interface (see `../../rules/common/code-organisation.md`). In existing codebases, follow established patterns; files that change together should live together.
+Map out which files will be created or modified and what each file is responsible for. Lock these decisions in before any code is written. Each file should have one clear responsibility with a well-defined interface (see `../../rules/common/coding-style.md`). In existing codebases, follow established patterns; files that change together should live together.
 
 ### Task Granularity
 

@@ -81,3 +81,139 @@ YAGNI is referenced from `testing.md` (where it applies during the GREEN step of
 
 ## Commit messages
 DO NOT add Co-Authored-By at the end of the commit message
+
+## Code Organisation
+
+### File Structure
+
+You **SHOULD** organise files to reflect domain concepts:
+
+- One primary class or module per file (language-dependent)
+- Group related functionality together
+- Use directory structure to represent architectural boundaries
+
+### Dependency Management
+
+You **MUST NOT** add new runtime or development dependencies without explicit user approval. When proposing a dependency, you **MUST** tell the user:
+
+- Why the standard library or existing project dependencies are insufficient
+- The package name, current version, and licence
+- Whether it is actively maintained (last release within 12 months, open issues triaged)
+- Its approximate installation size and transitive dependency count
+
+You **SHOULD** prefer the standard library or a small inline implementation when a dependency would add fewer than ~50 lines of logic.
+
+### Import Organisation
+
+You **SHOULD** organise imports logically:
+
+- Group by type (standard library, third-party, local)
+- Sort alphabetically within groups (allow formatting tools to handle this if defined in project instructions)
+- Remove unused imports
+
+## Consistency
+
+### Follow Existing Patterns
+
+You **MUST** maintain consistency with the existing codebase:
+
+- Match established patterns and conventions, even when you would prefer a different approach
+- If you believe a pattern should change, raise it with the user and wait for approval before acting
+- If the user approves a pattern change, apply it consistently across every site you touch in that change, not just the one you started from
+- Don't mix styles within a file or module
+
+### Formatters and Linters
+
+You **SHOULD** use automated tooling where available:
+
+- Code formatters
+- Linters
+- Static analysis tools
+- Respect existing tool configurations
+
+## Error Handling
+
+### Explicit Error States
+
+You **SHOULD** make error conditions explicit and handled:
+
+- Avoid silent failures
+- Use exceptions for exceptional circumstances, not control flow
+- Validate input at system boundaries (see the Security section for the definition of a system boundary)
+- Return explicit error types (Result/Either) for operations whose failure is an expected outcome rather than a bug (e.g. parsing, network calls, file I/O)
+
+### Error Messages
+
+You **MUST** provide actionable error messages:
+
+- Describe what went wrong
+- Include relevant context (what operation was attempted)
+- Suggest remediation where applicable
+
+## Performance
+
+### Premature Optimisation
+
+You **SHOULD** prioritise correctness and clarity over premature optimisation:
+
+- Write clear code first
+- Measure performance before optimising and cite the measurement when you do
+- For comments on optimised code, follow the Default Rule section
+
+### Resource Management
+
+You **MUST** handle resources properly:
+
+- Close file handles, database connections, network sockets
+- Use language-appropriate patterns (RAII, defer, using statements, context managers)
+- Avoid resource leaks
+
+## Security
+
+### Input Validation
+
+You **MUST** validate and sanitise external input:
+
+- Never trust user input
+- Validate at system boundaries
+- Use parameterised queries for database access
+- Encode output appropriately for context
+
+**System boundaries** are any point where data enters your code from outside its trust zone, including:
+
+- HTTP request handlers (body, query, headers, cookies)
+- CLI argument and environment variable parsing
+- File system reads and deserialisation (JSON, YAML, XML, binary)
+- Database result sets from tables that accept user writes
+- Message queue and event bus consumers
+- Third-party API responses and webhooks
+- Inter-process communication (pipes, sockets, IPC)
+
+### Sensitive Data
+
+You **MUST NOT** commit sensitive data:
+You **MUST** point out to the user if there is potential to commit sensitive data:
+
+- Credentials, API keys, tokens
+- Personal or confidential information
+- Use environment variables or secure secret management
+
+## Documentation
+
+### README Files
+
+You **SHOULD** maintain clear README documentation:
+
+- Installation instructions
+- Usage examples
+- Architecture overview (for complex projects)
+- Contribution guidelines
+
+### Architectural Documentation
+
+You **MAY** provide architectural documentation for complex systems:
+
+- System diagrams
+- Decision records (ADRs)
+- API specifications
+- Deployment guides

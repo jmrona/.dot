@@ -30,12 +30,6 @@
       "alwaysLoaded": true,
       "executable": false
     },
-    "rules/common/code-organisation.md": {
-      "sha256": "88734ec5f434d08b628635cc3772cb09bba8bd86c9a02fed0c9688e3c74d0a2c",
-      "words": 161,
-      "alwaysLoaded": true,
-      "executable": false
-    },
     "rules/common/code-review.md": {
       "sha256": "dffd834e2a49741a8266b494c1e00aac2aa9c553a2a745b814672ca70d7484b0",
       "words": 333,
@@ -43,32 +37,14 @@
       "executable": false
     },
     "rules/common/coding-style.md": {
-      "sha256": "440d6e522b9afacefc2551bf8d40d5333667818b2b23ec0e5bfe131275fc3e5b",
-      "words": 707,
-      "alwaysLoaded": true,
-      "executable": false
-    },
-    "rules/common/consistency.md": {
-      "sha256": "280861d85661e56a0b97b92def838efa1287bb2a935fa2ae539424cb5d1ad801",
-      "words": 115,
+      "sha256": "84134e06a16b9f45b0d737d1238dc81838e4e7b361c11a2ad83f64ca3018dc46",
+      "words": 1340,
       "alwaysLoaded": true,
       "executable": false
     },
     "rules/common/debugging.md": {
       "sha256": "614e1c7cb95e230b33016c43e5696fa6903b8dfce2a1b74dba1fcd45f92ca906",
       "words": 387,
-      "alwaysLoaded": true,
-      "executable": false
-    },
-    "rules/common/documentation.md": {
-      "sha256": "1732fc36eae87a34452964b2d00cf7315ad9e84338a9edc1c51636315a2e47d4",
-      "words": 50,
-      "alwaysLoaded": true,
-      "executable": false
-    },
-    "rules/common/errors.md": {
-      "sha256": "ca1451f68a110c18d31ffe8c9703d89a7bd5a129d41d90c6fb3a3a37e7ff46c9",
-      "words": 98,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -84,21 +60,9 @@
       "alwaysLoaded": true,
       "executable": false
     },
-    "rules/common/performance.md": {
-      "sha256": "cfb185b73922877dd7f99f23959847cabbbd5c00d59edcc2dab1fbd4e3b254eb",
-      "words": 100,
-      "alwaysLoaded": true,
-      "executable": false
-    },
     "rules/common/prose-style.md": {
       "sha256": "a8e684f5e387a0909ac9f8c508b4117f4029b82618bf302ec29ab7b3d68df380",
       "words": 428,
-      "alwaysLoaded": true,
-      "executable": false
-    },
-    "rules/common/security.md": {
-      "sha256": "e4733aeb7b1d3eee35baa5642ab2429e1e3d2e823e35f565addce2ba0e83f073",
-      "words": 147,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -169,7 +133,7 @@
       "executable": false
     },
     "rules/php/coding-style.md": {
-      "sha256": "dab59b05823082530255e1caec8e47576c6b654f32e23128ee04840d2e7d6bfe",
+      "sha256": "41b327e4c0f668af7c9ea4d75036b105ecdcfafc4c8e633e0aa95ba4c2b5250f",
       "words": 596,
       "alwaysLoaded": false,
       "executable": false
@@ -419,7 +383,7 @@
       "executable": false
     },
     "skills/subagent-driven-development/SKILL.md": {
-      "sha256": "212e738b4696f13f6f0b7ffbba844755bbf313f03c771063ebe5175f12023ee8",
+      "sha256": "2477bae3dc4764996d03c598683cf33567f4f20df2997068cdf9b66b0e403847",
       "words": 3881,
       "alwaysLoaded": false,
       "executable": false,
@@ -502,5 +466,5 @@
       "executable": false
     }
   },
-  "alwaysLoadedWords": 6794
+  "alwaysLoadedWords": 6756
 }
