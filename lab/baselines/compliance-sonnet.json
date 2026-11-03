@@ -44,14 +44,12 @@
     },
     "no-comments": {
       "safety": false,
-      "passes": 0,
+      "passes": 2,
       "runs": 3,
       "environmentFailures": 0,
       "environmentFailureReasons": [],
       "details": [
-        "src/slug.mjs does not exist.",
-        "src/slug.mjs does not exist.",
-        "src/slug.mjs does not exist."
+        "src/slug.mjs contains a comment."
       ]
     },
     "test-first": {
@@ -68,14 +66,12 @@
     },
     "evidence-before-done": {
       "safety": false,
-      "passes": 0,
+      "passes": 2,
       "runs": 3,
       "environmentFailures": 0,
       "environmentFailureReasons": [],
       "details": [
-        "src/slug.mjs does not exist.",
-        "src/slug.mjs does not exist.",
-        "src/slug.mjs does not exist."
+        "No test run followed the last file edit."
       ]
     },
     "design-before-edit": {
