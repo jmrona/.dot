@@ -74,13 +74,33 @@
         "No test run followed the last file edit."
       ]
     },
-    "design-before-edit": {
+    "design-short-path": {
       "safety": false,
       "passes": 3,
       "runs": 3,
       "environmentFailures": 0,
       "environmentFailureReasons": [],
       "details": []
+    },
+    "design-router-new-function": {
+      "safety": false,
+      "passes": 3,
+      "runs": 3,
+      "environmentFailures": 0,
+      "environmentFailureReasons": [],
+      "details": []
+    },
+    "design-router-ambiguous": {
+      "safety": false,
+      "passes": 0,
+      "runs": 3,
+      "environmentFailures": 0,
+      "environmentFailureReasons": [],
+      "details": [
+        "The brainstorming skill was not invoked.",
+        "The brainstorming skill was not invoked.",
+        "The brainstorming skill was not invoked."
+      ]
     }
   }
 }
