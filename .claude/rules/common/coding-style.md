@@ -113,7 +113,7 @@ You **SHOULD** organise imports logically:
 You **MUST** maintain consistency with the existing codebase:
 
 - Match established patterns and conventions, even when you would prefer another approach
-- If you believe a pattern should change, raise it with the user and wait for approval before acting
+- Do **NOT** unilaterally refactor or improve existing patterns. If you believe a pattern should change, raise it with the user and wait for approval before acting
 - If the user approves a pattern change, apply it at every site you touch in that change
 - Don't mix styles within a file or module
 
@@ -139,6 +139,7 @@ You **MUST** provide actionable error messages:
 - Describe what went wrong
 - Include relevant context (what operation was attempted)
 - Suggest remediation where applicable
+- Use British English
 
 ## Performance
 

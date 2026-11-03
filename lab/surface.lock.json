@@ -37,8 +37,8 @@
       "executable": false
     },
     "rules/common/coding-style.md": {
-      "sha256": "c790f56400bac56cb4feba36c5d5c6535cb0877c7084e05cd5169f18ee813b72",
-      "words": 1217,
+      "sha256": "722139f34c68e0f72c03d845eda388f1b7592a1fabc4a28533abcf0f8e12244a",
+      "words": 1229,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -466,5 +466,5 @@
       "executable": false
     }
   },
-  "alwaysLoadedWords": 6074
+  "alwaysLoadedWords": 6086
 }

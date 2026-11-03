@@ -128,7 +128,7 @@ Rows with strength IMPERATIVE are instructions that carry no modal verb of their
 |----|------------|----------|--------|
 | CON-1 | You MUST maintain consistency with the existing codebase: | MUST | coding-style.md, Consistency, Follow Existing Patterns |
 | CON-2 | Match established patterns and conventions, even when you would prefer a different approach | MUST | coding-style.md, Consistency, Follow Existing Patterns |
-| CON-3 | Do NOT unilaterally refactor or "improve" existing patterns | MUST NOT | dropped, duplicate of CS-38 |
+| CON-3 | Do NOT unilaterally refactor or "improve" existing patterns | MUST NOT | coding-style.md, Consistency, Follow Existing Patterns |
 | CON-4 | If you believe a pattern should change, raise it with the user and wait for approval before acting | IMPERATIVE | coding-style.md, Consistency, Follow Existing Patterns |
 | CON-5 | If the user approves a pattern change, apply it consistently across every site you touch in that change, not... | MUST | coding-style.md, Consistency, Follow Existing Patterns |
 | CON-6 | Don't mix styles within a file or module | IMPERATIVE | coding-style.md, Consistency, Follow Existing Patterns |
@@ -184,7 +184,7 @@ Rows with strength IMPERATIVE are instructions that carry no modal verb of their
 | ERR-7 | Describe what went wrong | MUST | coding-style.md, Error Handling, Error Messages |
 | ERR-8 | Include relevant context (what operation was attempted) | MUST | coding-style.md, Error Handling, Error Messages |
 | ERR-9 | Suggest remediation where applicable | MUST | coding-style.md, Error Handling, Error Messages |
-| ERR-10 | Use British English | MUST | dropped, duplicate of LANG-1 |
+| ERR-10 | Use British English | MUST | coding-style.md, Error Handling, Error Messages |
 
 ## git.md
 
