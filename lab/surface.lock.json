@@ -67,8 +67,8 @@
       "executable": false
     },
     "rules/common/skills-policy.md": {
-      "sha256": "e6875f38797bf3074fd2ba3b9b8d2c4716c08241c6311a419cc62f3befa70288",
-      "words": 1036,
+      "sha256": "1c49efdca6765040d9f68871be4e777b9921bc15bc7820b00b09591a0217dedd",
+      "words": 839,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -466,5 +466,5 @@
       "executable": false
     }
   },
-  "alwaysLoadedWords": 6756
+  "alwaysLoadedWords": 6559
 }

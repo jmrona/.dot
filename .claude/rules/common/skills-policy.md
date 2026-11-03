@@ -38,19 +38,12 @@ When more than one skill could apply, you **MUST** invoke them in this order:
 3. **Implementation skills third**: `subagent-driven-development`, `fast-path-implementation`, `test-driven-development`, `dispatching-parallel-agents`, and domain-specific skills. These guide execution.
 4. **Review skills fourth**: `requesting-code-review`, `receiving-code-review`. These run before completion claims.
 
-Examples:
+Specific mandatory pairings. Each pairing names a trigger and its skill, and the rule file that is named holds the details:
 
-- "Let's build X" -> `brainstorming` first (the router asks the user which mode); the user picks a mode; the mode skill produces a design; an implementation skill takes over.
-- "Fix this bug" -> `debugging` first (reproduce, find root cause, get user approval on the fix approach); then `test-driven-development` for the regression test; then the fix; then `verification-before-completion`.
-- "Work on #42" -> `work-on-ticket` first; it recovers the design from the parent epic and hands off to `subagent-driven-development`.
-- "Is this done?" -> `verification-before-completion` first, nothing else until the gate has been run.
-
-Specific mandatory pairings:
-
-- **Before any code edit**: `brainstorming`, unless the short path in `workflow.md` applies. The router will enter plan mode and ask the user how to approach the design. The router includes a "Skip brainstorming" option for cases where structured brainstorming would be overkill, that option exists so the router can be a hard requirement without becoming a usability tax. You **MUST NOT** rationalise your way out of invoking the router by deciding the work is "obvious", "small", or "just an X" when the short path does not apply. The user picks the mode; you do not pick on their behalf.
-- **Before writing implementation code for a feature or non-trivial change**: `test-driven-development`. The only exemptions are the ones in the "When TDD Applies" section of `testing.md`.
-- **Before any debugging or fix work**: `debugging`. The hard gate in `debugging.md` (reproduce + root cause) applies whether or not the skill is invoked, and the skill is the procedure that produces the evidence the rule requires.
-- **Before claiming work is complete**: `requesting-code-review` followed by `verification-before-completion`. In orchestrated work via `subagent-driven-development`, the per-task reviewer covers the per-task review and `subagent-driven-development` invokes `requesting-code-review` itself at the end of the feature against the cumulative diff, you do not invoke it again.
+- **Before any code edit**: `brainstorming`, unless the short path in `workflow.md` applies.
+- **Before writing implementation code for a feature or non-trivial change**: `test-driven-development`. The only exemptions are those in `testing.md`.
+- **Before any debugging or fix work**: `debugging`. The hard gate in `debugging.md` applies whether or not the skill runs.
+- **Before claiming work is complete**: `requesting-code-review` followed by `verification-before-completion`. In orchestrated work through `subagent-driven-development`, that skill invokes `requesting-code-review` itself at the end of the feature against the cumulative diff. Do not invoke it again.
 - **Before asserting that something passes, works, or is ready**: `verification-before-completion`.
 
 ## Instruction Priority
