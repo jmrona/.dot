@@ -6,32 +6,17 @@ You **MAY** create commits without asking, provided they follow the rules below.
 
 ## Commit Message Format
 
-You **MUST** use Conventional Commits:
+You **MUST** use Conventional Commits: `<type>(<scope>): <description> (<TICKET-KEY>)`.
 
-```
-<type>(<scope>): <description> (<TICKET-KEY>)
+The scope is required and names the changed area in lowercase. If the change spans several areas, use the dominant one.
 
-<optional body>
-```
+`<TICKET-KEY>` is the ticket key at the start of the current branch name (`git branch --show-current`). For example, branch `VAN3-388-fix-tabs` gives `(VAN3-388)`.
 
-**Types:** `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`, `build`, `style`, `revert`
+If the branch name carries no ticket key, omit the suffix. Do not invent a key and do not ask.
 
-**Rules for the subject line:**
+Write commit messages in British English (see `language.md`).
 
-- Use the imperative mood (`add`, not `added` or `adds`)
-- Lowercase after the type (`feat(ui): add colour picker (EMBER-12)`, not `feat(ui): Add colour picker (EMBER-12)`)
-- The scope is required and names the area changed, in lowercase. If the change spans several areas, use the dominant one.
-- `<TICKET-KEY>` is the ticket key at the start of the current branch name (`git branch --show-current`). Branch `VAN3-388` or `VAN3-388-fix-tabs` gives `(VAN3-388)`.
-- If the branch name carries no ticket key (for example `main` or `ai-audit`), omit the suffix. Do not invent a key and do not ask.
-- No trailing full stop
-- Aim for under 72 characters for the whole subject line, suffix included
-- British English (see `language.md`)
-
-**Body (optional):**
-
-- Explain *why*, not *what* (the diff shows the what)
-- Wrap at 72 characters
-- Reference tickets or issues where relevant
+Before you write any commit message, invoke the `commit-msg` skill, which holds the full format.
 
 ## Pushes Are Forbidden
 

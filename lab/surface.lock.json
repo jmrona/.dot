@@ -49,8 +49,8 @@
       "executable": false
     },
     "rules/common/git.md": {
-      "sha256": "065aab4ca0371a59fddb1e461abadbeaa768337f74c94e9846f5c88916abdcb2",
-      "words": 462,
+      "sha256": "6732075a10b1fcd94c6cb49d418491de24e75f1ec8d627fc9a062d9fa139651e",
+      "words": 383,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -276,11 +276,11 @@
       "description": "Use the codebase knowledge graph for structural code queries. Triggers on: explore the codebase, understand the architecture, what functions exist, show me the structure, who calls this function, what does X call, trace the call chain, find callers of, show dependencies, impact analysis, dead code, unused functions, high fan-out, refactor candidates, code quality audit, graph query syntax, Cypher query examples, edge types, how to use search_graph."
     },
     "skills/commit-msg/SKILL.md": {
-      "sha256": "7b55ac59489cc813c70f835f864b86368f7f860d2a171ffd8d0fb3ccf2ef598a",
-      "words": 173,
+      "sha256": "9af34daec61f5a04e8c22eacee1787875ccbbe995f9e7ca38978704bbeee9802",
+      "words": 236,
       "alwaysLoaded": false,
       "executable": false,
-      "description": "Generate a conventional commit message from a diff or change description. Use when the user asks for a commit message. The caller must include the ticket key from the branch name, if any."
+      "description": "Generate a conventional commit message from a diff or change description. Use when the user asks for a commit message, and before writing any commit message, including commits made during other work. The caller must include the ticket key from the branch name, if any."
     },
     "skills/complexity-triage/SKILL.md": {
       "sha256": "a0b3ea6fb52bb4e9c2f2e1414b9ed1f6eeb01740ede2a834a994d2924b2e3fd5",
@@ -466,5 +466,5 @@
       "executable": false
     }
   },
-  "alwaysLoadedWords": 6152
+  "alwaysLoadedWords": 6073
 }
