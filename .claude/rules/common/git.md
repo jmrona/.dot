@@ -41,13 +41,12 @@ You **MUST NOT** run `git push` (or any variant) under any circumstances. The us
 
 You **MUST NOT** run destructive version control commands without explicit, specific permission from the user for that exact action. Permission for one destructive action is not permission for another.
 
-**Destructive commands** include but are not limited to:
+The `block-git-commands.mjs` hook blocks `git reset --hard`, `git clean -f`, `git checkout .`, `git restore .`, `git branch -D` and `git rebase`. If you need one of them, ask the user to run it.
 
-- `git reset --hard` and `git reset` onto a different branch
-- `git checkout -- <file>` / `git restore` that discards working-tree changes
-- `git clean -f` / `-fd` / `-fx`
-- `git branch -D` (force delete)
-- `git rebase` of commits that have already been pushed
+**Destructive commands** the hook does not block include but are not limited to:
+
+- `git reset` onto a different branch, without `--hard`
+- `git checkout -- <file>` / `git restore <file>` that discards working-tree changes
 - `git commit --amend` on commits that have already been pushed
 - `git stash drop` / `git stash clear`
 - `git tag -d` of pushed tags

@@ -73,8 +73,8 @@
       "executable": false
     },
     "rules/common/git.md": {
-      "sha256": "1931e35b14845e4f00aaa67304d0e8a360f2ce99dce8c20dd4f50f0fbe3a248e",
-      "words": 448,
+      "sha256": "065aab4ca0371a59fddb1e461abadbeaa768337f74c94e9846f5c88916abdcb2",
+      "words": 462,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -502,5 +502,5 @@
       "executable": false
     }
   },
-  "alwaysLoadedWords": 6780
+  "alwaysLoadedWords": 6794
 }
