@@ -119,7 +119,7 @@ You **MUST** maintain consistency with the existing codebase:
 
 ### Formatters and Linters
 
-You **SHOULD** use automated tooling where available (code formatters, linters, static analysis tools). Respect existing tool configurations.
+You **SHOULD** use automated tooling where available (code formatters, linters, static analysis tools) and respect existing tool configurations.
 
 ## Error Handling
 
