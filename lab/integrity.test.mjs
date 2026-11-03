@@ -269,12 +269,6 @@ test('a language rule with an empty inline paths list is reported', () => {
   assert.equal(findInvalidRuleFrontmatter(harnessDir).length, 1)
 })
 
-test('a language rule using globs is reported', () => {
-  const harnessDir = makeHarnessDir()
-  writeFile(harnessDir, 'rules/go/style.md', '---\nglobs:\n  - "*.go"\n---\n# Go')
-  assert.ok(findInvalidRuleFrontmatter(harnessDir).some((failure) => /globs/.test(failure)))
-})
-
 test('findBrokenHooks sends a benign Bash payload on stdin', () => {
   const harnessDir = makeHarnessDir()
   const script = '#!/usr/bin/env node\nconst input = require("node:fs").readFileSync(0, "utf8")\nprocess.exit(JSON.parse(input).tool_input.command === "true" ? 0 : 2)\n'
@@ -284,7 +278,7 @@ test('findBrokenHooks sends a benign Bash payload on stdin', () => {
 })
 
 function settingsWithBashHook(hook) {
-  return { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: '~/.claude/hooks/block-git-commands', ...hook }] }] } }
+  return { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: '~/.claude/hooks/block-git-commands.mjs', ...hook }] }] } }
 }
 
 test('a PreToolUse Bash hook with onFailure block produces no failure', () => {

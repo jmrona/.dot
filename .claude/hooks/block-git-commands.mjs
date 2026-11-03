@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-const fs = require('node:fs')
-const path = require('node:path')
+import fs from 'node:fs'
+import path from 'node:path'
 
 const isShortFlagCluster = (letter) => (argument) => new RegExp(`^-[A-Za-z]*${letter}[A-Za-z]*$`).test(argument)
 const isForceFlag = (argument) => argument === '--force' || isShortFlagCluster('f')(argument)

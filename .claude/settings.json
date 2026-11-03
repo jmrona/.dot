@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/block-git-commands",
+            "command": "~/.claude/hooks/block-git-commands.mjs",
             "timeout": 5,
             "onFailure": "block"
           }

@@ -6,8 +6,8 @@
       "alwaysLoaded": false,
       "executable": false
     },
-    "hooks/block-git-commands": {
-      "sha256": "bc7efa2d74291131766bc45a5bdc790d113923735cccdfa048da5133f4642452",
+    "hooks/block-git-commands.mjs": {
+      "sha256": "3e8add29dac4684f97b74d3557a323eb17b32c1b9c113ab3b18864cc6f85b99b",
       "words": 1836,
       "alwaysLoaded": false,
       "executable": true
@@ -241,7 +241,7 @@
       "executable": false
     },
     "settings.json": {
-      "sha256": "02904b6dc1546eecea5ab83707206e2f534fea7b14bc8caadb3d5f67867b6f57",
+      "sha256": "55c601971cc88f9c10d7b54d2553ae55d715ec4db3daa51cd2d5857f375e3105",
       "words": 221,
       "alwaysLoaded": false,
       "executable": false

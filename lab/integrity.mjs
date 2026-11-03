@@ -18,9 +18,9 @@ export const REQUIRED_DENY_ENTRIES = [
 const HOOK_TIMEOUT_MILLISECONDS = 5000
 const BENIGN_HOOK_PAYLOAD = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'true' } })
 const RELATIVE_REFERENCE = /^\.{1,2}\/[^\s`()<>*{}]*\.md$/
-const BLOCK_HOOK_COMMAND = /(^|\/)block-git-commands(\s|$)/
+const BLOCK_HOOK_COMMAND = /(^|\/)block-git-commands\.mjs(\s|$)/
 const MISSING_BASH_BLOCK_HOOK =
-  'settings.json has no PreToolUse Bash hook with onFailure block that runs block-git-commands'
+  'settings.json has no PreToolUse Bash hook with onFailure block that runs block-git-commands.mjs'
 const HOOK_COMMAND = /^~\/\.claude\/hooks\/([^\s/]+)(\s.*)?$/
 
 function listMarkdownFiles(directory) {
