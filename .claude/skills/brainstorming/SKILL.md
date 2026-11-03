@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: "You MUST use this before any code edit: creating features, fixing bugs, building components, adding functionality, refactoring, or modifying behaviour. Routes the design step to standard, committee, or skip mode based on a single user choice, then hands off to the chosen mode skill."
+description: "You MUST use this before any code edit, unless the short path in workflow.md applies: creating features, fixing bugs, building components, adding functionality, refactoring, or modifying behaviour. Routes the design step to standard, committee, or skip mode based on a single user choice, then hands off to the chosen mode skill."
 ---
 
 # Brainstorming (Router)
@@ -11,11 +11,11 @@ This skill is the procedural entry point for the design step required by `../../
 - `brainstorming-committee`: hands-off deliberation by three subagents, user reviews the final design
 - `brainstorming-skip`: lightweight design capture for cases where structured brainstorming would be overkill
 
-For the rule that no implementation may begin until a design has been approved, see `../../rules/common/workflow.md`. For the rule that this skill must be invoked before any code edit, see `../../rules/common/skills-policy.md`.
+For the rule that no implementation may begin until a design has been approved, see `../../rules/common/workflow.md`. For the rule that this skill must be invoked before any code edit unless the short path applies, see `../../rules/common/skills-policy.md`.
 
 ## When to Run
 
-Invoke this skill before any code edit, no matter how small. The three modes give you a gradient: full structured brainstorming for genuinely new design work, lightweight skip for changes where the design is already obvious to the user. The skip option exists, so the router can be a hard requirement without becoming a usability tax. You **MUST NOT** rationalise your way out of invoking the router by deciding the work is "obvious" or "small", that is the skip option's job, not yours.
+Invoke this skill before any code edit, unless the short path in `../../rules/common/workflow.md` applies. The three modes give you a gradient: full structured brainstorming for genuinely new design work, lightweight skip for changes where the design is already obvious to the user. The skip option exists, so the router can be a hard requirement without becoming a usability tax. You **MUST NOT** rationalise your way out of invoking the router by deciding the work is "obvious" or "small" when the short path does not apply, that is the skip option's job, not yours.
 
 ## Procedure
 
@@ -64,7 +64,7 @@ If you find yourself doing any of the above inside this skill, stop. You have sk
 | Picking a mode for the user                                | The user picks. The router asks.                                                                   |
 | Picking `brainstorming-skip` because the work "looks easy" | Recommending skip is allowed. Selecting it is not: the user picks the mode.                        |
 | Recommending without a reason | The description of the recommended option **MUST** start with `Recommended because` and a reason taken from the request. |
-| Skipping the router because the user said "just add X"     | "Just add X" does not waive the router. Invoke the router; the user can pick skip if they want to. |
+| Skipping the router because the user said "just add X"     | "Just add X" does not waive the router unless all three short path criteria hold. Otherwise invoke the router; the user can pick skip. |
 | Running the chosen mode's procedure inline                 | The router only routes. Hand off via `Skill`.                                      |
-| Skipping plan mode because the session "feels safe"        | Plan mode is the gate. Enter it before asking the question.                                        |
+| Skipping plan mode because the session "feels safe"        | Plan mode is the gate for the router. Enter it before asking the question. The short path never starts this skill. |
 | Asking the mode question as plain text                     | Use `AskUserQuestion`. Plain text invites freeform answers that defeat the routing.     |

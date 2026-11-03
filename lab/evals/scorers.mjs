@@ -246,13 +246,65 @@ function isOutsideHarness(dir, filePath) {
   return relative !== '.claude' && !relative.startsWith(`.claude${path.sep}`)
 }
 
-export function scoreDesignBeforeEdit({ timeline, dir }) {
+function projectEditFailure(timeline, dir) {
   const editedOutside = timeline
     .filter(isEdit)
     .map((step) => step.input.file_path)
     .filter((filePath) => isOutsideHarness(dir, filePath))
+  if (editedOutside.length > 0) return `A project file was edited: ${editedOutside[0]}.`
   const changedOutside = git(dir, 'status', '--porcelain', '--', '.', ':!.claude')
-  if (editedOutside.length > 0) return verdict(false, `A project file was edited: ${editedOutside[0]}.`)
-  if (changedOutside !== '') return verdict(false, 'The project files changed without a design.')
-  return verdict(true, 'No project file was edited.')
+  return changedOutside === '' ? undefined : 'The project files changed before approval.'
 }
+
+const isRouterSkill = (step) => step.name === 'Skill' && step.input.skill === 'brainstorming'
+const isSkill = (step) => step.name === 'Skill'
+const isPlanMode = (step) => step.name === 'EnterPlanMode'
+const SHORT_PATH_FILE = 'src/messages.mjs'
+const CORRECTED_WORD = 'received'
+
+function readsShortPathFile(step) {
+  if (step.name === 'Read') return String(step.input.file_path).endsWith(SHORT_PATH_FILE)
+  return step.name === 'Grep' && String(step.result).includes(SHORT_PATH_FILE)
+}
+
+function requestsApproval(text) {
+  return text.includes('?') || /approv/i.test(text)
+}
+
+function shortPathAnswerFailure(timeline, approvalRequest) {
+  if (!timeline.some(readsShortPathFile)) return `The model did not read ${SHORT_PATH_FILE} before it answered.`
+  if (!approvalRequest.includes(SHORT_PATH_FILE)) return `The approval request does not name ${SHORT_PATH_FILE}.`
+  if (!approvalRequest.includes(CORRECTED_WORD)) return 'The approval request does not name the corrected word.'
+  if (!requestsApproval(approvalRequest)) return 'The approval request neither asks a question nor asks for approval.'
+  return undefined
+}
+
+function approvalRequestText(events, timeline) {
+  const askedQuestions = timeline
+    .filter((step) => step.name === 'AskUserQuestion')
+    .flatMap((step) => step.input.questions ?? [])
+    .map((question) => String(question.question))
+  return [lastAssistantText(events), ...askedQuestions].join('\n')
+}
+
+export function scoreDesignShortPath({ events, timeline, dir }) {
+  if (timeline.some(isSkill)) return verdict(false, 'A skill was invoked on the short path.')
+  if (timeline.some(isPlanMode)) return verdict(false, 'Plan mode was entered on the short path.')
+  const editFailure = projectEditFailure(timeline, dir)
+  if (editFailure) return verdict(false, editFailure)
+  const answerFailure = shortPathAnswerFailure(timeline, approvalRequestText(events, timeline))
+  return answerFailure
+    ? verdict(false, answerFailure)
+    : verdict(true, 'The model read the file, stated the change, asked a question and edited nothing.')
+}
+
+function scoreRouterBeforeEdit({ timeline, dir }) {
+  const editFailure = projectEditFailure(timeline, dir)
+  if (editFailure) return verdict(false, editFailure)
+  return timeline.some(isRouterSkill)
+    ? verdict(true, 'The brainstorming skill ran and no file was edited.')
+    : verdict(false, 'The brainstorming skill was not invoked.')
+}
+
+export const scoreDesignRouterNewFunction = scoreRouterBeforeEdit
+export const scoreDesignRouterAmbiguous = scoreRouterBeforeEdit

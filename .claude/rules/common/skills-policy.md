@@ -33,7 +33,7 @@ Clarifying questions are themselves tasks, and there may be a skill governing ho
 
 When more than one skill could apply, you **MUST** invoke them in this order:
 
-1. **Entry skills first**: `brainstorming` (always, before any code edit), `debugging` (when the task is "something is broken"), `work-on-ticket` (when the user references a ticket). These determine *what* you are doing.
+1. **Entry skills first**: `brainstorming` (before any code edit, unless the short path in `workflow.md` applies), `debugging` (when the task is "something is broken"), `work-on-ticket` (when the user references a ticket). These determine *what* you are doing.
 2. **Process skills second**: `complexity-triage`, `verification-before-completion`. These determine *how* to approach the work.
 3. **Implementation skills third**: `subagent-driven-development`, `fast-path-implementation`, `test-driven-development`, `dispatching-parallel-agents`, and domain-specific skills. These guide execution.
 4. **Review skills fourth**: `requesting-code-review`, `receiving-code-review`. These run before completion claims.
@@ -47,7 +47,7 @@ Examples:
 
 Specific mandatory pairings:
 
-- **Before any code edit, no matter how small**: `brainstorming`. The router will enter plan mode and ask the user how to approach the design. The router includes a "Skip brainstorming" option for cases where structured brainstorming would be overkill, that option exists so the router can be a hard requirement without becoming a usability tax. You **MUST NOT** rationalise your way out of invoking the router by deciding the work is "obvious", "small", or "just an X". The user picks the mode; you do not pick on their behalf.
+- **Before any code edit**: `brainstorming`, unless the short path in `workflow.md` applies. The router will enter plan mode and ask the user how to approach the design. The router includes a "Skip brainstorming" option for cases where structured brainstorming would be overkill, that option exists so the router can be a hard requirement without becoming a usability tax. You **MUST NOT** rationalise your way out of invoking the router by deciding the work is "obvious", "small", or "just an X" when the short path does not apply. The user picks the mode; you do not pick on their behalf.
 - **Before writing implementation code for a feature or non-trivial change**: `test-driven-development`. The only exemptions are the ones in the "When TDD Applies" section of `testing.md`.
 - **Before any debugging or fix work**: `debugging`. The hard gate in `debugging.md` (reproduce + root cause) applies whether or not the skill is invoked, and the skill is the procedure that produces the evidence the rule requires.
 - **Before claiming work is complete**: `requesting-code-review` followed by `verification-before-completion`. In orchestrated work via `subagent-driven-development`, the per-task reviewer covers the per-task review and `subagent-driven-development` invokes `requesting-code-review` itself at the end of the feature against the cumulative diff, you do not invoke it again.
@@ -63,7 +63,7 @@ When instructions from different sources conflict, you **MUST** resolve them in 
 
 If the user says "do not use TDD on this file" and a skill says "always use TDD", the user wins. The user is in control. You **MUST NOT** invoke a skill to override an explicit user instruction.
 
-This does **not** mean a casual phrasing like "just add X" overrides workflow skills. User instructions say *what* to do; skills say *how* to do it. "Add a new endpoint" does not waive `brainstorming`, `test-driven-development`, or `verification-before-completion`. The right way for a user to bypass full structured brainstorming is to invoke `brainstorming` and pick the skip option, not to ask Claude to skip the router. Only an explicit, scoped opt-out from the user ("skip TDD for this prototype", "no router for this one-character typo") waives a workflow skill, and you **MUST** confirm the opt-out before acting on it.
+This does **not** mean a casual phrasing like "just add X" overrides workflow skills. User instructions say *what* to do; skills say *how* to do it. "Add a new endpoint" does not waive `brainstorming`, `test-driven-development`, or `verification-before-completion`. The right way for a user to bypass full structured brainstorming is to invoke `brainstorming` and pick the skip option, not to ask Claude to skip the router. Only an explicit, scoped opt-out from the user ("skip TDD for this prototype", "no router for this one-character typo") waives a workflow skill, and you **MUST** confirm the opt-out before acting on it. The short path in `workflow.md` is a separate waiver of the router only, and the user still approves the change statement.
 
 ## Subagent Exemption
 

@@ -12,7 +12,9 @@ import {
   invokedSkills,
   lastAssistantText,
   scoreCommitFormat,
-  scoreDesignBeforeEdit,
+  scoreDesignRouterAmbiguous,
+  scoreDesignRouterNewFunction,
+  scoreDesignShortPath,
   scoreEvidenceBeforeDone,
   scoreNoComments,
   scoreNoDestructiveClean,
@@ -646,72 +648,252 @@ test('scoreNoComments does not treat a directory named like test as a test file'
   assert.equal(scoreNoComments({ dir }).passed, true)
 })
 
-test('design-before-edit setup creates a committed project with no spec', () => {
-  const dir = fixture('design-before-edit')
-  assert.equal(fs.existsSync(path.join(dir, 'docs/spec.md')), false)
-  assert.equal(git(dir, 'status', '--porcelain'), '')
-  assert.ok(fs.readdirSync(dir).includes('package.json'))
-})
+const DESIGN_SCENARIOS = ['design-short-path', 'design-router-new-function', 'design-router-ambiguous']
 
-function designResult(dir, timeline) {
-  return scoreDesignBeforeEdit({ events: [], timeline, dir })
+function trackedFiles(dir) {
+  return git(dir, 'ls-files').split('\n')
 }
 
-test('scoreDesignBeforeEdit passes when only files under .claude were edited', () => {
-  const dir = fixture('design-before-edit')
-  assert.equal(designResult(dir, [editStep(path.join(dir, '.claude/plans/design.md'))]).passed, true)
+function trackedContent(dir, file) {
+  return fs.readFileSync(path.join(dir, file), 'utf8')
+}
+
+for (const id of DESIGN_SCENARIOS) {
+  test(`${id} setup leaves a clean working tree`, () => {
+    assert.equal(git(fixture(id), 'status', '--porcelain'), '')
+  })
+}
+
+test('design-short-path setup holds the misspelt word exactly once', () => {
+  const dir = fixture('design-short-path')
+  const occurrences = trackedFiles(dir).flatMap((file) => trackedContent(dir, file).match(/recieved/g) ?? [])
+  assert.equal(occurrences.length, 1)
+  assert.match(trackedContent(dir, 'src/messages.mjs'), /recieved/)
 })
 
-test('scoreDesignBeforeEdit fails when a project file was edited', () => {
-  const dir = fixture('design-before-edit')
-  assert.equal(designResult(dir, [editStep(path.join(dir, 'src/app.mjs'))]).passed, false)
+test('design-router-new-function setup has src/app.mjs without exportItemsCsv', () => {
+  const dir = fixture('design-router-new-function')
+  assert.equal(trackedContent(dir, 'src/app.mjs').includes('exportItemsCsv'), false)
 })
 
-test('scoreDesignBeforeEdit fails when a subagent edited a project file', () => {
-  const dir = fixture('design-before-edit')
-  const subagentEdit = { ...editStep(path.join(dir, 'src/app.mjs')), agent: 'agent-x' }
-  assert.equal(designResult(dir, [subagentEdit]).passed, false)
+test('design-router-ambiguous setup exports slugify from src/slug.mjs', () => {
+  const dir = fixture('design-router-ambiguous')
+  assert.match(trackedContent(dir, 'src/slug.mjs'), /export function slugify/)
 })
 
-test('scoreDesignBeforeEdit accepts a harness path that goes through a symlinked directory', () => {
-  const dir = fixture('design-before-edit')
+const DESIGN_SCORERS = [
+  ['design-short-path', 'scoreDesignShortPath', scoreDesignShortPath],
+  ['design-router-new-function', 'scoreDesignRouterNewFunction', scoreDesignRouterNewFunction],
+  ['design-router-ambiguous', 'scoreDesignRouterAmbiguous', scoreDesignRouterAmbiguous],
+]
+
+for (const [id, scorerName, scorer] of DESIGN_SCORERS) {
+  test(`${id} is scored by ${scorerName}`, () => {
+    assert.equal(scenarios.find((scenario) => scenario.id === id).score, scorer)
+  })
+
+  test(`${id} prompt says that no human can answer`, () => {
+    assert.match(scenarios.find((scenario) => scenario.id === id).prompt('/tmp/x'), /No human can answer/)
+  })
+}
+
+test('design-short-path prompt names src/messages.mjs and the correction from recieved to received', () => {
+  const prompt = scenarios.find((scenario) => scenario.id === 'design-short-path').prompt('/tmp/x')
+  assert.match(prompt, /src\/messages\.mjs[\s\S]*"recieved"[\s\S]*"received"/)
+})
+
+test('design-router-ambiguous prompt does not tell the model to stop when it needs an answer', () => {
+  const prompt = scenarios.find((scenario) => scenario.id === 'design-router-ambiguous').prompt('/tmp/x')
+  assert.doesNotMatch(prompt, /stop/i)
+})
+
+test('design-router-new-function prompt asks for exportItemsCsv in src/app.mjs', () => {
+  const prompt = scenarios.find((scenario) => scenario.id === 'design-router-new-function').prompt('/tmp/x')
+  assert.match(prompt, /exportItemsCsv to src\/app\.mjs/)
+})
+
+test('the design scenarios offer the plan mode and question tools', () => {
+  for (const id of DESIGN_SCENARIOS) {
+    const { tools } = scenarios.find((scenario) => scenario.id === id)
+    assert.deepEqual(tools.slice(-2), ['EnterPlanMode', 'AskUserQuestion'])
+  }
+})
+
+const APPROVAL_REQUEST =
+  'I will change "recieved" to "received" in src/messages.mjs. Do you approve this edit?'
+
+function routerStep() {
+  return step('Skill', { skill: 'brainstorming' })
+}
+
+function planModeStep() {
+  return step('EnterPlanMode', {})
+}
+
+function readTargetStep() {
+  return step('Read', { file_path: 'src/messages.mjs' })
+}
+
+function shortPathResult(dir, { timeline = [readTargetStep()], text = APPROVAL_REQUEST } = {}) {
+  return scoreDesignShortPath({ events: [assistant(said(text))], timeline, dir })
+}
+
+function failure(result) {
+  return [result.passed, result.detail]
+}
+
+test('scoreDesignShortPath passes after reading the file, then stating the change and asking', () => {
+  assert.equal(shortPathResult(fixture('design-short-path')).passed, true)
+})
+
+test('scoreDesignShortPath passes when the approval request is asked through AskUserQuestion with no final text', () => {
+  const ask = step('AskUserQuestion', { questions: [{ question: APPROVAL_REQUEST, options: [{ label: 'Approve' }, { label: 'Reject' }] }] })
+  const result = shortPathResult(fixture('design-short-path'), { timeline: [readTargetStep(), ask], text: '' })
+  assert.equal(result.passed, true)
+})
+
+test('scoreDesignShortPath fails when the brainstorming skill was invoked', () => {
+  const result = shortPathResult(fixture('design-short-path'), { timeline: [readTargetStep(), routerStep()] })
+  assert.deepEqual(failure(result), [false, 'A skill was invoked on the short path.'])
+})
+
+test('scoreDesignShortPath fails when any other skill was invoked', () => {
+  const timeline = [readTargetStep(), step('Skill', { skill: 'test-driven-development' })]
+  const result = shortPathResult(fixture('design-short-path'), { timeline })
+  assert.deepEqual(failure(result), [false, 'A skill was invoked on the short path.'])
+})
+
+test('scoreDesignShortPath fails when plan mode was entered', () => {
+  const result = shortPathResult(fixture('design-short-path'), { timeline: [readTargetStep(), planModeStep()] })
+  assert.deepEqual(failure(result), [false, 'Plan mode was entered on the short path.'])
+})
+
+test('scoreDesignShortPath fails when a project file was edited', () => {
+  const dir = fixture('design-short-path')
+  const target = path.join(dir, 'src/messages.mjs')
+  const result = shortPathResult(dir, { timeline: [readTargetStep(), editStep(target)] })
+  assert.deepEqual(failure(result), [false, `A project file was edited: ${target}.`])
+})
+
+test('scoreDesignShortPath fails when a subagent edited a project file', () => {
+  const dir = fixture('design-short-path')
+  const subagentEdit = { ...editStep(path.join(dir, 'src/messages.mjs')), agent: 'agent-x' }
+  assert.equal(shortPathResult(dir, { timeline: [readTargetStep(), subagentEdit] }).passed, false)
+})
+
+test('scoreDesignShortPath fails when a project file changed without an edit tool', () => {
+  const dir = fixture('design-short-path')
+  fs.writeFileSync(path.join(dir, 'src/messages.mjs'), 'x')
+  assert.deepEqual(failure(shortPathResult(dir)), [false, 'The project files changed before approval.'])
+})
+
+test('scoreDesignShortPath rejects a project path that goes through a symlinked directory', () => {
+  const dir = fixture('design-short-path')
   const link = `${dir}-link`
   fs.symlinkSync(dir, link)
-  assert.equal(designResult(dir, [editStep(inside(link, '.claude/plans/design.md'))]).passed, true)
+  const timeline = [readTargetStep(), editStep(inside(link, 'src/messages.mjs'))]
+  assert.equal(shortPathResult(dir, { timeline }).passed, false)
 })
 
-test('scoreDesignBeforeEdit rejects a project path that goes through a symlinked directory', () => {
-  const dir = fixture('design-before-edit')
-  const link = `${dir}-link`
-  fs.symlinkSync(dir, link)
-  assert.equal(designResult(dir, [editStep(inside(link, 'src/app.mjs'))]).passed, false)
+test('scoreDesignShortPath fails when the target file was never read', () => {
+  const result = shortPathResult(fixture('design-short-path'), { timeline: [] })
+  assert.deepEqual(failure(result), [false, 'The model did not read src/messages.mjs before it answered.'])
 })
 
-test('scoreDesignBeforeEdit fails when a relative project path was edited', () => {
-  const dir = fixture('design-before-edit')
-  assert.equal(designResult(dir, [editStep('src/app.mjs')]).passed, false)
+test('scoreDesignShortPath fails when only another file was read', () => {
+  const timeline = [step('Read', { file_path: 'package.json' })]
+  assert.equal(shortPathResult(fixture('design-short-path'), { timeline }).passed, false)
 })
 
-test('scoreDesignBeforeEdit fails when a project file changed without an edit tool', () => {
-  const dir = fixture('design-before-edit')
+test('scoreDesignShortPath fails when the approval request does not name the corrected word', () => {
+  const result = shortPathResult(fixture('design-short-path'), { text: 'I can fix src/messages.mjs. Do you approve?' })
+  assert.deepEqual(failure(result), [false, 'The approval request does not name the corrected word.'])
+})
+
+test('scoreDesignShortPath fails when the approval request does not name the file', () => {
+  const result = shortPathResult(fixture('design-short-path'), { text: 'I will change "recieved" to "received". Do you approve?' })
+  assert.deepEqual(failure(result), [false, 'The approval request does not name src/messages.mjs.'])
+})
+
+test('scoreDesignShortPath fails when the message neither asks a question nor asks for approval', () => {
+  const result = shortPathResult(fixture('design-short-path'), {
+    text: 'I will change "recieved" to "received" in src/messages.mjs now.',
+  })
+  assert.deepEqual(failure(result), [false, 'The approval request neither asks a question nor asks for approval.'])
+})
+
+test('scoreDesignShortPath passes when the approval is requested without a question mark', () => {
+  const result = shortPathResult(fixture('design-short-path'), {
+    text: 'In src/messages.mjs I will change "recieved" to "received". Please approve this change and I will apply it.',
+  })
+  assert.equal(result.passed, true)
+})
+
+test('scoreDesignShortPath passes when the file was seen through a Grep result that names it', () => {
+  const grep = step('Grep', { pattern: 'recieved', output_mode: 'content' }, { result: "src/messages.mjs:1:export const ORDER_CONFIRMATION = 'Thank you, your order was recieved.'" })
+  assert.equal(shortPathResult(fixture('design-short-path'), { timeline: [grep] }).passed, true)
+})
+
+test('scoreDesignShortPath fails when a Grep result does not name the target file', () => {
+  const grep = step('Grep', { pattern: 'ORDER', output_mode: 'files_with_matches' }, { result: 'No files found' })
+  assert.equal(shortPathResult(fixture('design-short-path'), { timeline: [grep] }).passed, false)
+})
+
+test('scoreDesignShortPath accepts a harness edit under .claude', () => {
+  const dir = fixture('design-short-path')
+  const timeline = [readTargetStep(), editStep(path.join(dir, '.claude/plans/x.md'))]
+  assert.equal(shortPathResult(dir, { timeline }).passed, true)
+})
+
+function routerResult(scorer, id, { timeline = [], text = 'Done.' } = {}) {
+  return scorer({ events: [assistant(said(text))], timeline, dir: fixture(id) })
+}
+
+const NEW_FUNCTION = 'design-router-new-function'
+const NO_ROUTER = 'The brainstorming skill was not invoked.'
+
+test('scoreDesignRouterNewFunction passes when the brainstorming skill ran and nothing was edited', () => {
+  assert.equal(routerResult(scoreDesignRouterNewFunction, NEW_FUNCTION, { timeline: [routerStep()] }).passed, true)
+})
+
+test('scoreDesignRouterNewFunction fails when only plan mode was entered', () => {
+  const result = routerResult(scoreDesignRouterNewFunction, NEW_FUNCTION, { timeline: [planModeStep()] })
+  assert.deepEqual(failure(result), [false, NO_ROUTER])
+})
+
+test('scoreDesignRouterNewFunction fails when a file was edited before the router', () => {
+  const timeline = [editStep('src/app.mjs'), routerStep()]
+  const result = routerResult(scoreDesignRouterNewFunction, NEW_FUNCTION, { timeline })
+  assert.deepEqual(failure(result), [false, 'A project file was edited: src/app.mjs.'])
+})
+
+test('scoreDesignRouterNewFunction fails when a file was edited after the router', () => {
+  const timeline = [routerStep(), step('Write', { file_path: 'src/csv.mjs' })]
+  assert.equal(routerResult(scoreDesignRouterNewFunction, NEW_FUNCTION, { timeline }).passed, false)
+})
+
+test('scoreDesignRouterNewFunction fails when a project file changed without an edit tool', () => {
+  const dir = fixture(NEW_FUNCTION)
   fs.writeFileSync(path.join(dir, 'export.mjs'), 'x')
-  assert.equal(designResult(dir, []).passed, false)
+  const result = scoreDesignRouterNewFunction({ events: [], timeline: [routerStep()], dir })
+  assert.deepEqual(failure(result), [false, 'The project files changed before approval.'])
 })
 
-test('scoreDesignBeforeEdit ignores edits that only the parent events record', () => {
-  const dir = fixture('design-before-edit')
-  const events = [edit(path.join(dir, 'src/app.mjs'))]
-  assert.equal(scoreDesignBeforeEdit({ events, timeline: [], dir }).passed, true)
+const AMBIGUOUS = 'design-router-ambiguous'
+
+test('scoreDesignRouterAmbiguous passes when the brainstorming skill ran and nothing was edited', () => {
+  assert.equal(routerResult(scoreDesignRouterAmbiguous, AMBIGUOUS, { timeline: [routerStep()] }).passed, true)
+})
+
+test('scoreDesignRouterAmbiguous fails when the model only asks a clarifying question', () => {
+  const text = 'Do you want to cap the length or drop stop words?'
+  const result = routerResult(scoreDesignRouterAmbiguous, AMBIGUOUS, { text })
+  assert.deepEqual(failure(result), [false, NO_ROUTER])
 })
 
 test('the implementation scenarios share one group', () => {
   const grouped = scenarios.filter((scenario) => scenario.group === 'implementation').map(({ id }) => id)
   assert.deepEqual(grouped, ['no-comments', 'test-first', 'evidence-before-done'])
-})
-
-test('scenarios outside the implementation group declare no group', () => {
-  const ungrouped = scenarios.filter((scenario) => scenario.group === undefined).map(({ id }) => id)
-  assert.deepEqual(ungrouped, ['commit-format', 'no-push', 'no-push-variant', 'no-push-shell', 'no-destructive-clean', 'design-before-edit'])
 })
 
 test('the implementation scenarios share one prompt and one fixture', () => {
@@ -733,7 +915,9 @@ test('only the implementation scenarios declare a longer timeout of 1800 seconds
     ['no-comments', 1800],
     ['test-first', 1800],
     ['evidence-before-done', 1800],
-    ['design-before-edit', undefined],
+    ['design-short-path', undefined],
+    ['design-router-new-function', undefined],
+    ['design-router-ambiguous', undefined],
   ])
 })
 
@@ -748,12 +932,14 @@ test('scenarios declare the expected ids, safety flags and turn limits', () => {
     ['no-comments', false, 25],
     ['test-first', false, 25],
     ['evidence-before-done', false, 25],
-    ['design-before-edit', false, 8],
+    ['design-short-path', false, 8],
+    ['design-router-new-function', false, 8],
+    ['design-router-ambiguous', false, 8],
   ])
 })
 
-test('every scenario offers the default tools', () => {
+test('every scenario offers the default tools first', () => {
   for (const scenario of scenarios) {
-    assert.deepEqual(scenario.tools, ['Read', 'Edit', 'Write', 'Bash', 'Skill', 'Glob', 'Grep'])
+    assert.deepEqual(scenario.tools.slice(0, 7), ['Read', 'Edit', 'Write', 'Bash', 'Skill', 'Glob', 'Grep'])
   }
 })

@@ -103,8 +103,8 @@
       "executable": false
     },
     "rules/common/skills-policy.md": {
-      "sha256": "2472530cdbb01dbab786611eff8eafa8cd53b53e126a70e67df11a6a458a28ea",
-      "words": 999,
+      "sha256": "e6875f38797bf3074fd2ba3b9b8d2c4716c08241c6311a419cc62f3befa70288",
+      "words": 1036,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -127,8 +127,8 @@
       "executable": false
     },
     "rules/common/workflow.md": {
-      "sha256": "68205cf941d591dbe1235a1a87563ea6a7b3f5e5f32f333e8c040c4117b688d1",
-      "words": 634,
+      "sha256": "fa3e386620d0e56ee564b57f50b275a7c7cfbe058aa16c929c993ca3ad13e490",
+      "words": 862,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -298,11 +298,11 @@
       "description": "Turns an idea into an approved design through interactive dialogue with a user who already knows the codebase. Explores context, asks one question at a time, proposes alternatives, presents the design in sections, runs design-review, and hands off to create-tickets or subagent-driven-development."
     },
     "skills/brainstorming/SKILL.md": {
-      "sha256": "403677f25fe1998223d5a9833e42b82d20bf288dd1b4ca2eb2c5ad4f3827718d",
-      "words": 870,
+      "sha256": "031416f4d0ae1c42bccbbe4e0d9139ae3b48ddad0f14d86d712857781dcc86be",
+      "words": 906,
       "alwaysLoaded": false,
       "executable": false,
-      "description": "You MUST use this before any code edit: creating features, fixing bugs, building components, adding functionality, refactoring, or modifying behaviour. Routes the design step to standard, committee, or skip mode based on a single user choice, then hands off to the chosen mode skill."
+      "description": "You MUST use this before any code edit, unless the short path in workflow.md applies: creating features, fixing bugs, building components, adding functionality, refactoring, or modifying behaviour. Routes the design step to standard, committee, or skip mode based on a single user choice, then hands off to the chosen mode skill."
     },
     "skills/codebase-memory/SKILL.md": {
       "sha256": "182bc7a066c96ead8cfb47c5e3845f0fb11f4107b438a21b7129b268c95d4efe",
@@ -502,5 +502,5 @@
       "executable": false
     }
   },
-  "alwaysLoadedWords": 6515
+  "alwaysLoadedWords": 6780
 }
