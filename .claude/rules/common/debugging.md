@@ -1,10 +1,10 @@
 # Debugging
 
-These rules apply to every debugging activity, regardless of whether the `debugging` skill has been invoked and regardless of how obvious the bug seems.
+These rules apply to every debugging activity, whether or not the `debugging` skill has been invoked and however obvious the bug seems.
 
 ## The Hard Gate
 
-You **MUST NOT** attempt any fix until both of the following are true:
+You **MUST NOT** attempt any fix until both of these are true:
 
 1. You have reproduced the bug against the current state of the code, or you have explicitly noted that it cannot be reproduced and adjusted your confidence accordingly
 2. You have identified the root cause with supporting evidence from actual code or actual program output
@@ -15,18 +15,14 @@ This gate applies to every bug. You **MUST NOT** waive it because the bug "looks
 
 ## Evidence Over Intuition
 
-Every claim you make about what is wrong **MUST** be supported by actual code you have read, actual output you have captured, or actual observations from a reproduction. Pattern-matching against an error message without reproduction is forbidden. "It looks like" and "I suspect" are not acceptable as the sole basis for a fix.
+Every claim about what is wrong **MUST** rest on code that you have read, output that you have captured, or observations from a reproduction. Pattern-matching against an error message without reproduction is forbidden. "It looks like" and "I suspect" are not acceptable as the sole basis for a fix.
 
-If you do not have evidence for a claim, your next action is to gather evidence, not to change code.
+If you have no evidence for a claim, gather evidence before you change code.
 
 ## Bug Fixes Are Still Changes
 
-Bug fixes do not waive the rules in `workflow.md`, `testing.md`, or `verification.md`:
-
-- Per `workflow.md`, a bug fix **MUST** have an approved design, even if the design is a single sentence describing the reproduction approach and the module that will change.
-- Per `testing.md`, a bug fix **MUST** begin with a failing regression test that reproduces the bug. The test goes red, the fix goes in, the test goes green. You **MUST NOT** fix a bug without first writing that test.
-- Per `verification.md`, the fix is not complete until the verification gate has been run against it and the evidence has been cited.
+A bug fix **MUST** have an approved design (`workflow.md`) and a failing regression test written first (`testing.md`). Run the verification gate on the fix and cite the evidence before you call it complete (`verification.md`).
 
 ## Procedural Rules
 
-The procedural rules that bind once the `debugging` skill is running, scope discipline, the refocus rule, the investigation budget, root cause vs symptom, the minimal fix principle, and the rationalisation prevention table, live in `skills/debugging/RULES.md` and load when the skill is invoked. The executable procedure (the 7-phase investigation, mode selection, investigator subagent dispatch) lives in `skills/debugging/SKILL.md`.
+When the `debugging` skill runs, `skills/debugging/RULES.md` holds its procedural rules, and `skills/debugging/SKILL.md` holds the executable procedure.

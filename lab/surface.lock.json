@@ -25,8 +25,8 @@
       "executable": true
     },
     "rules/common/ambiguity.md": {
-      "sha256": "fc05bc2020f361fd2352fee92bb98eeac3b0f9c4149f0f3666f1eec01f03d0f0",
-      "words": 341,
+      "sha256": "eea48ea6d02f1cec11ee1a20c5d3d1fd2d605ac43abbb6df16ca6cd776b480be",
+      "words": 258,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -37,14 +37,14 @@
       "executable": false
     },
     "rules/common/coding-style.md": {
-      "sha256": "84134e06a16b9f45b0d737d1238dc81838e4e7b361c11a2ad83f64ca3018dc46",
-      "words": 1340,
+      "sha256": "a2a381fc9fac44b31a5808123a5ca6a560c944525c62181eb6735620bc423ba1",
+      "words": 1216,
       "alwaysLoaded": true,
       "executable": false
     },
     "rules/common/debugging.md": {
-      "sha256": "614e1c7cb95e230b33016c43e5696fa6903b8dfce2a1b74dba1fcd45f92ca906",
-      "words": 387,
+      "sha256": "dc9e1ecbbf139fcac9177db05c9dd96e6685c1caa21e08f3bac923fb90ebf742",
+      "words": 264,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -55,8 +55,8 @@
       "executable": false
     },
     "rules/common/language.md": {
-      "sha256": "533ca3796663b77bdebecb281e8b46628d8d10cb3616b38a160213b073677c69",
-      "words": 264,
+      "sha256": "3f80467bf1369b97bfd215e3e78f261ed7297ddb74e718b923a3d2a29258ff7f",
+      "words": 221,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -85,8 +85,8 @@
       "executable": false
     },
     "rules/common/verification.md": {
-      "sha256": "dec70dcdd51591449aa39d9cf5e63bc6f25c0951da1a1061adbbb0673691f7d7",
-      "words": 357,
+      "sha256": "126c53a882a4b5b4264d830a9155b608a5fd4a2530bcfaccb65207a83fe3f79f",
+      "words": 323,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -466,5 +466,5 @@
       "executable": false
     }
   },
-  "alwaysLoadedWords": 6559
+  "alwaysLoadedWords": 6152
 }

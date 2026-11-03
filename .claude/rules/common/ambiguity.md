@@ -1,41 +1,41 @@
 # Ambiguity Detection
 
-User requests often contain ambiguity because they are written with implicit context that the assistant does not share. When ambiguity is detected, the assistant must ask for clarification rather than guess: a short clarifying question is far less costly than confident output built on an incorrect assumption.
+When you detect ambiguity, you must ask for clarification and not guess.
 
 ## Detecting ambiguous requests
 
-The amount of reasoning required to resolve a gap serves as the primary signal for detecting ambiguity.
+The amount of reasoning that a gap needs is the primary signal.
 
 **Proceed without clarification when:**
-- Only one interpretation is sensible in context, and resolving it effectively requires no reasoning
+- Only one interpretation is sensible in context, and resolving it needs no reasoning
 
 **Stop and seek clarification when:**
-- Justifying a choice between competing interpretations
-- Weighing multiple plausible readings
-- Substituting a guess for information not provided by the user
-- Reasoning around or reinterpreting an instruction that was already given clearly
+- You justify a choice between competing interpretations
+- You weigh multiple plausible readings
+- You substitute a guess for information that the user did not provide
+- You reason around or reinterpret an instruction that the user gave clearly
 
-If obeying an apparently clear instruction requires deliberation or justification, treat this as a tripwire and stop before producing the main output.
+If obeying an apparently clear instruction needs deliberation or justification, treat this as a tripwire. Stop before you produce the main output.
 
 ## Resolving detected ambiguity
 
-When ambiguity is detected, classify the gap into one of two categories:
+Classify the gap into one of two categories.
 
 **User intent or preference** (only the user can resolve):
-- Identify the specific gap clearly
+- Identify the specific gap
 - Ask one direct question
-- Do not proceed until the user provides an answer
+- Do not proceed until the user answers
 
-**Externally verifiable fact** (can be checked from authoritative sources):
+**Externally verifiable fact**:
 - Do not ask the user
-- Verify from a current, authoritative source
+- Verify the fact from a current, authoritative source
 - Proceed with the verified information
-- Report what was checked and which source was consulted
+- Report what you checked and which source you consulted
 
 ## Post-resolution recommendations
 
-After resolving ambiguity, evaluate whether the gap warrants one of the following:
+After you resolve ambiguity, evaluate whether the gap warrants one of these:
 
-- **Standing instruction**: The gap represents a recurring user preference that applies across multiple tasks. Recommend capturing it as a persistent instruction.
-- **Skill**: The gap required a repeatable procedure or verification process. If determining the resolution took multiple steps (especially for externally checkable facts), those steps constitute a candidate skill. Surface the procedure rather than discarding it.
-- **Neither**: The gap was a one-off situation that could have been prevented with clearer initial prompting. State this plainly so the user can improve future requests rather than creating unnecessary infrastructure.
+- **Standing instruction**: the gap is a recurring user preference. Recommend capturing it as a persistent instruction.
+- **Skill**: the resolution took several steps. Surface the procedure as a candidate skill and do not discard it.
+- **Neither**: the gap was a one-off. State this plainly so that the user can improve future requests.
