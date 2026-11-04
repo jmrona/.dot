@@ -133,6 +133,27 @@ test('loadTimeline returns an empty timeline for a transcript with no tool use',
   assert.deepEqual(loadFrom(projectsDir), [])
 })
 
+test('the timeline includes the transcripts of agents spawned by a workflow run', () => {
+  const projectsDir = makeProjectsDir()
+  writeTranscript(parentPath(projectsDir), [toolUseLine({ timestamp: '2026-01-01T00:00:01Z', id: 'p1' })])
+  const workflowAgentPath = path.join(
+    projectsDir,
+    'project-a',
+    SESSION,
+    'subagents',
+    'workflows',
+    'wf_x',
+    'agent-w1.jsonl',
+  )
+  writeTranscript(workflowAgentPath, [
+    toolUseLine({ timestamp: '2026-01-01T00:00:02Z', id: 'w1', name: 'Write', input: {} }),
+  ])
+  assert.equal(
+    loadFrom(projectsDir).some((entry) => entry.agent === 'agent-w1' && entry.name === 'Write'),
+    true,
+  )
+})
+
 function blobLine(line) {
   return { type: 'api-request-blob', message: line.message }
 }

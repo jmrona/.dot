@@ -11,13 +11,32 @@ function findParentTranscript({ projectsDir, sessionId }) {
     .find((candidate) => fs.existsSync(candidate))
 }
 
-function subagentTranscripts({ parentTranscript, sessionId }) {
-  const directory = path.join(path.dirname(parentTranscript), sessionId, 'subagents')
-  if (!fs.existsSync(directory)) return []
+const WORKFLOWS_DIRECTORY = 'workflows'
+
+function transcriptFilesIn(directory) {
   return fs
     .readdirSync(directory)
     .filter((name) => name.endsWith('.jsonl'))
-    .map((name) => ({ file: path.join(directory, name), agent: path.basename(name, '.jsonl') }))
+    .map((name) => path.join(directory, name))
+}
+
+function workflowRunDirectories(subagentsDirectory) {
+  const workflowsDirectory = path.join(subagentsDirectory, WORKFLOWS_DIRECTORY)
+  if (!fs.existsSync(workflowsDirectory)) return []
+  return fs
+    .readdirSync(workflowsDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(workflowsDirectory, entry.name))
+}
+
+function subagentTranscripts({ parentTranscript, sessionId }) {
+  const directory = path.join(path.dirname(parentTranscript), sessionId, 'subagents')
+  if (!fs.existsSync(directory)) return []
+  const files = [
+    ...transcriptFilesIn(directory),
+    ...workflowRunDirectories(directory).flatMap((runDirectory) => transcriptFilesIn(runDirectory)),
+  ]
+  return files.map((file) => ({ file, agent: path.basename(file, '.jsonl') }))
 }
 
 const CONVERSATION_LINE_TYPES = ['assistant', 'user']
