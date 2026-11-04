@@ -102,6 +102,18 @@ test('a dependency on an unknown task id aborts before any agent call', async ()
   assert.equal(calls.length, 0)
 })
 
+test('a dependency on a completed task that is not in the plan is satisfied', async () => {
+  const args = makeArgs({ completed: ['a'], tasks: [makeTask('b', { dependsOn: ['a'] })] })
+  const { result, calls } = await runWave(args, {
+    'implement:b': implementerDone,
+    'review:b': reviewPass,
+    Gate: gatePass(['src/b.js']),
+  })
+  assert.notEqual(result.status, 'aborted')
+  assert.deepEqual(result.wave, ['b'])
+  assert.equal(calls.some((call) => call.label === 'implement:b'), true)
+})
+
 test('a tier without a model aborts before any agent call', async () => {
   const args = makeArgs({ models: { low: 'model-low', standard: 'model-standard' }, tasks: [makeTask('a', { tier: 'high' })] })
   const { result, calls } = await runWave(args)

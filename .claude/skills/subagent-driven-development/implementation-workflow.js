@@ -47,7 +47,7 @@ function findDuplicateId() {
 
 function findUnknownDependency() {
   for (const task of args.tasks) {
-    const unknown = task.dependsOn.find((id) => !tasksById.has(id))
+    const unknown = task.dependsOn.find((id) => !tasksById.has(id) && !args.completed.includes(id))
     if (unknown) return `Task "${task.id}" depends on "${unknown}", which is not in the plan. Correct the dependency or add the task.`
   }
   return null
