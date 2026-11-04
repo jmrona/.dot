@@ -389,6 +389,12 @@
       "executable": false,
       "description": "Implements an approved design by decomposing it into tasks and grouping independent tasks into parallel waves. Each task gets a fresh subagent and a combined review, with one user checkpoint per wave. Delegates uniformly simple work to fast-path-implementation via complexity-triage."
     },
+    "skills/subagent-driven-development/implementation-workflow.js": {
+      "sha256": "4d2944be42b8bff92db09a28fd0bbc0ffaa2097a1f4791d672b24f7aa62d5d79",
+      "words": 1150,
+      "alwaysLoaded": false,
+      "executable": false
+    },
     "skills/subagent-driven-development/implementer-prompt.md": {
       "sha256": "853e7c3492d76fc12ac4488e5c00ecc81ed45eb276d45f6956f5a131a1d93e22",
       "words": 2124,
