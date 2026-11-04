@@ -110,6 +110,18 @@ test('buildClaudeEnv replaces a ceiling that the caller environment sets', () =>
   assert.equal(env.CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS, '0')
 })
 
+const LAB_GIT_GUARD_DIR = path.resolve(import.meta.dirname, '../.claude/mods/git-guard')
+
+test('buildClaudeEnv replaces a plugin directory that the caller environment sets with the lab git-guard mod', () => {
+  const env = buildClaudeEnv({ CLAUDE_CODE_PLUGIN_DIRS: '~/.claude/mods/git-guard:~/.claude/mods/waves' })
+  assert.equal(env.CLAUDE_CODE_PLUGIN_DIRS, LAB_GIT_GUARD_DIR)
+})
+
+test('buildClaudeEnv sets the plugin directory to the lab git-guard mod when the caller sets none', () => {
+  const env = buildClaudeEnv({ HOME: '/home/someone' })
+  assert.equal(env.CLAUDE_CODE_PLUGIN_DIRS, LAB_GIT_GUARD_DIR)
+})
+
 test('assessIsolation passes on a clean run', () => {
   const result = assessIsolation(cleanRun())
   assert.deepEqual(result, { isolated: true, failures: [] })
@@ -410,92 +422,6 @@ test('runSandboxed on timeout kills a grandchild that holds the output pipe', as
       } catch {}
     }
   }
-})
-
-const BASH_HOOK_ENTRY = {
-  matcher: 'Bash',
-  hooks: [{ type: 'command', command: '~/.claude/hooks/block-git-commands.mjs', timeout: 5, onFailure: 'block' }],
-}
-const GREP_HOOK_ENTRY = {
-  matcher: 'Grep|Glob',
-  hooks: [{ type: 'command', command: '~/.claude/hooks/cbm-code-discovery-gate', timeout: 5 }],
-}
-const SESSION_HOOK_ENTRY = {
-  matcher: 'startup',
-  hooks: [{ type: 'command', command: '~/.claude/hooks/cbm-session-reminder' }],
-}
-
-function sandboxWithHooks() {
-  const harnessDir = makeTempDir()
-  const settings = {
-    permissions: { deny: ['Bash(git push:*)'] },
-    hooks: { PreToolUse: [GREP_HOOK_ENTRY, BASH_HOOK_ENTRY], SessionStart: [SESSION_HOOK_ENTRY] },
-  }
-  writeFile(path.join(harnessDir, 'settings.json'), JSON.stringify(settings))
-  writeFile(path.join(harnessDir, 'rules/common/style.md'), 'rule')
-  writeFile(path.join(harnessDir, 'skills/demo/SKILL.md'), 'skill')
-  for (const name of ['block-git-commands.mjs', 'cbm-code-discovery-gate', 'cbm-session-reminder']) {
-    writeFile(path.join(harnessDir, 'hooks', name), '#!/bin/sh\nexit 0\n')
-    fs.chmodSync(path.join(harnessDir, 'hooks', name), 0o755)
-  }
-  const targetDir = makeTempDir()
-  createSandbox({ harnessDir, targetDir })
-  return path.join(targetDir, '.claude')
-}
-
-function readSandboxSettings(claudeDir) {
-  return JSON.parse(fs.readFileSync(path.join(claudeDir, 'settings.json'), 'utf8'))
-}
-
-test('createSandbox copies the Bash PreToolUse hook script into the sandbox hooks directory', () => {
-  const claudeDir = sandboxWithHooks()
-  assert.equal(fs.existsSync(path.join(claudeDir, 'hooks/block-git-commands.mjs')), true)
-})
-
-test('createSandbox preserves the executable bit of the copied hook script', () => {
-  const claudeDir = sandboxWithHooks()
-  assert.notEqual(fs.statSync(path.join(claudeDir, 'hooks/block-git-commands.mjs')).mode & 0o111, 0)
-})
-
-test('createSandbox does not copy the Grep hook script', () => {
-  const claudeDir = sandboxWithHooks()
-  assert.equal(fs.existsSync(path.join(claudeDir, 'hooks/cbm-code-discovery-gate')), false)
-})
-
-test('createSandbox does not copy the session hook script', () => {
-  const claudeDir = sandboxWithHooks()
-  assert.equal(fs.existsSync(path.join(claudeDir, 'hooks/cbm-session-reminder')), false)
-})
-
-test('createSandbox writes only the Bash entry into the sandbox PreToolUse hooks', () => {
-  const settings = readSandboxSettings(sandboxWithHooks())
-  assert.deepEqual(settings.hooks.PreToolUse.map((entry) => entry.matcher), ['Bash'])
-})
-
-test('createSandbox leaves other hook events out of the sandbox settings', () => {
-  const settings = readSandboxSettings(sandboxWithHooks())
-  assert.deepEqual(Object.keys(settings.hooks), ['PreToolUse'])
-})
-
-test('createSandbox points the Bash hook command at the absolute sandbox path', () => {
-  const claudeDir = sandboxWithHooks()
-  const [hook] = readSandboxSettings(claudeDir).hooks.PreToolUse[0].hooks
-  assert.equal(hook.command, path.join(claudeDir, 'hooks/block-git-commands.mjs'))
-})
-
-test('createSandbox keeps the timeout and onFailure of the Bash hook', () => {
-  const [hook] = readSandboxSettings(sandboxWithHooks()).hooks.PreToolUse[0].hooks
-  assert.deepEqual({ timeout: hook.timeout, onFailure: hook.onFailure }, { timeout: 5, onFailure: 'block' })
-})
-
-test('createSandbox keeps the deny list alongside the Bash hook', () => {
-  const settings = readSandboxSettings(sandboxWithHooks())
-  assert.deepEqual(settings.permissions.deny, ['Bash(git push:*)'])
-})
-
-test('createSandbox writes no hooks key when the harness has no Bash PreToolUse hook', () => {
-  const settings = readSandboxSettings(sandboxFromHarness())
-  assert.deepEqual(Object.keys(settings), ['permissions'])
 })
 
 const STOP_AFTER_FIRST_EVENT = (events) => events.length > 0

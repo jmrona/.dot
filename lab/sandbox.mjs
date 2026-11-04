@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const COPIED_HARNESS_ENTRIES = ['rules', 'skills']
+const LAB_GIT_GUARD_DIR = path.resolve(import.meta.dirname, '../.claude/mods/git-guard')
 
 export function createSandbox({ harnessDir, targetDir }) {
   const claudeDir = path.join(targetDir, '.claude')
@@ -18,38 +19,9 @@ function readHarnessSettings(harnessDir) {
   return fs.existsSync(settingsPath) ? JSON.parse(fs.readFileSync(settingsPath, 'utf8')) : {}
 }
 
-function hookScriptName(command) {
-  return path.basename(command.split(/\s+/)[0])
-}
-
-function copyHookScript({ harnessDir, claudeDir, scriptName }) {
-  const hooksDir = path.join(claudeDir, 'hooks')
-  fs.mkdirSync(hooksDir, { recursive: true })
-  const target = path.join(hooksDir, scriptName)
-  fs.copyFileSync(path.join(harnessDir, 'hooks', scriptName), target)
-  fs.chmodSync(target, fs.statSync(path.join(harnessDir, 'hooks', scriptName)).mode)
-  return target
-}
-
-function sandboxBashHookEntry({ harnessDir, claudeDir, entry }) {
-  const hooks = entry.hooks.map((hook) => {
-    const scriptName = hookScriptName(hook.command)
-    return { ...hook, command: copyHookScript({ harnessDir, claudeDir, scriptName }) }
-  })
-  return { ...entry, hooks }
-}
-
-function sandboxBashHookEntries({ harnessDir, claudeDir, settings }) {
-  return (settings.hooks?.PreToolUse ?? [])
-    .filter((entry) => entry.matcher === 'Bash')
-    .map((entry) => sandboxBashHookEntry({ harnessDir, claudeDir, entry }))
-}
-
 function writeSandboxSettings({ harnessDir, claudeDir }) {
   const harnessSettings = readHarnessSettings(harnessDir)
   const settings = { permissions: { deny: harnessSettings.permissions?.deny ?? [] } }
-  const bashHooks = sandboxBashHookEntries({ harnessDir, claudeDir, settings: harnessSettings })
-  if (bashHooks.length > 0) settings.hooks = { PreToolUse: bashHooks }
   fs.writeFileSync(path.join(claudeDir, 'settings.json'), `${JSON.stringify(settings, null, 2)}\n`)
 }
 
@@ -69,7 +41,11 @@ export function buildClaudeArgs({ prompt, model, tools = ['Read'], maxTurns = 8 
 
 export function buildClaudeEnv(env) {
   const { CLAUDECODE: _nestingMarker, ...remaining } = env
-  return { ...remaining, CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '0' }
+  return {
+    ...remaining,
+    CLAUDE_CODE_PLUGIN_DIRS: LAB_GIT_GUARD_DIR,
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '0',
+  }
 }
 
 function parseJsonLines(output) {
