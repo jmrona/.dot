@@ -2,6 +2,7 @@ import { atom, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import type { EvalTally } from '../types'
+import { isEmberRemote } from './ember-detection'
 
 const DENIAL =
   'A full eval run already ran this session (CLAUDE.md: once at the end). Ask the user to type /allow-evals.'
@@ -16,14 +17,6 @@ const tally = atom(
 )
 
 type RunKind = 'full' | 'filtered'
-
-const normaliseRemote = (remote: string) =>
-  remote
-    .replace(/^[a-z+]+:\/\//, '')
-    .replace(/^[^@/]+@/, '')
-    .replace(':', '/')
-    .replace(/\.git$/, '')
-    .replace(/\/$/, '')
 
 const segmentsOf = (command: string) =>
   command.split(/&&|\|\||;|\||\n|(?<![>&])&(?![>&])/).map(segment => segment.trim())
@@ -48,8 +41,7 @@ const statusText = (current: EvalTally) =>
   `evals: ${current.full} full, ${current.filtered} filtered`
 
 export const register: Register = (on, options) => {
-  const emberRemote =
-    typeof options.emberRemote === 'string' ? normaliseRemote(options.emberRemote) : ''
+  const emberRemote = typeof options.emberRemote === 'string' ? options.emberRemote.trim() : ''
   if (emberRemote === '') return
 
   on('session.start', async ($, e, next) => {
@@ -70,8 +62,7 @@ export const register: Register = (on, options) => {
 
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const repo = await $.session.repo()
-    const isEmber =
-      repo?.remote != null && normaliseRemote(repo.remote).endsWith(emberRemote)
+    const isEmber = isEmberRemote(repo?.remote ?? null, emberRemote)
     const runKinds = runKindsOf(e.command)
     if (!isEmber || runKinds.length === 0) return next(e)
 

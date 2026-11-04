@@ -4,7 +4,7 @@ Ember's `just api evals` calls a real model and spends API budget. The project r
 
 ## Where it acts
 
-Only in Ember. The mod has one setting, `emberRemote`: the host and path of the Ember remote, without a scheme. The mod acts when the origin remote of the session repository, normalised, ends with that value. Scheme, user and a `.git` suffix are ignored, so `git@host:path` and `https://host/path.git` agree.
+Only in Ember. The mod has one setting, `emberRemote`: the host and path of the Ember remote, without a scheme. The mod acts when the origin remote of the session repository, normalised, equals that value or ends with it after a slash. Scheme, user, a `.git` suffix and a trailing slash are ignored, so `git@host:path` and `https://host/path.git` agree.
 
 If `emberRemote` is unset or empty, the mod registers nothing. In any other repository, and in a repository with no remote, every call passes untouched and nothing is counted.
 
@@ -58,6 +58,8 @@ The counts live in `$.state` under `ember-evals-budget`, so a hot reload keeps t
 - A run inside `bash -c "just api evals"` counts, because the words appear in the segment.
 - A run hidden in a script, an alias or a shell variable is not seen.
 - A denied run is not counted. A run that starts and then fails still uses the first full run, so type `/allow-evals` to repeat it.
+- A `/allow-evals` given before the first full run is kept. The session then gets two full runs.
+- The mod counts the full run when the call starts. The run is spent even if another hook or a permission prompt refuses that call afterwards.
 - The `slack-ping` and `auto-continuation` origins are not treated as the person, so `/allow-evals` refuses them.
 
 ## Tests

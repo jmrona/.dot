@@ -234,6 +234,20 @@ test('an ssh remote of Ember is recognised as Ember', OPTIONS, async ($, on) => 
   expect(answer.deny).toContain(DENIAL)
 })
 
+test('a remote with a trailing slash is recognised as Ember', OPTIONS, async ($, on) => {
+  await startSession($, on, 'HTTPS://gitlab.example.com/acme/app.git/')
+  await runBash($, FULL_RUN)
+  const answer = await runBash($, FULL_RUN)
+  expect(answer.deny).toContain(DENIAL)
+})
+
+test('a look-alike host that only ends with the Ember host is not Ember', OPTIONS, async ($, on) => {
+  await startSession($, on, 'https://evil-gitlab.example.com/acme/app.git')
+  await runBash($, FULL_RUN)
+  const answer = await runBash($, FULL_RUN)
+  expect(answer.deny).toBeUndefined()
+})
+
 test('the status shows one full run after a full run', OPTIONS, async ($, on) => {
   const texts = recordStatusTexts(on)
   await startSession($, on)
