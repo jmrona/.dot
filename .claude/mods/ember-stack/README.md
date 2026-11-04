@@ -4,7 +4,7 @@ Ember has one shared local Docker stack. It can mount a different worktree from 
 
 ## Where it acts
 
-Only in the repository that you name in the `emberRemote` setting. The mod treats a repository as Ember when its remote ends with that value. The scheme, the user and a `.git` suffix do not count, so `git@host:path` and `https://host/path.git` agree. If the setting is unset or empty, the mod does nothing. In any other repository it runs nothing and the band draws nothing.
+Only in the repository that you name in the `emberRemote` setting. The mod treats a repository as Ember when its remote equals that value, or ends with a slash and that value. A look-alike host, such as `evil-gitlab.example.com/acme/app`, does not count. The scheme, the user and a `.git` suffix do not count, so `git@host:path` and `https://host/path.git` agree. If the setting is unset or empty, the mod does nothing. In any other repository it runs nothing and the band draws nothing.
 
 ## Configuration
 
@@ -33,7 +33,7 @@ The setting also appears as a row in the `/config` menu. A change there reloads 
 
 ## Hooks and commands
 
-- `session.start` registers `/stack` and reads the stack.
+- `session.start` registers `/stack` and reads the stack. When the setting is unset, the mod registers nothing.
 - `tool.call` for `Bash` reads the stack again after any command that mentions `docker` or `worktree.sh`. The result of the call is unchanged.
 - `command.run` for `/stack` reads the stack again and answers "Stack refreshed."
 - `ui.render` for `AbovePrompt` draws the band on the terminal and desktop surfaces.

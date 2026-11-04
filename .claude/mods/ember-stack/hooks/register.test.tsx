@@ -59,13 +59,18 @@ function stubWorld(
 ) {
   const runs: { argv: readonly string[]; cwd: string | undefined }[] = []
   const logs: string[] = []
+  const registrations: string[] = []
   on('session.repo', () =>
     repo === 'rejects'
       ? { deny: 'repository lookup failed' }
       : { value: remote === null ? null : { root: MAIN, remote, internal: false, name: 'ember' } },
   )
   on('session.cwd', () => ({ value: CWD }))
-  on('command.register', () => ({ value: { command: 'stack' } }))
+  on('command.register', (_, e) => {
+    registrations.push(e.name)
+
+    return { value: { command: e.name } }
+  })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('tool.call', () => ({ result: { text: ENGINE_RESULT } }))
   on('ui.render', ($, e) => {
@@ -90,7 +95,7 @@ function stubWorld(
     return { value: { ...FINISHED, ...which } }
   })
 
-  return { runs, logs }
+  return { runs, logs, registrations }
 }
 
 async function startSession($: Engine) {
@@ -276,6 +281,19 @@ test('a rejected repository lookup does not fail a Bash call', WITH_REMOTE_SETTI
 
 test('an unset emberRemote makes the mod inert', async ($, on) => {
   const { runs } = stubWorld(on, {})
+  await startSession($)
+  await $.tool.call({ tool: 'Bash', command: 'docker ps' })
+  expect(runs).toEqual([])
+})
+
+test('an unset emberRemote does not register the stack command', async ($, on) => {
+  const { registrations } = stubWorld(on, {})
+  await startSession($)
+  expect(registrations).toEqual([])
+})
+
+test('a remote whose host only ends with the Ember host runs nothing', WITH_REMOTE_SETTING, async ($, on) => {
+  const { runs } = stubWorld(on, { remote: 'https://evil-gitlab.example.com/acme/app.git' })
   await startSession($)
   await $.tool.call({ tool: 'Bash', command: 'docker ps' })
   expect(runs).toEqual([])
