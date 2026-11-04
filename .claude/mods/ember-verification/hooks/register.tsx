@@ -198,7 +198,10 @@ function describeRun(run: Run | null, editedAt: number): string {
 }
 
 export const register: Register = (on, options) => {
-  const emberRemote = typeof options.emberRemote === 'string' ? options.emberRemote : ''
+  const emberRemote = typeof options.emberRemote === 'string' ? options.emberRemote.trim() : ''
+  if (emberRemote === '') {
+    return
+  }
 
   on('session.start', async ($, e, next) => {
     if (await isEmber($, emberRemote)) {

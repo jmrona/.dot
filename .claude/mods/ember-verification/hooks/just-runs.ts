@@ -4,7 +4,7 @@ export type JustRun = { pillar: Pillar; kind: 'check' | 'test'; isPartial: boole
 
 export const PILLARS: readonly Pillar[] = ['api', 'governor', 'platform', 'pods', 'proto']
 
-const PILLAR_RUN = /\bjust\s+(?:(api|governor|platform|pods|proto)\s+)?(check|test|lint)(?=\s|$)(.*)/
+const PILLAR_RUN = /^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:time\s+)?just\s+(?:(api|governor|platform|pods|proto)\s+)?(check|test|lint)(?=\s|$)(.*)/
 const REDIRECTION = /^\d*[<>]/
 const REDIRECTION_OPERATOR = /^\d*(?:>>?|<)$/
 
@@ -34,14 +34,35 @@ function parseSegment(segment: string): JustRun[] {
   return pillars.map(pillar => ({ pillar, kind, isPartial }))
 }
 
-export function parseJustRuns(command: string): JustRun[] {
-  return command.split(/&&|\|\||[\n;|&]/).flatMap(parseSegment)
+function isPipeOperator(separator: string): boolean {
+  return separator === '|' || separator === '||'
 }
 
-const EVALS_RUN = /\bjust\s+api\s+evals(?=\s|$)(.*)/
+const QUOTED_TEXT_OR_ESCAPE = /\\.|"(?:\\.|[^"\\])*"|'[^']*'/g
+
+function maskQuotedText(command: string): string {
+  return command.replace(QUOTED_TEXT_OR_ESCAPE, '_')
+}
+
+function unpipedSegments(command: string): string[] {
+  const parts = maskQuotedText(command).split(/(&&|\|\||[\n;|&])/)
+
+  return parts.filter((_, index) => {
+    const isSegment = index % 2 === 0
+    const isFollowedByPipe = parts.slice(index + 1).some((later, offset) => offset % 2 === 0 && isPipeOperator(later))
+
+    return isSegment && !isFollowedByPipe
+  })
+}
+
+export function parseJustRuns(command: string): JustRun[] {
+  return unpipedSegments(command).flatMap(parseSegment)
+}
+
+const EVALS_RUN = /^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:time\s+)?just\s+api\s+evals(?=\s|$)(.*)/
 
 export function hasFullEvalsRun(command: string): boolean {
-  return command.split(/&&|\|\||[\n;|&]/).some(segment => {
+  return unpipedSegments(command).some(segment => {
     const match = EVALS_RUN.exec(segment)
 
     return match !== null && !(match[1] ?? '').includes('--filter')

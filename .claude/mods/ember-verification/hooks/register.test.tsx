@@ -169,6 +169,14 @@ async function platformRow($: Engine, surface: 'terminal' | 'desktop') {
   return row?.text
 }
 
+async function apiRow($: Engine, surface: 'terminal' | 'desktop') {
+  const ui = await $.ui.mount({ ...PANE, surface })
+  const row = await ui.find({ type: 'Text', text: /^api/ })
+  await ui.unmount()
+
+  return row?.text
+}
+
 for (const surface of ['terminal', 'desktop'] as const) {
   test(`a check run after an edit shows as fresh and passing on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
     const world = stubWorld(on)
@@ -223,6 +231,24 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await world.clock.advance(MINUTE)
     await runCommand($, 'just platform test src/app.test.tsx')
     expect(await platformRow($, surface)).toContain('test parcial (OK 10:43)')
+  })
+
+  test(`a test run with a quoted filter value shows as partial on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
+    const world = stubWorld(on)
+    await startSession($)
+    await editFile($, `${ROOT}/api/app/User.php`)
+    await world.clock.advance(MINUTE)
+    await runCommand($, 'just api test --filter="Foo Bar"')
+    expect(await apiRow($, surface)).toContain('test parcial (OK 10:43)')
+  })
+
+  test(`a test run with a quoted path shows as partial on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
+    const world = stubWorld(on)
+    await startSession($)
+    await editFile($, `${ROOT}/api/app/User.php`)
+    await world.clock.advance(MINUTE)
+    await runCommand($, "just api test 'tests/My Test.php'")
+    expect(await apiRow($, surface)).toContain('test parcial (OK 10:43)')
   })
 
   test(`a test run with a filter shows as partial on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -322,8 +348,17 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     await editFile($, `${ROOT}/platform/src/app.tsx`)
     await world.clock.advance(MINUTE)
-    await runCommand($, 'cd /home/dev/app && sudo FOO=1 just platform check')
+    await runCommand($, 'cd /home/dev/app && FOO=1 just platform check')
     expect(await platformRow($, surface)).toContain('check OK 10:43')
+  })
+
+  test(`a check run behind time is recorded on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
+    const world = stubWorld(on)
+    await startSession($)
+    await editFile($, `${ROOT}/api/app/User.php`)
+    await world.clock.advance(MINUTE)
+    await runCommand($, 'time just api check')
+    expect(await apiRow($, surface)).toContain('check OK 10:43')
   })
 
   test(`a test run and a check run on separate lines are both recorded on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -334,6 +369,46 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await runCommand($, 'just platform test\njust platform check')
     const row = await platformRow($, surface)
     expect([row?.includes('test OK 10:43'), row?.includes('check OK 10:43')]).toEqual([true, true])
+  })
+}
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`a test run piped into another command records nothing on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
+    const world = stubWorld(on)
+    await startSession($)
+    await editFile($, `${ROOT}/api/app/User.php`)
+    await world.clock.advance(MINUTE)
+    await runCommand($, 'just api test 2>&1 | tail -20')
+    expect(await apiRow($, surface)).toContain('test --')
+  })
+}
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`a check run followed by or true records nothing on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
+    const world = stubWorld(on)
+    await startSession($)
+    await editFile($, `${ROOT}/api/app/User.php`)
+    await world.clock.advance(MINUTE)
+    await runCommand($, 'just api check || true')
+    expect(await apiRow($, surface)).toContain('check --')
+  })
+
+  test(`just inside a quoted commit message records nothing on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
+    const world = stubWorld(on)
+    await startSession($)
+    await editFile($, `${ROOT}/api/app/User.php`)
+    await world.clock.advance(MINUTE)
+    await runCommand($, 'git commit -m "run just api test before pushing"')
+    expect(await apiRow($, surface)).toContain('test --')
+  })
+
+  test(`a quoted separator before just records nothing on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
+    const world = stubWorld(on)
+    await startSession($)
+    await editFile($, `${ROOT}/api/app/User.php`)
+    await world.clock.advance(MINUTE)
+    await runCommand($, 'echo "a && just api test ; b"')
+    expect(await apiRow($, surface)).toContain('test --')
   })
 }
 
@@ -403,6 +478,22 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     await editFile($, `${ROOT}/api/tests/Evals/AssistantToolRoutingLookupTest.php`)
     await runCommand($, 'just api evals-watch')
+    expect(await evalsRow($, surface)).toBe('evals     pendiente')
+  })
+
+  test(`a just api evals inside quoted text leaves the evals row on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
+    stubWorld(on)
+    await startSession($)
+    await editFile($, `${ROOT}/api/tests/Evals/AssistantToolRoutingLookupTest.php`)
+    await runCommand($, 'echo "x && just api evals ; y"')
+    expect(await evalsRow($, surface)).toBe('evals     pendiente')
+  })
+
+  test(`a full evals run piped into another command leaves the evals row on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
+    stubWorld(on)
+    await startSession($)
+    await editFile($, `${ROOT}/api/tests/Evals/AssistantToolRoutingLookupTest.php`)
+    await runCommand($, 'just api evals | tail')
     expect(await evalsRow($, surface)).toBe('evals     pendiente')
   })
 
@@ -626,6 +717,25 @@ test('an unset emberRemote makes the mod record nothing and never open the pane'
   const outcome = await recordsNothingAfterEdit($, world)
   expect(outcome.row).toBeUndefined()
   expect(outcome.opened).toEqual([])
+})
+
+test('an unset emberRemote installs no verification command hook', async ($, on) => {
+  stubWorld(on)
+  await startSession($)
+  await expect(runVerificationCommand($)).rejects.toThrow('no implementation for command.run')
+})
+
+test('a look-alike host that ends with the configured remote records nothing', WITH_REMOTE_SETTING, async ($, on) => {
+  const world = stubWorld(on, { remote: 'https://evil-gitlab.example.com/acme/app.git' })
+  const outcome = await recordsNothingAfterEdit($, world)
+  expect(outcome.row).toBeUndefined()
+  expect(outcome.opened).toEqual([])
+})
+
+test('a remote with a trailing slash still matches the configured remote', WITH_REMOTE_SETTING, async ($, on) => {
+  const world = stubWorld(on, { remote: 'HTTPS://gitlab.example.com/acme/app.git/' })
+  const outcome = await recordsNothingAfterEdit($, world)
+  expect(outcome.row?.text).toMatch(/^platform\s+editado 10:42/)
 })
 
 test('an ssh style remote matches the configured Ember remote', WITH_REMOTE_SETTING, async ($, on) => {

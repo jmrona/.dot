@@ -6,7 +6,7 @@ Ember requires `just <pillar> check` and `just <pillar> test` to run after the l
 
 ## Where it acts
 
-Only in Ember. Set the `emberRemote` option to the host and path of the Ember remote, without a scheme, for example `gitlab.example.com/acme/app`. If the option is unset or empty, or the repository has another remote, the mod does nothing at all.
+Only in Ember. Set the `emberRemote` option to the host and path of the Ember remote, without a scheme, for example `gitlab.example.com/acme/app`. If the option is unset or empty, the mod installs no hooks and registers no command. If the repository has another remote, the mod records nothing. The remote must match the whole host and path, so a look-alike host such as `evil-gitlab.example.com/acme/app` does not count.
 
 The pillars are `api`, `governor`, `platform`, `pods` and `proto`. The mod finds a pillar from the path of an edit, relative to the git top level of the session directory.
 
@@ -14,6 +14,8 @@ The pillars are `api`, `governor`, `platform`, `pods` and `proto`. The mod finds
 
 - `tool.call` for `Edit`, `Write` and `NotebookEdit`. An edit that finished without error, under `<root>/<pillar>/`, marks that pillar as edited.
 - `tool.call` for `Bash`. Each command segment (split on newlines, `&&`, `||`, `;`, `|` and `&`) that runs `just <pillar> check` or `just <pillar> test` records the start time and the outcome.
+- A segment counts only if it starts with `just`. Environment assignments such as `FOO=1` and `time` can come before it, so `cd platform && just test` and `time just api check` record.
+- A command that has a pipe `|` or `||` after the segment records nothing, and the row keeps its state. For example, `just api test 2>&1 | tail -20` and `just api check || true` record nothing.
 - `just proto lint` counts as the proto check.
 - `just check` and `just test` without a pillar count for every pillar.
 - A test run with a path argument or a `--filter` is partial. The mod records it but never treats it as fresh. A partial run never replaces a recorded full test run.
@@ -54,11 +56,8 @@ The mod keeps two values. `ember-verification.branchHeader` holds the header tex
 - If a git command fails, the mod logs a line when it runs the command (at session start, on each edit and on `/verification`). The mod records nothing for a failed root lookup and draws the pane without the header.
 - The header refreshes at session start, on each edit and on `/verification`. A branch switch shows after the next of these.
 - The mod does not see edits made through Bash (`sed`, heredocs).
-- Command matching is best effort. It can record a run that appears only inside quoted text.
-- The outcome comes from the `isError` flag of the Bash result. These cases can record the wrong outcome:
-  - `just x check || true`, which hides a failure.
-  - A pipe such as `just api test | tail`, which reports the status of the last command.
-  - Several runs in one command, which share one outcome.
+- Command matching is best effort. The mod removes quoted text and backslash escapes before it splits the command, so `echo "a && just api test"` records nothing. A run inside quotes, such as `bash -c "just api test"`, also records nothing.
+- The outcome comes from the `isError` flag of the Bash result. Several runs in one command share one outcome.
 - A run launched in the background records nothing, because the mod sees only its launch. The row keeps its previous state, and a backgrounded `just api evals` does not clear the evals row.
 - The mod records the time when a run starts, so an edit that lands while a run is in progress makes that run obsolete.
 
