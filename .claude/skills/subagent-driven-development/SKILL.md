@@ -20,7 +20,7 @@ You need an approved design (from the `brainstorming` router via any of its mode
 1. Ask the commit preference (once, at the start of the session)
 2. Run `complexity-triage` against the design
 3. If SIMPLE: hand off to `fast-path-implementation` and stop
-4. If COMPLEX: decompose into tasks, group them into waves, and execute the per-wave pipeline for each wave
+4. If COMPLEX: decompose into tasks, group them into waves, and run each wave through the `Workflow` tool, falling back to the per-wave pipeline if the tool is missing
 5. When all waves are complete, run the final feature-level review and verification, then report completion
 
 A wave is a set of independent tasks that run together in the same working tree. A sequential run is waves of one task. Worktrees stay forbidden.
@@ -107,7 +107,41 @@ Record each task in the session's task-tracking tool if one is listed. Otherwise
 - Dependencies on other tasks
 - Scene-setting context describing where this task fits in the overall design
 
+## Running a Wave with the Workflow Tool
+
+If the `Workflow` tool is in your tool list, you **MUST** call the `Workflow` tool for each wave. Set `scriptPath` to the absolute path of `implementation-workflow.js` in this skill directory. Set `args` to an actual JSON object:
+
+- `baseSha`: the output of `git rev-parse HEAD`.
+- `dirtyAtBase`: the bare paths from `git status --porcelain -uall`, without the status prefix.
+- `models`: one concrete model for each tier, resolved per `../_shared/subagent-dispatch.md`.
+- `prompts`: the full text of `./implementer-prompt.md` and `./reviewer-prompt.md`, read with the Read tool.
+- `proofCommands`: the whole-project checks of the wave gate.
+- `completed` and `stopped`: the task ids from earlier waves.
+- `tasks`: the decomposition. Each task needs `id`, `title`, `brief`, `writes`, `dependsOn`, `tier`, `agentType` and `acceptance`. The `brief` holds the full task text and its context.
+
+Every field of `args` must be present, with an empty array where nothing applies. The `models` object must always include `standard`, because the gate agent uses it.
+
+The script owns dispatch, review, correction rounds, the gate agent and task states. You **MUST NOT** dispatch implementers or reviewers yourself for a wave that the script runs. You **MUST NOT** change a state that the script returned. One call runs at most 4 tasks. The tasks in `remaining` run in a later call.
+
+The gate agent is a subagent. Before the checkpoint, run the proof commands yourself in the current message. Then check that the touched paths match the `writes` of the wave. `../../rules/common/verification.md` forbids accepting a subagent's report.
+
+Act on the result as follows:
+
+- `completed` with `verified` tasks: go to the User Checkpoint, then commit them, even in a mixed wave. Add them to `completed` before the next call.
+- `completed` with no `verified` task, `gate` is `null`: run no checkpoint. Act on the `blocked` and `stopped` tasks.
+- `blocked` task: no live agent exists, so never use `SendMessage`. Edit the `args` of the task and call the script again. Answer a `NEEDS_CONTEXT` in its `brief`. Raise its `tier` for a reasoning-capacity `BLOCKED`. Treat `BLOCKED_BY_SIBLING` as an ordinary `BLOCKED`, and call again once the sibling is verified and in `completed`.
+- `stopped` task: show the user the reviews. The user decides whether to add it to `stopped` or adjust it.
+- `gate-failed`: show the user the gate output.
+- `aborted`: stop the work and show the user the reason.
+- `nothing-to-run`: report the `held` tasks to the user.
+
+A wave of 4 tasks with no failed review uses 9 agents.
+
+If the `Workflow` tool is not in your tool list, run the Per-Wave Pipeline below with the `Agent` tool. Run one task per wave, in plan order.
+
 ## Per-Wave Pipeline
+
+This is the procedure for sessions without the `Workflow` tool.
 
 Execute waves in order. Each wave follows the same pipeline.
 
@@ -242,17 +276,12 @@ Wave 1: Task 1 (install-hook command) and Task 2 (verify/repair modes)
   writes are disjoint, neither consumes the other, both at the Low-cost default tier
 Wave 2: Task 3 (register both commands in the CLI entry point), integration wave of one
 
-[Wave 1: record base, dispatch both implementers in one message, in the background]
-Implementer 2 returns DONE first.
-[Dispatch the reviewer for Task 2 without waiting]
-Reviewer: [FAIL] missing progress reporting.
-[Continue implementer 2 through SendMessage]
-Implementer 1 returns DONE.
-[Dispatch the reviewer for Task 1]
-Reviewer: [PASS]
-[Task 2 fixed, reviewed again] Reviewer: [PASS]
+[Wave 1: call the Workflow tool with implementation-workflow.js]
+args: baseSha, dirtyAtBase, models, both prompts, proofCommands, completed [], stopped [], tasks 1 and 2
+Result: completed. Task 1 verified after 0 correction rounds.
+Task 2 verified after 1 correction round (the first review said: missing progress reporting).
 
-[Wave gate: touched list matches both tasks' writes]
+[Orchestrator re-runs the checks in this message; touched paths match both tasks' writes]
 $ just cli check
 exit 0
 $ just cli test
@@ -263,7 +292,7 @@ exit 0 (78 passed)
 User: Commit all tasks
 [Commit Task 1, then Task 2, each limited to its own paths]
 
-[Wave 2: record base, dispatch implementer 3, review, gate, checkpoint, commit]
+[Wave 2: call the Workflow tool with completed [1, 2] and task 3, re-run the checks, checkpoint, commit]
 
 [Final feature-level review: requesting-code-review, then verification-before-completion]
 
