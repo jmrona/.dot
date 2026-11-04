@@ -4,6 +4,82 @@ export const meta = {
   phases: ['Implement', 'Review', 'Gate'],
 }
 
+const ARTICLED_KIND = { array: 'an array', string: 'a string', object: 'an object' }
+
+const TOP_LEVEL_SHAPE = [
+  ['baseSha', 'string'],
+  ['dirtyAtBase', 'array'],
+  ['models', 'object'],
+  ['prompts', 'object'],
+  ['proofCommands', 'array'],
+  ['completed', 'array'],
+  ['stopped', 'array'],
+  ['tasks', 'array'],
+]
+
+const PROMPT_SHAPE = [
+  ['implementer', 'string'],
+  ['reviewer', 'string'],
+]
+
+const TASK_SHAPE = [
+  ['id', 'string'],
+  ['title', 'string'],
+  ['brief', 'string'],
+  ['writes', 'array'],
+  ['dependsOn', 'array'],
+  ['acceptance', 'array'],
+  ['tier', 'string'],
+  ['agentType', 'string'],
+]
+
+function isKind(value, kind) {
+  if (kind === 'array') return Array.isArray(value)
+  if (kind === 'object') return typeof value === 'object' && value !== null && !Array.isArray(value)
+  return typeof value === kind
+}
+
+function findShapeViolation(record, shape) {
+  return shape.find(([field, kind]) => !isKind(record[field], kind))
+}
+
+function fieldMessage(path, kind) {
+  const hint = kind === 'array' ? ' Pass an empty array when nothing applies.' : ''
+  return `${path} must be ${ARTICLED_KIND[kind]}.${hint}`
+}
+
+function taskRequirement(field, kind) {
+  return kind === 'array' ? `a ${field} array` : `a ${kind} ${field}`
+}
+
+function taskMessage(label, [field, kind], task) {
+  const requirement = `Give every task ${taskRequirement(field, kind)}.`
+  if (task[field] === undefined) return `Task ${label} has no ${field}. ${requirement}`
+  return `Task ${label} field ${field} must be ${ARTICLED_KIND[kind]}. ${requirement}`
+}
+
+function findTaskProblem() {
+  for (const [index, task] of args.tasks.entries()) {
+    if (!isKind(task, 'object')) return `Task at position ${index + 1} must be an object.`
+    const violation = findShapeViolation(task, TASK_SHAPE)
+    if (violation) return taskMessage(isKind(task.id, 'string') ? `"${task.id}"` : `at position ${index + 1}`, violation, task)
+  }
+  return null
+}
+
+function findArgsProblem() {
+  if (typeof args === 'string') return 'args must be a JSON object, not a string. Pass the plan as an object, not as serialised JSON.'
+  if (!isKind(args, 'object')) return 'args must be a JSON object. Pass the plan as an object with the fields the workflow contract lists.'
+  const topLevelViolation = findShapeViolation(args, TOP_LEVEL_SHAPE)
+  if (topLevelViolation) return fieldMessage(`args.${topLevelViolation[0]}`, topLevelViolation[1])
+  const promptViolation = findShapeViolation(args.prompts, PROMPT_SHAPE)
+  if (promptViolation) return fieldMessage(`args.prompts.${promptViolation[0]}`, promptViolation[1])
+  return findTaskProblem()
+}
+
+const argsProblem = findArgsProblem()
+if (argsProblem) return { status: 'aborted', reason: argsProblem }
+
 const tasksById = new Map(args.tasks.map((task) => [task.id, task]))
 
 function ancestorIds(task) {

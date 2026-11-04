@@ -284,3 +284,43 @@ test('a gate that reports changed paths with porcelain prefixes still verifies t
   assert.deepEqual(result.gate.unattributed, [])
   assert.equal(result.tasks.c.state, 'verified')
 })
+
+function runWaveSettled(args) {
+  const fake = makeFakeAgent({})
+  return runWorkflow(workflowPath, { agent: fake.agent, args }).then(
+    (value) => ({ result: value, calls: fake.calls }),
+    (error) => ({ result: { status: 'threw', reason: error.message }, calls: fake.calls }),
+  )
+}
+
+test('args passed as a JSON string aborts before any agent call and asks for a JSON object', async () => {
+  const { result, calls } = await runWaveSettled(JSON.stringify(makeArgs()))
+  assert.equal(result.status, 'aborted')
+  assert.match(result.reason, /JSON object, not a string/)
+  assert.equal(calls.length, 0)
+})
+
+test('a missing top-level array field aborts before any agent call and names the field', async () => {
+  const args = makeArgs()
+  delete args.stopped
+  const { result, calls } = await runWaveSettled(args)
+  assert.equal(result.status, 'aborted')
+  assert.match(result.reason, /args\.stopped must be an array/)
+  assert.equal(calls.length, 0)
+})
+
+test('a top-level field of the wrong kind aborts before any agent call and names the field', async () => {
+  const { result, calls } = await runWaveSettled(makeArgs({ stopped: 'a' }))
+  assert.equal(result.status, 'aborted')
+  assert.match(result.reason, /args\.stopped must be an array/)
+  assert.equal(calls.length, 0)
+})
+
+test('a task without a writes field aborts before any agent call and names the task and field', async () => {
+  const task = makeTask('b')
+  delete task.writes
+  const { result, calls } = await runWaveSettled(makeArgs({ tasks: [makeTask('a'), task] }))
+  assert.equal(result.status, 'aborted')
+  assert.match(result.reason, /Task "b" has no writes/)
+  assert.equal(calls.length, 0)
+})
