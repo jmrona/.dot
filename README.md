@@ -6,6 +6,7 @@ This repository collects my dot directories, such as `.opencode` and `.claude`. 
 
 - [.opencode](.opencode/): the opencode v2 harness of agents, commands, plugins, rules and skills.
 - [.claude](.claude/): the Claude Code harness of rules, skills, hooks and statusline.
+- [Claude Code mods](#claude-code-mods): the function-hook plugins that guard and monitor Claude Code sessions.
 
 ## Claude Code statusline
 
@@ -32,6 +33,65 @@ fc-cache -fv
 ```
 
 Select "JetBrainsMono Nerd Font" as the font in the terminal settings. Then restart the terminal.
+
+## Claude Code mods
+
+Mods are Claude Code function-hook plugins. They live in `.claude/mods/<mod>/`, and each one has its own README. Mods work with Claude Code only, because opencode has no counterpart.
+
+| Mod | What it does | Scope |
+| --- | --- | --- |
+| `git-guard` | Stops the model and its subagents from pushing and from adding `Co-Authored-By` trailers. | Any repository |
+| `waves` | Shows the subagents that the main loop spawns, grouped in waves, in a pane beside the chat. | Any repository |
+| `ember-guard` | Blocks commands that switch the shared Docker stack, edits to generated code and `php artisan test`. | Ember only |
+| `ember-evals-budget` | Allows one full `just api evals` run, then asks for `/allow-evals` before another. | Ember only |
+| `ember-stack` | Shows a band above the prompt when the shared Docker stack mounts another worktree. | Ember only |
+| `ember-verification` | Shows which Ember pillars have fresh `check` and `test` runs since their last edit. | Ember only |
+
+### Install
+
+Copy each mod to `~/.claude/mods/<mod>` with `rsync`. Run this command once for each of the six mods:
+
+```bash
+rsync -a --exclude .claude-plugin/types --exclude tsconfig.json .claude/mods/<mod>/ ~/.claude/mods/<mod>/
+```
+
+Then list the six mod folders in `env.CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json`, separated by `:`:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/git-guard:~/.claude/mods/waves:~/.claude/mods/ember-guard:~/.claude/mods/ember-evals-budget:~/.claude/mods/ember-stack:~/.claude/mods/ember-verification"
+  }
+}
+```
+
+Claude Code reads this variable from the process environment or the `env` block of the user settings. It never reads it from a project's settings.
+
+### Configure the Ember mods
+
+The four `ember-` mods need the `emberRemote` option. It holds the host and path of the Ember git remote, without a scheme. Set it only in `~/.claude/settings.json`, under `pluginConfigs.<mod>.options.emberRemote`. Never set it in this repository. Unset, an Ember mod does nothing.
+
+```json
+{
+  "pluginConfigs": {
+    "ember-guard": {
+      "options": { "emberRemote": "gitlab.example.com/acme/app" }
+    }
+  }
+}
+```
+
+### Develop and test
+
+Run these commands from the `.dot` repository root, because the paths are relative:
+
+- `claude plugin test .claude/mods/<mod>` runs the tests of a mod.
+- `claude plugin validate .claude/mods/<mod>` checks that a mod is well formed.
+- `claude --plugin-dir .claude/mods/<mod>` starts a session with one mod loaded.
+
+### Turn a mod off
+
+Remove its path from `CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json`.
 
 ## Notes
 
