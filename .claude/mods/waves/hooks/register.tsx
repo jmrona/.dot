@@ -39,13 +39,13 @@ function summariseProgress(wave: readonly WaveAgent[]): string {
   const running = countWhere(wave, RUNNING)
   const failed = countWhere(wave, FAILED)
   if (running === 0 && failed === 0) {
-    return 'terminada'
+    return 'finished'
   }
   const finishedWell = wave.length - running - failed
   const parts = [
-    running > 0 ? `${running} en curso` : '',
+    running > 0 ? `${running} running` : '',
     finishedWell > 0 ? `${finishedWell} OK` : '',
-    failed > 0 ? `${failed} ${failed === 1 ? 'fallido' : 'fallidos'}` : '',
+    failed > 0 ? `${failed} failed` : '',
   ]
 
   return parts.filter(part => part !== '').join(', ')
@@ -74,7 +74,7 @@ async function refreshStatuses($: Engine): Promise<boolean> {
 function describeWave(number: number, wave: readonly WaveAgent[]): string {
   const mark = wave.some(isRunning) ? ' ' : 'x'
 
-  return `[${mark}] Wave ${number}   ${wave.length} ${wave.length === 1 ? 'agente' : 'agentes'}  ${summariseProgress(wave)}  ${summariseModels(wave)}`
+  return `[${mark}] Wave ${number}   ${wave.length} ${wave.length === 1 ? 'agent' : 'agents'}  ${summariseProgress(wave)}  ${summariseModels(wave)}`
 }
 
 const polling: { timer: Timer | null } = { timer: null }
@@ -142,7 +142,7 @@ export const register: Register = on => {
         step: currentStep,
         agentId: answer.agentId,
         subagentType: e.subagentType,
-        model: e.model ?? `hereda ${e.parentModel}`,
+        model: e.model ?? `inherits ${e.parentModel}`,
         status: 'running',
       }
       const recorded = await update($, agents, list => [...list, record])

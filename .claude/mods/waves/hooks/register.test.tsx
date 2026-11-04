@@ -108,7 +108,7 @@ test('spawns made in one step form one wave', async ($, on) => {
     const ui = await $.ui.mount({ ...PANE, surface })
     const rows = await ui.findAll({ type: 'Text', text: /Wave/ })
     expect(rows.map(row => row.text)).toEqual([expect.stringContaining('Wave 1')])
-    expect(rows[0]?.text).toContain('2 agentes')
+    expect(rows[0]?.text).toContain('2 agents')
     await ui.unmount()
   }
 })
@@ -152,7 +152,7 @@ test('a spawn made inside a subagent does not count in the wave of its parent', 
   await spawn($, { parentAgentId: 'agent-1' })
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toMatch(/\b1 agente\b(?!s)/)
+    expect((await rowTexts($, surface))[0]).toMatch(/\b1 agent\b(?!s)/)
   }
 })
 
@@ -167,7 +167,7 @@ test('a step taken by a subagent does not start a new wave', async ($, on) => {
   for (const surface of ['terminal', 'desktop'] as const) {
     const rows = await rowTexts($, surface)
     expect(rows).toEqual([expect.stringContaining('Wave 1')])
-    expect(rows[0]).toContain('2 agentes')
+    expect(rows[0]).toContain('2 agents')
   }
 })
 
@@ -198,7 +198,7 @@ test('an agent with no model shows the parent model it inherits', async ($, on) 
   await spawn($)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('hereda opus x1')
+    expect((await rowTexts($, surface))[0]).toContain('inherits opus x1')
   }
 })
 
@@ -211,7 +211,7 @@ test('a running agent shows the wave as in progress and unchecked', async ($, on
   for (const surface of ['terminal', 'desktop'] as const) {
     const row = (await rowTexts($, surface))[0]
     expect(row).toContain('[ ] Wave 1')
-    expect(row).toContain('1 en curso')
+    expect(row).toContain('1 running')
   }
 })
 
@@ -237,7 +237,7 @@ test('a wave whose agents all finished is checked', async ($, on) => {
   }
 })
 
-test('a wave whose agents all finished shows terminada', async ($, on) => {
+test('a wave whose agents all finished shows finished', async ($, on) => {
   const roster = newWorld()
   const clock = stubWorld(on, roster)
 
@@ -248,11 +248,11 @@ test('a wave whose agents all finished shows terminada', async ($, on) => {
   await clock.advance(5000)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('terminada')
+    expect((await rowTexts($, surface))[0]).toContain('finished')
   }
 })
 
-test('a failed agent shows fallido in the summary', async ($, on) => {
+test('a failed agent shows failed in the summary', async ($, on) => {
   const roster = newWorld()
   const clock = stubWorld(on, roster)
 
@@ -266,11 +266,11 @@ test('a failed agent shows fallido in the summary', async ($, on) => {
   await clock.advance(5000)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toMatch(/1 fallido\b(?!s)/)
+    expect((await rowTexts($, surface))[0]).toContain('1 failed')
   }
 })
 
-test('two failed agents show fallidos in the summary', async ($, on) => {
+test('two failed agents show 2 failed in the summary', async ($, on) => {
   const roster = newWorld()
   const clock = stubWorld(on, roster)
 
@@ -284,7 +284,7 @@ test('two failed agents show fallidos in the summary', async ($, on) => {
   await clock.advance(5000)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('2 fallidos')
+    expect((await rowTexts($, surface))[0]).toContain('2 failed')
   }
 })
 
@@ -351,7 +351,7 @@ test('an agent that the list no longer shows counts as finished', async ($, on) 
   }
 })
 
-test('a failed agent that the list later drops still shows fallido', async ($, on) => {
+test('a failed agent that the list later drops still shows failed', async ($, on) => {
   const roster = newWorld([
     { id: 'agent-1', status: 'running' },
     { id: 'agent-2', status: 'running' },
@@ -370,7 +370,7 @@ test('a failed agent that the list later drops still shows fallido', async ($, o
   await clock.advance(3000)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toMatch(/1 fallido\b(?!s)/)
+    expect((await rowTexts($, surface))[0]).toContain('1 failed')
   }
 })
 

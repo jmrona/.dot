@@ -12,16 +12,16 @@ In any repository. It has no options and no repository detection.
 
 ## What it shows
 
-One row per wave, numbered from 1 in order. Pane text is in Spanish.
+One row per wave, numbered from 1 in order.
 
 ```
-[x] Wave 1   3 agentes   terminada         sonnet x3
-[ ] Wave 2   4 agentes   2 en curso, 2 OK  sonnet x2, hereda opus x2
+[x] Wave 1   3 agents   finished                 sonnet x3
+[ ] Wave 2   4 agents   2 running, 2 OK          sonnet x2, inherits opus x2
 ```
 
 - `[x]` means that every agent of the wave has finished. `[ ]` means that at least one still runs.
-- A failed or killed agent shows as `<n> fallido(s)`.
-- A model shows as given in the spawn. An agent without a model shows `hereda <parent model>`.
+- A failed or killed agent shows as `<n> failed`.
+- A model shows as given in the spawn. An agent without a model shows `inherits <parent model>`.
 
 ## What it hooks
 
