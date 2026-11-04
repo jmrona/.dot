@@ -38,3 +38,47 @@ test('segments split a pipe-ampersand as a pipe with no lone ampersand left', as
 test('unquoted segments list a plain command once', async () => {
   expect(unquotedSegmentsOf('git rebase main')).toEqual(['git rebase main'])
 })
+
+test('unquoted segments expose a push inside a double-quoted sh -c argument', async () => {
+  const segments = unquotedSegmentsOf('sh -c "git push"')
+  expect(segments.some(segment => gitSubcommand('push').test(segment))).toBe(true)
+})
+
+test('unquoted segments expose a hard reset inside a single-quoted bash -c argument', async () => {
+  const segments = unquotedSegmentsOf("bash -c 'git reset --hard'")
+  expect(segments.some(segment => segment.includes('git reset --hard'))).toBe(true)
+})
+
+test('unquoted segments expose a push inside a zsh -c argument', async () => {
+  const segments = unquotedSegmentsOf('zsh -c "git push"')
+  expect(segments.some(segment => gitSubcommand('push').test(segment))).toBe(true)
+})
+
+test('unquoted segments expose a push inside nested shell -c arguments', async () => {
+  const segments = unquotedSegmentsOf(`sh -c "bash -c 'git push'"`)
+  expect(segments.some(segment => gitSubcommand('push').test(segment))).toBe(true)
+})
+
+test('unquoted segments expose a push inside a sudo bash -c argument', async () => {
+  const segments = unquotedSegmentsOf('sudo bash -c "git push"')
+  expect(segments.some(segment => gitSubcommand('push').test(segment))).toBe(true)
+})
+
+test('unquoted segments expose a push inside an env sh -c argument', async () => {
+  const segments = unquotedSegmentsOf('env A=1 sh -c "git push"')
+  expect(segments.some(segment => gitSubcommand('push').test(segment))).toBe(true)
+})
+
+test('unquoted segments find no git command in a harmless sh -c argument', async () => {
+  const segments = unquotedSegmentsOf('sh -c "ls"')
+  expect(segments.some(segment => /\bgit\b/.test(segment))).toBe(false)
+})
+
+test('unquoted segments ignore a shell -c argument built from a variable', async () => {
+  expect(unquotedSegmentsOf('sh -c $CMD')).toEqual(['sh -c $CMD'])
+})
+
+test('unquoted segments still ignore a push word in a commit message', async () => {
+  const segments = unquotedSegmentsOf('git commit -m "sh -c git push"')
+  expect(segments.some(segment => gitSubcommand('push').test(segment))).toBe(false)
+})

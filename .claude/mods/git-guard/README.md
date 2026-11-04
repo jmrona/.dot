@@ -8,7 +8,7 @@ It acts in every repository. It does no Ember detection.
 
 ## What it hooks
 
-It guards `tool.call` for `Bash`. The mod splits each command into segments on `&&`, `||`, `;`, `|`, `|&`, a lone `&` and newlines. It then looks for a `git` word anywhere in each segment, followed by any options and then the subcommand. Wrappers such as `sudo` and subshells such as `(git push)` are caught. Before matching, it removes quoted text and backslash-escaped characters, so options such as `-c user.name="A B"` and `-C my\ dir` do not hide the subcommand.
+It guards `tool.call` for `Bash`. The mod splits each command into segments on `&&`, `||`, `;`, `|`, `|&`, a lone `&` and newlines. It then looks for a `git` word anywhere in each segment, followed by any options and then the subcommand. Wrappers such as `sudo` and subshells such as `(git push)` are caught. Before matching, it removes quoted text and backslash-escaped characters, so options such as `-c user.name="A B"` and `-C my\ dir` do not hide the subcommand. It also checks the quoted argument of `sh -c`, `bash -c` and `zsh -c` as a command of its own, including nested ones.
 
 ## What it denies
 
@@ -76,7 +76,8 @@ A command that is not git runs no git process.
 ## Known limits
 
 - The guard matches on a best-effort basis: it does not catch a command built through a shell variable, a script or an alias.
-- The guard removes quoted text before matching, so `bash -c "git reset --hard"` and `git reset "--hard"` pass.
+- The guard checks `sh -c`, `bash -c` and `zsh -c` arguments, but `git reset "--hard"` still passes because it removes quoted text before matching.
+- The guard does not check a `-c` argument that is built from a variable, an expansion or `eval`.
 - The guard runs its git checks in the session directory, so it checks `git -C other commit` against the session repository.
 - The guard does not catch `git reset <other-branch>` without `--hard`.
 - The guard reads the branch, the upstream and the index before the command runs, so it checks the old branch for `git switch X && git commit`.
