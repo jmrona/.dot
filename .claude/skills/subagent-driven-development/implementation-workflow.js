@@ -224,7 +224,7 @@ function buildGatePrompt() {
   return [
     'Run each proof command below serially, from the repository root, and record its exit code and a one-line summary. Run all of them even if one fails.',
     commands,
-    'Then run `git rev-parse HEAD` and report it as headSha. Run `git status --porcelain -uall` and report every path it lists as changedPaths.',
+    'Then run `git rev-parse HEAD` and report it as headSha. Run `git status --porcelain -uall` and report every path it lists as changedPaths, as a bare path with no status prefix. For a rename, report only the new path.',
     'Edit nothing.',
     GIT_RULE,
   ].join('\n\n')
@@ -239,10 +239,15 @@ function runGate() {
   })
 }
 
+function bareChangedPath(reported) {
+  const withoutStatus = reported.replace(/^[ MADRCU?!]{2} /, '')
+  return withoutStatus.includes(' -> ') ? withoutStatus.split(' -> ').pop() : withoutStatus
+}
+
 function judgeGate(report) {
   if (!report) return { passed: false, report: null, unattributed: [], failure: 'The gate agent returned no report.' }
   const attributable = new Set([...args.dirtyAtBase, ...waveTasks.flatMap((task) => task.writes)])
-  const unattributed = report.changedPaths.filter((changedPath) => !attributable.has(changedPath))
+  const unattributed = report.changedPaths.map(bareChangedPath).filter((changedPath) => !attributable.has(changedPath))
   const allCommandsPassed =
     report.commands.length === args.proofCommands.length && report.commands.every((entry) => entry.exitCode === 0)
   return { passed: allCommandsPassed && unattributed.length === 0, report, unattributed }

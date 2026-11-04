@@ -264,3 +264,11 @@ test('a task whose pipeline throws is blocked with reason workflow-error', async
   assert.equal(result.tasks.a.state, 'blocked')
   assert.equal(result.tasks.a.reason, 'workflow-error')
 })
+
+test('a gate that reports changed paths with porcelain prefixes still verifies the wave', async () => {
+  const prefixed = gatePass(['?? src/a.js', ' M src/b.js', 'R  old/name.js -> src/c.js'])
+  const tasks = ['a', 'b', 'c'].map((id) => makeTask(id))
+  const { result } = await runWave(makeArgs({ tasks }), { Implement: implementerDone, Review: reviewPass, Gate: prefixed })
+  assert.deepEqual(result.gate.unattributed, [])
+  assert.equal(result.tasks.c.state, 'verified')
+})
