@@ -133,7 +133,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     const ui = await $.ui.mount({ ...BAND, surface })
     expect(await ui.find({ type: 'Text', text: /Stack/ })).toBeUndefined()
-    expect(logs.join('\n')).toContain('ember-stack: could not read the stack')
+    expect(logs.some(line => line.startsWith('could not read the stack'))).toBe(true)
     await ui.unmount()
   })
 }

@@ -35,9 +35,9 @@ async function gitOutput($: Engine, argv: string[], cwd: string): Promise<string
     if (result.exitCode === 0) {
       return result.stdout.trim()
     }
-    $.ui.log(`ember-verification: \`${command}\` exited with ${result.exitCode} in ${cwd}. Nothing was recorded from it.`)
+    $.ui.log(`\`${command}\` exited with ${result.exitCode} in ${cwd}. Nothing was recorded from it.`)
   } catch (error) {
-    $.ui.log(`ember-verification: \`${command}\` could not run in ${cwd} (${String(error)}). Nothing was recorded from it.`)
+    $.ui.log(`\`${command}\` could not run in ${cwd} (${String(error)}). Nothing was recorded from it.`)
   }
 
   return null

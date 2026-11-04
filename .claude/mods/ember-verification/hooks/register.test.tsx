@@ -482,7 +482,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const world = stubWorld(on, { failingGit: 'root' })
     await startSession($)
     await editFile($, `${ROOT}/platform/src/app.tsx`)
-    expect(world.logged.some(line => line.includes('git rev-parse --show-toplevel'))).toBe(true)
+    expect(world.logged.some(line => line.startsWith('`git rev-parse --show-toplevel` exited with 128'))).toBe(true)
   })
 
   test(`a git command that throws on the root lookup records no edit on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -496,7 +496,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const world = stubWorld(on, { throwingGit: 'root' })
     await startSession($)
     await editFile($, `${ROOT}/platform/src/app.tsx`)
-    expect(world.logged.some(line => line.includes('could not run'))).toBe(true)
+    expect(world.logged.some(line => line.startsWith('`git rev-parse --show-toplevel` could not run'))).toBe(true)
   })
 }
 
@@ -547,7 +547,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const world = stubWorld(on, { failingGit: 'branch' })
     await startSession($)
     await editFile($, `${ROOT}/platform/src/app.tsx`)
-    expect(world.logged.some(line => line.includes('git branch --show-current'))).toBe(true)
+    expect(world.logged.some(line => line.startsWith('`git branch --show-current` exited with 128'))).toBe(true)
   })
 }
 

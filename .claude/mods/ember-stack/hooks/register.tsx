@@ -46,7 +46,7 @@ async function refresh($: Engine, emberRemote: string): Promise<void> {
     await update($, reading, () => stack)
   } catch (error) {
     await update($, reading, () => ({ worktreeRoot: null, mounts: [] }))
-    $.ui.log(`ember-stack: could not read the stack. ${String(error)}`)
+    $.ui.log(`could not read the stack. ${String(error)}`)
   }
 }
 
