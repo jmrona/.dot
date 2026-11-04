@@ -1,0 +1,13 @@
+{
+  "name": "ember-evals-budget",
+  "version": "0.1.0",
+  "description": "Allows one full Ember eval run per session and counts filtered runs.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "emberRemote": {
+      "type": "string",
+      "title": "Ember remote",
+      "description": "Host and path of the Ember repository remote, without scheme, for example gitlab.example.com/acme/app. Unset means the mod does nothing."
+    }
+  }
+}
