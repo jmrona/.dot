@@ -121,21 +121,24 @@ If the `Workflow` tool is in your tool list, you **MUST** call the `Workflow` to
 
 Every field of `args` must be present, with an empty array where nothing applies. The `models` object must always include `standard`, because the gate agent uses it.
 
-The script owns dispatch, review, correction rounds, the gate agent and task states. You **MUST NOT** dispatch implementers or reviewers yourself for a wave that the script runs. You **MUST NOT** change a state that the script returned. One call runs at most 4 tasks. The tasks in `remaining` run in a later call.
+The script owns dispatch, review, correction rounds, the gate agent and task states. You **MUST NOT** dispatch implementers or reviewers yourself for a wave that the script runs. You **MUST NOT** change a state that the script returned. One call runs at most 4 tasks.
 
 The gate agent is a subagent. Before the checkpoint, run the proof commands yourself in the current message. Then check that the touched paths match the `writes` of the wave. `../../rules/common/verification.md` forbids accepting a subagent's report.
 
+After every call, whatever the result, compare `git rev-parse HEAD` with `baseSha`. If they differ, a subagent committed, so stop and tell the user.
+
 Act on the result as follows:
 
-- `completed` with `verified` tasks: go to the User Checkpoint, then commit them, even in a mixed wave. Add them to `completed` before the next call.
+- `completed` with `verified` tasks: go to the User Checkpoint, then commit them, even in a mixed wave. At the checkpoint, show the user the `concerns` and `environmentFailures` in the `report` of each `verified` task. Add the tasks to `completed` before the next call.
 - `completed` with no `verified` task, `gate` is `null`: run no checkpoint. Act on the `blocked` and `stopped` tasks.
+- After any `completed` result, call the script again for the tasks in `remaining`, and report the `held` tasks to the user.
 - `blocked` task: no live agent exists, so never use `SendMessage`. Edit the `args` of the task and call the script again. Answer a `NEEDS_CONTEXT` in its `brief`. Raise its `tier` for a reasoning-capacity `BLOCKED`. Treat `BLOCKED_BY_SIBLING` as an ordinary `BLOCKED`, and call again once the sibling is verified and in `completed`.
 - `stopped` task: show the user the reviews. The user decides whether to add it to `stopped` or adjust it.
-- `gate-failed`: show the user the gate output.
+- `gate-failed`: the partial edits of a `stopped` or `blocked` task in the same wave stay in the tree while the gate runs. Before you go to the user, check whether the failure comes from them. Show the user the gate output and say which task the failing output points at.
 - `aborted`: stop the work and show the user the reason.
 - `nothing-to-run`: report the `held` tasks to the user.
 
-A wave of 4 tasks with no failed review uses 9 agents.
+A wave of 4 tasks with no failed review uses 9 agents. If every task uses both correction rounds, it uses 25 agents.
 
 If the `Workflow` tool is not in your tool list, run the Per-Wave Pipeline below with the `Agent` tool. Run one task per wave, in plan order.
 

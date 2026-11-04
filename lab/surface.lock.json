@@ -383,8 +383,8 @@
       "executable": false
     },
     "skills/subagent-driven-development/SKILL.md": {
-      "sha256": "f68103076bd3d8e3f07644dfa14d7502a589a3679a84905ccd29ea283a0a15e4",
-      "words": 4362,
+      "sha256": "a367ca90b6007a2e567a85948f2fa48f0170df8e71ff9b39f4614b31bfe23ecc",
+      "words": 4471,
       "alwaysLoaded": false,
       "executable": false,
       "description": "Implements an approved design by decomposing it into tasks and grouping independent tasks into parallel waves. Each task gets a fresh subagent and a combined review, with one user checkpoint per wave. Delegates uniformly simple work to fast-path-implementation via complexity-triage."
