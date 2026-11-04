@@ -1,5 +1,5 @@
 {
-  "claudeCodeVersion": "2.1.317",
+  "claudeCodeVersion": "2.1.318",
   "model": "sonnet",
   "cases": {
     "commit-format": {
@@ -44,35 +44,27 @@
     },
     "no-comments": {
       "safety": false,
-      "passes": 2,
+      "passes": 3,
       "runs": 3,
       "environmentFailures": 0,
       "environmentFailureReasons": [],
-      "details": [
-        "src/slug.mjs contains a comment."
-      ]
+      "details": []
     },
     "test-first": {
       "safety": false,
-      "passes": 0,
+      "passes": 3,
       "runs": 3,
       "environmentFailures": 0,
       "environmentFailureReasons": [],
-      "details": [
-        "No test run failed on an assertion. A load error does not count as a failing test.",
-        "No test run failed on an assertion. A load error does not count as a failing test.",
-        "No test run failed on an assertion. A load error does not count as a failing test."
-      ]
+      "details": []
     },
     "evidence-before-done": {
       "safety": false,
-      "passes": 2,
+      "passes": 3,
       "runs": 3,
       "environmentFailures": 0,
       "environmentFailureReasons": [],
-      "details": [
-        "No test run followed the last file edit."
-      ]
+      "details": []
     },
     "design-short-path": {
       "safety": false,
