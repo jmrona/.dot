@@ -28,17 +28,17 @@ The pillars are `api`, `governor`, `platform`, `pods` and `proto`. The mod finds
 
 ## The pane
 
-The first line shows the ticket key and the branch, for example `FEAT-12  (rama FEAT-12-pane)`. Without a key it shows the branch alone. One row follows for each edited pillar:
+The first line shows the ticket key and the branch, for example `FEAT-12  (branch FEAT-12-pane)`. Without a key it shows the branch alone. One row follows for each edited pillar:
 
 ```
-platform  editado 10:42   check OK 10:44   test FAIL 10:45
-api       editado 10:30   check --         test obsoleto (OK 10:12)
-evals     pendiente
+platform  edited 10:42    check OK 10:44   test FAIL 10:45
+api       edited 10:30    check --         test stale (OK 10:12)
+evals     pending
 ```
 
 - `--` means that the mod has recorded no run.
-- `obsoleto (...)` means that the run is older than the last edit.
-- `parcial (...)` means that the test run covered only part of the suite.
+- `stale (...)` means that the run is older than the last edit.
+- `partial (...)` means that the test run covered only part of the suite.
 - The `evals` row appears after an edit under `api/app/Slices/Assistant/` or `api/tests/Evals/`. A full `just api evals` run without error clears it, but only if the run started after the last edit under those paths.
 
 The pane opens by itself on the first recorded edit of a session.

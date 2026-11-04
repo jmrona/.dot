@@ -9,7 +9,7 @@ type Engine = Parameters<Hook<'session.start'>>[0]
 
 const PANE = 'verification'
 const COMMAND = 'verification'
-const PANE_TITLE = 'Verificación'
+const PANE_TITLE = 'Verification'
 
 const EVALS_PATHS = ['api/app/Slices/Assistant/', 'api/tests/Evals/']
 
@@ -83,7 +83,7 @@ async function describeBranch($: Engine, root: string): Promise<string | null> {
   }
   const ticketKey = TICKET_KEY.exec(branch)?.[0]
 
-  return ticketKey === undefined ? `rama ${branch}` : `${ticketKey}  (rama ${branch})`
+  return ticketKey === undefined ? `branch ${branch}` : `${ticketKey}  (branch ${branch})`
 }
 
 async function refreshBranchHeader($: Engine, root: string | null): Promise<void> {
@@ -177,11 +177,11 @@ async function clearEvalsEditedBefore($: Engine, startedAt: number): Promise<voi
 }
 
 function describeRow(pillar: Pillar, record: PillarRecord & { editedAt: number }): string {
-  const edited = `editado ${formatTime(record.editedAt)}`
+  const edited = `edited ${formatTime(record.editedAt)}`
   const check = `check ${describeRun(record.check, record.editedAt)}`
   const test = `test ${describeRun(record.test, record.editedAt)}`
 
-  return `${pillar.padEnd(9)} ${edited}   ${check}   ${test}`
+  return `${pillar.padEnd(9)} ${edited.padEnd(13)}   ${check}   ${test}`
 }
 
 function describeRun(run: Run | null, editedAt: number): string {
@@ -191,10 +191,10 @@ function describeRun(run: Run | null, editedAt: number): string {
   const result = `${run.outcome === 'pass' ? 'OK' : 'FAIL'} ${formatTime(run.at)}`
 
   if (run.isPartial) {
-    return `parcial (${result})`
+    return `partial (${result})`
   }
 
-  return run.at < editedAt ? `obsoleto (${result})` : result
+  return run.at < editedAt ? `stale (${result})` : result
 }
 
 export const register: Register = (on, options) => {
@@ -265,7 +265,7 @@ export const register: Register = (on, options) => {
 
           return text === null ? [] : [<Text key={pillar}>{text}</Text>]
         })}
-        {state.evalsEditedAt !== null && <Text>evals     pendiente</Text>}
+        {state.evalsEditedAt !== null && <Text>evals     pending</Text>}
       </Box>
     )
   })

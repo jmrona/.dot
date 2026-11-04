@@ -112,7 +112,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await editFile($, `${ROOT}/platform/src/app.tsx`)
     const ui = await $.ui.mount({ ...PANE, surface })
     const row = await ui.find({ type: 'Text', text: /^platform/ })
-    expect(row?.text).toContain('editado 10:42')
+    expect(row?.text).toContain('edited 10:42')
     await ui.unmount()
   })
 }
@@ -123,7 +123,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     await editFile($, `${ROOT}/docs/testing.md`)
     const ui = await $.ui.mount({ ...PANE, surface })
-    expect(await ui.find({ type: 'Text', text: /editado/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /edited/ })).toBeUndefined()
     await ui.unmount()
   })
 
@@ -133,7 +133,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     await $.tool.call({ tool: 'Edit', file_path: `${ROOT}/api/app/User.php`, old_string: 'a', new_string: 'b' }).catch(() => undefined)
     const ui = await $.ui.mount({ ...PANE, surface })
-    expect(await ui.find({ type: 'Text', text: /editado/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /edited/ })).toBeUndefined()
     await ui.unmount()
   })
 
@@ -143,7 +143,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     await editFile($, `${ROOT}/api/app/User.php`)
     const ui = await $.ui.mount({ ...PANE, surface })
-    expect(await ui.find({ type: 'Text', text: /editado/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /edited/ })).toBeUndefined()
     await ui.unmount()
   })
 }
@@ -211,7 +211,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(await platformRow($, surface)).toContain('test FAIL 10:43')
   })
 
-  test(`a run made before the latest edit shows as obsolete on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
+  test(`a run made before the latest edit shows as stale on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
     const world = stubWorld(on)
     await startSession($)
     await editFile($, `${ROOT}/platform/src/app.tsx`)
@@ -219,7 +219,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await runCommand($, 'just platform check')
     await world.clock.advance(MINUTE)
     await editFile($, `${ROOT}/platform/src/app.tsx`)
-    expect(await platformRow($, surface)).toContain('check obsoleto (OK 10:43)')
+    expect(await platformRow($, surface)).toContain('check stale (OK 10:43)')
   })
 }
 
@@ -230,7 +230,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await editFile($, `${ROOT}/platform/src/app.tsx`)
     await world.clock.advance(MINUTE)
     await runCommand($, 'just platform test src/app.test.tsx')
-    expect(await platformRow($, surface)).toContain('test parcial (OK 10:43)')
+    expect(await platformRow($, surface)).toContain('test partial (OK 10:43)')
   })
 
   test(`a test run with a quoted filter value shows as partial on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -239,7 +239,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await editFile($, `${ROOT}/api/app/User.php`)
     await world.clock.advance(MINUTE)
     await runCommand($, 'just api test --filter="Foo Bar"')
-    expect(await apiRow($, surface)).toContain('test parcial (OK 10:43)')
+    expect(await apiRow($, surface)).toContain('test partial (OK 10:43)')
   })
 
   test(`a test run with a quoted path shows as partial on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -248,7 +248,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await editFile($, `${ROOT}/api/app/User.php`)
     await world.clock.advance(MINUTE)
     await runCommand($, "just api test 'tests/My Test.php'")
-    expect(await apiRow($, surface)).toContain('test parcial (OK 10:43)')
+    expect(await apiRow($, surface)).toContain('test partial (OK 10:43)')
   })
 
   test(`a test run with a filter shows as partial on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -260,7 +260,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
     const row = await ui.find({ type: 'Text', text: /^api/ })
     await ui.unmount()
-    expect(row?.text).toContain('test parcial (OK 10:43)')
+    expect(row?.text).toContain('test partial (OK 10:43)')
   })
 }
 
@@ -312,14 +312,14 @@ for (const surface of ['terminal', 'desktop'] as const) {
     stubWorld(on)
     await startSession($)
     await editFile($, `${ROOT}/api/../platform/./src/app.tsx`)
-    expect(await platformRow($, surface)).toContain('editado 10:42')
+    expect(await platformRow($, surface)).toContain('edited 10:42')
   })
 
   test(`an edit path with a current directory segment marks the pillar on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
     stubWorld(on)
     await startSession($)
     await editFile($, `${ROOT}/./platform/src/app.tsx`)
-    expect(await platformRow($, surface)).toContain('editado 10:42')
+    expect(await platformRow($, surface)).toContain('edited 10:42')
   })
 
   test(`an edit path with dot segments does not mark the pillar it started in on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -460,7 +460,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     stubWorld(on)
     await startSession($)
     await editFile($, `${ROOT}/api/app/Slices/Assistant/Agents/Chat.php`)
-    expect(await evalsRow($, surface)).toBe('evals     pendiente')
+    expect(await evalsRow($, surface)).toBe('evals     pending')
   })
 }
 
@@ -478,7 +478,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     await editFile($, `${ROOT}/api/tests/Evals/AssistantToolRoutingLookupTest.php`)
     await runCommand($, 'just api evals-watch')
-    expect(await evalsRow($, surface)).toBe('evals     pendiente')
+    expect(await evalsRow($, surface)).toBe('evals     pending')
   })
 
   test(`a just api evals inside quoted text leaves the evals row on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -486,7 +486,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     await editFile($, `${ROOT}/api/tests/Evals/AssistantToolRoutingLookupTest.php`)
     await runCommand($, 'echo "x && just api evals ; y"')
-    expect(await evalsRow($, surface)).toBe('evals     pendiente')
+    expect(await evalsRow($, surface)).toBe('evals     pending')
   })
 
   test(`a full evals run piped into another command leaves the evals row on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -494,7 +494,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     await editFile($, `${ROOT}/api/tests/Evals/AssistantToolRoutingLookupTest.php`)
     await runCommand($, 'just api evals | tail')
-    expect(await evalsRow($, surface)).toBe('evals     pendiente')
+    expect(await evalsRow($, surface)).toBe('evals     pending')
   })
 
   test(`a filtered evals run leaves the evals row on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -502,7 +502,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     await editFile($, `${ROOT}/api/tests/Evals/AssistantToolRoutingLookupTest.php`)
     await runCommand($, 'just api evals --filter=Lookup')
-    expect(await evalsRow($, surface)).toBe('evals     pendiente')
+    expect(await evalsRow($, surface)).toBe('evals     pending')
   })
 
   test(`an evals edit made while a full evals run is in flight leaves the evals row on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -515,7 +515,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
       await editFile($, `${ROOT}/api/app/Slices/Assistant/Agents/Chat.php`)
     }
     await runCommand($, 'just api evals')
-    expect(await evalsRow($, surface)).toBe('evals     pendiente')
+    expect(await evalsRow($, surface)).toBe('evals     pending')
   })
 
   test(`a full evals run launched in the background leaves the evals row on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -524,7 +524,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await editFile($, `${ROOT}/api/tests/Evals/AssistantToolRoutingLookupTest.php`)
     world.engine.result = { result: { backgroundTaskId: 'task-2' } }
     await runCommand($, 'just api evals')
-    expect(await evalsRow($, surface)).toBe('evals     pendiente')
+    expect(await evalsRow($, surface)).toBe('evals     pending')
   })
 
   test(`a full evals run that finished with an error leaves the evals row on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -533,13 +533,13 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await editFile($, `${ROOT}/api/tests/Evals/AssistantToolRoutingLookupTest.php`)
     world.engine.result = { isError: true }
     await runCommand($, 'just api evals')
-    expect(await evalsRow($, surface)).toBe('evals     pendiente')
+    expect(await evalsRow($, surface)).toBe('evals     pending')
   })
 }
 
 async function headerText($: Engine, surface: 'terminal' | 'desktop') {
   const ui = await $.ui.mount({ ...PANE, surface })
-  const header = await ui.find({ type: 'Text', text: /rama/ })
+  const header = await ui.find({ type: 'Text', text: /branch/ })
   await ui.unmount()
 
   return header?.text
@@ -550,14 +550,14 @@ for (const surface of ['terminal', 'desktop'] as const) {
     stubWorld(on, { branch: 'FEAT-12-pane' })
     await startSession($)
     await editFile($, `${ROOT}/platform/src/app.tsx`)
-    expect(await headerText($, surface)).toBe('FEAT-12  (rama FEAT-12-pane)')
+    expect(await headerText($, surface)).toBe('FEAT-12  (branch FEAT-12-pane)')
   })
 
   test(`the header shows the branch alone when it carries no ticket key on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
     stubWorld(on, { branch: 'ai-audit' })
     await startSession($)
     await editFile($, `${ROOT}/platform/src/app.tsx`)
-    expect(await headerText($, surface)).toBe('rama ai-audit')
+    expect(await headerText($, surface)).toBe('branch ai-audit')
   })
 }
 
@@ -606,7 +606,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
   test(`the header shows the branch before any edit on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
     stubWorld(on, { branch: 'FEAT-12-pane' })
     await startSession($)
-    expect(await headerText($, surface)).toBe('FEAT-12  (rama FEAT-12-pane)')
+    expect(await headerText($, surface)).toBe('FEAT-12  (branch FEAT-12-pane)')
   })
 
   test(`the header follows a branch switch after the next edit on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -615,7 +615,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await editFile($, `${ROOT}/platform/src/app.tsx`)
     world.checkout.branch = 'FEAT-13-list'
     await editFile($, `${ROOT}/platform/src/app.tsx`)
-    expect(await headerText($, surface)).toBe('FEAT-13  (rama FEAT-13-list)')
+    expect(await headerText($, surface)).toBe('FEAT-13  (branch FEAT-13-list)')
   })
 }
 
@@ -631,7 +631,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     stubWorld(on, { failingGit: 'branch' })
     await startSession($)
     await editFile($, `${ROOT}/platform/src/app.tsx`)
-    expect(await platformRow($, surface)).toContain('editado 10:42')
+    expect(await platformRow($, surface)).toContain('edited 10:42')
   })
 
   test(`a git failure on the branch lookup logs what failed on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -692,7 +692,7 @@ async function recordsNothingAfterEdit($: Engine, world: ReturnType<typeof stubW
   await editFile($, `${ROOT}/platform/src/app.tsx`)
   await runCommand($, 'just platform check')
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  const row = await ui.find({ type: 'Text', text: /editado/ })
+  const row = await ui.find({ type: 'Text', text: /edited/ })
   await ui.unmount()
 
   return { row, opened: world.opened }
@@ -735,13 +735,13 @@ test('a look-alike host that ends with the configured remote records nothing', W
 test('a remote with a trailing slash still matches the configured remote', WITH_REMOTE_SETTING, async ($, on) => {
   const world = stubWorld(on, { remote: 'HTTPS://gitlab.example.com/acme/app.git/' })
   const outcome = await recordsNothingAfterEdit($, world)
-  expect(outcome.row?.text).toMatch(/^platform\s+editado 10:42/)
+  expect(outcome.row?.text).toMatch(/^platform\s+edited 10:42/)
 })
 
 test('an ssh style remote matches the configured Ember remote', WITH_REMOTE_SETTING, async ($, on) => {
   const world = stubWorld(on, { remote: 'git@gitlab.example.com:acme/app.git' })
   const outcome = await recordsNothingAfterEdit($, world)
-  expect(outcome.row?.text).toMatch(/^platform\s+editado 10:42\s+check OK 10:42/)
+  expect(outcome.row?.text).toMatch(/^platform\s+edited 10:42\s+check OK 10:42/)
 })
 
 for (const surface of ['terminal', 'desktop'] as const) {
@@ -750,7 +750,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startSession($)
     world.checkout.branch = 'FEAT-13-list'
     await runVerificationCommand($)
-    expect(await headerText($, surface)).toBe('FEAT-13  (rama FEAT-13-list)')
+    expect(await headerText($, surface)).toBe('FEAT-13  (branch FEAT-13-list)')
   })
 }
 
@@ -782,7 +782,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
     const row = await ui.find({ type: 'Text', text: /^pods/ })
     await ui.unmount()
-    expect(row?.text).toContain('editado 10:42')
+    expect(row?.text).toContain('edited 10:42')
   })
 
   test(`a written file under a pillar marks it as edited on ${surface}`, WITH_REMOTE_SETTING, async ($, on) => {
@@ -792,6 +792,6 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
     const row = await ui.find({ type: 'Text', text: /^governor/ })
     await ui.unmount()
-    expect(row?.text).toContain('editado 10:42')
+    expect(row?.text).toContain('edited 10:42')
   })
 }
