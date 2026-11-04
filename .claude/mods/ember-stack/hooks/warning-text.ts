@@ -1,6 +1,6 @@
 import type { MountedService } from '../types'
 
-const ADVICE = 'No pruebes en el navegador ni con docker compose exec.'
+const ADVICE = 'Do not test in the browser or with docker compose exec.'
 
 function groupByMount(mounts: MountedService[]): Map<string, MountedService[]> {
   const groups = new Map<string, MountedService[]>()
@@ -24,7 +24,7 @@ export function describeForeignMounts(mounts: MountedService[], worktreeRoot: st
     const [first] = group as [MountedService]
     const services = group.map(mount => mount.service).join(', ')
 
-    return `Stack: ${services} montan ${first.path} (${first.branch}). Esta sesión está en ${worktreeRoot}.`
+    return `Stack: ${services} mount ${first.path} (${first.branch}). This session is in ${worktreeRoot}.`
   })
 
   return sentences.length === 0 ? [] : [...sentences, ADVICE]

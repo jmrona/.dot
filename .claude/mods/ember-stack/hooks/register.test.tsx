@@ -120,8 +120,8 @@ for (const surface of ['terminal', 'desktop'] as const) {
     stubWorld(on, {})
     await startSession($)
     const ui = await $.ui.mount({ ...BAND, surface })
-    const line = await ui.find({ type: 'Text', text: /montan/ })
-    expect(line?.text).toBe(`Stack: api, governor, pods montan ${MAIN} (FEAT-1). Esta sesión está en ${ROOT}.`)
+    const line = await ui.find({ type: 'Text', text: /mount/ })
+    expect(line?.text).toBe(`Stack: api, governor, pods mount ${MAIN} (FEAT-1). This session is in ${ROOT}.`)
     await ui.unmount()
   })
 
@@ -204,9 +204,9 @@ test('two different mount paths give one sentence per path and the advice once a
     '/work/here',
   )
   expect(lines).toEqual([
-    'Stack: api montan /work/a (A-1). Esta sesión está en /work/here.',
-    'Stack: pods montan /work/b (B-2). Esta sesión está en /work/here.',
-    'No pruebes en el navegador ni con docker compose exec.',
+    'Stack: api mount /work/a (A-1). This session is in /work/here.',
+    'Stack: pods mount /work/b (B-2). This session is in /work/here.',
+    'Do not test in the browser or with docker compose exec.',
   ])
 })
 
@@ -219,8 +219,8 @@ test('one path mounted on different branches gives one sentence per branch', () 
     '/work/here',
   )
   expect(lines.filter(line => line.startsWith('Stack:'))).toEqual([
-    'Stack: api montan /work/a (A-1). Esta sesión está en /work/here.',
-    'Stack: pods montan /work/a (B-2). Esta sesión está en /work/here.',
+    'Stack: api mount /work/a (A-1). This session is in /work/here.',
+    'Stack: pods mount /work/a (B-2). This session is in /work/here.',
   ])
 })
 

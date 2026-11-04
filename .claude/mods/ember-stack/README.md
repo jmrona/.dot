@@ -26,7 +26,7 @@ The setting also appears as a row in the `/config` menu. A change there reloads 
 
 - It runs `just docker which` in the git top level of the session directory.
 - It parses each line as `service branch path` and skips services that are not running.
-- If a running service mounts another path, the band names the services, the path and the branch, in Spanish.
+- If a running service mounts another path, the band names the services, the path and the branch.
 - If several paths differ, the band shows one sentence per path, then one line of advice.
 - If everything matches, or nothing runs, the band draws nothing.
 - If the command fails, the band draws nothing and the error goes to the log.
@@ -46,7 +46,6 @@ The mod keeps one value, `ember-stack.reading`, which holds the worktree root an
 
 - The stack is read at session start, after matching Bash calls and on `/stack`. A change made elsewhere shows after the next refresh.
 - A Bash command matches by a plain text search, so it can refresh when `docker` only appears in an argument.
-- The advice text assumes that the reader prefers Spanish.
 
 ## Tests
 
