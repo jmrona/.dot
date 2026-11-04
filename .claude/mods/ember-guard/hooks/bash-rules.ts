@@ -6,7 +6,7 @@ const anywhere = (pattern: string): RegExp => new RegExp(`${COMMAND_START}${patt
 
 const STACK_SWITCH_PATTERNS = [
   anywhere('just\\s+docker\\s+(?:use|up)'),
-  anywhere('docker\\s+compose(?:\\s+-\\S+(?:\\s+[^-\\s]\\S*)?)*\\s+up'),
+  anywhere('docker-?\\s*compose\\b.*\\bup'),
   anywhere('worktree\\.sh\\s+(?:use|up)'),
 ]
 

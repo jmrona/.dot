@@ -6,7 +6,8 @@
     "emberRemote": {
       "type": "string",
       "title": "Ember remote",
-      "description": "Host and path of the Ember git remote, without scheme, for example gitlab.example.com/acme/app. Leave empty to turn the mod off."
+      "description": "Host and path of the Ember repository remote, without a scheme, for example gitlab.example.com/acme/app. Leave empty to turn the mod off.",
+      "required": false
     }
   }
 }

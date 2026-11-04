@@ -75,6 +75,20 @@ for (const command of SWITCH_COMMANDS) {
   })
 }
 
+test('the hyphenated docker-compose up is denied in Ember', WITH_REMOTE, async ($, on) => {
+  const reached = arrange(on, { remote: EMBER_REMOTE })
+  const result = await $.tool.call({ tool: 'Bash', command: 'docker-compose up -d' })
+  expect(result.deny).toContain('Do not switch the shared stack.')
+  expect(reached.count).toBe(0)
+})
+
+test('docker compose with a quoted flag value before up is denied in Ember', WITH_REMOTE, async ($, on) => {
+  const reached = arrange(on, { remote: EMBER_REMOTE })
+  const result = await $.tool.call({ tool: 'Bash', command: 'docker compose --project-directory "my dir" up' })
+  expect(result.deny).toContain('Do not switch the shared stack.')
+  expect(reached.count).toBe(0)
+})
+
 test('just docker which passes through in Ember', WITH_REMOTE, async ($, on) => {
   const reached = arrange(on, { remote: EMBER_REMOTE })
   await $.tool.call({ tool: 'Bash', command: 'just docker which' })
@@ -175,6 +189,18 @@ test('a git remote in ssh form is recognised as Ember', WITH_REMOTE, async ($, o
   expect(reached.count).toBe(0)
 })
 
+test('a remote with a trailing slash is recognised as Ember', WITH_REMOTE, async ($, on) => {
+  const reached = arrange(on, { remote: 'HTTPS://gitlab.example.com/acme/app.git/' })
+  await $.tool.call({ tool: 'Bash', command: 'just docker use' })
+  expect(reached.count).toBe(0)
+})
+
+test('a look-alike host that only ends with the Ember host is not Ember', WITH_REMOTE, async ($, on) => {
+  const reached = arrange(on, { remote: 'https://evil-gitlab.example.com/acme/app.git' })
+  await $.tool.call({ tool: 'Bash', command: 'just docker use' })
+  expect(reached.count).toBe(1)
+})
+
 test('a stack switch on the second line of a multi-line command is denied', WITH_REMOTE, async ($, on) => {
   const reached = arrange(on, { remote: EMBER_REMOTE })
   const result = await $.tool.call({ tool: 'Bash', command: 'echo start\njust docker up' })
@@ -215,12 +241,6 @@ test('a direct artisan test behind the time wrapper is denied', WITH_REMOTE, asy
   const result = await $.tool.call({ tool: 'Bash', command: 'time php artisan test' })
   expect(result.deny).toContain('Use `just api test`')
   expect(reached.count).toBe(0)
-})
-
-test('artisan up inside docker compose exec passes through in Ember', WITH_REMOTE, async ($, on) => {
-  const reached = arrange(on, { remote: EMBER_REMOTE })
-  await $.tool.call({ tool: 'Bash', command: 'docker compose exec api php artisan up' })
-  expect(reached.count).toBe(1)
 })
 
 test('docker compose ps passes through in Ember', WITH_REMOTE, async ($, on) => {

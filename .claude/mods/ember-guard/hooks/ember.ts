@@ -1,9 +1,9 @@
 import type { EngineInterface } from 'claude-code'
 
-function normalisedRemote(remote: string): string {
+function normaliseRemote(remote: string): string {
   return remote
     .trim()
-    .replace(/^[a-z+]+:\/\//, '')
+    .replace(/^[a-z+]+:\/\//i, '')
     .replace(/^[^@/]+@/, '')
     .replace(':', '/')
     .replace(/\/+$/, '')
@@ -11,7 +11,11 @@ function normalisedRemote(remote: string): string {
 }
 
 export function isEmberRemote(remote: string | null, emberRemote: string): boolean {
-  return remote !== null && normalisedRemote(remote).endsWith(normalisedRemote(emberRemote))
+  const expected = normaliseRemote(emberRemote)
+  if (remote === null || expected === '') return false
+  const actual = normaliseRemote(remote)
+
+  return actual === expected || actual.endsWith(`/${expected}`)
 }
 
 export async function isInEmber($: EngineInterface, emberRemote: string): Promise<boolean> {
