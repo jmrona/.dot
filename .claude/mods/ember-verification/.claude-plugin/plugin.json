@@ -1,0 +1,14 @@
+{
+  "name": "ember-verification",
+  "version": "0.1.0",
+  "description": "Shows in a pane which Ember pillars have fresh check and test runs since their last edit.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "emberRemote": {
+      "type": "string",
+      "title": "Ember remote",
+      "description": "Host and path of the Ember repository remote, without a scheme, for example gitlab.example.com/acme/app. Leave empty to turn the mod off.",
+      "required": false
+    }
+  }
+}
