@@ -1,0 +1,1 @@
+{ "name": "git-guard", "version": "0.1.0", "description": "Refuses git pushes and Co-Authored-By trailers in commits." }
