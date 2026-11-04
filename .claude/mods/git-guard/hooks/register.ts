@@ -12,11 +12,18 @@ const GIT_PUSH = gitSubcommand('push')
 const GIT_COMMIT = gitSubcommand('commit')
 const CO_AUTHORED_BY = /co-authored-by/i
 
+const QUOTED_OR_ESCAPED = /\\[\s\S]|"(?:\\[\s\S]|[^"\\])*"|'[^']*'/g
+
+const withoutQuotedText = (segment: string) => segment.replace(QUOTED_OR_ESCAPED, '')
+
 const segmentsOf = (command: string) =>
   command.split(/&&|\|\||;|\||\n/).map(segment => segment.trim())
 
 const denialFor = (command: string) => {
-  const segments = segmentsOf(command)
+  const segments = [
+    ...segmentsOf(withoutQuotedText(command)),
+    ...segmentsOf(command).map(withoutQuotedText),
+  ]
   if (segments.some(segment => GIT_PUSH.test(segment))) return PUSH_DENIAL
   const hasCommit = segments.some(segment => GIT_COMMIT.test(segment))
   return hasCommit && CO_AUTHORED_BY.test(command) ? TRAILER_DENIAL : undefined

@@ -8,7 +8,7 @@ It acts in every repository. It does no Ember detection.
 
 ## What it hooks
 
-It guards `tool.call` for `Bash`. The mod splits each command into segments on `&&`, `||`, `;`, `|` and newlines. It then looks for a `git` word anywhere in each segment, followed by any options and then `push` or `commit`. Wrappers such as `sudo` and subshells such as `(git push)` are caught. A quoted mention of `git push` can be denied too, because false positives are safe.
+It guards `tool.call` for `Bash`. The mod splits each command into segments on `&&`, `||`, `;`, `|` and newlines. It then looks for a `git` word anywhere in each segment, followed by any options and then `push` or `commit`. Wrappers such as `sudo` and subshells such as `(git push)` are caught. Before matching, it removes quoted text and backslash-escaped characters, so options such as `-c user.name="A B"` and `-C my\ dir` do not hide the subcommand. A commit message that only mentions push passes.
 
 - A segment that runs `git push` in any form is denied. This includes `git -C <dir> push` and `git push --force`.
 - A `git commit` whose command holds `Co-Authored-By`, in any letter case, is denied. This covers `-m` text and heredocs.
@@ -19,6 +19,7 @@ If the hook itself fails, the guard denies the call.
 ## Known limits
 
 - Matching is best effort. A push built through a shell variable, a script or an alias is not caught.
+- A `git commit -F <file>` whose file holds `Co-Authored-By` passes, because the guard reads only the command text.
 - Your own `!` commands do not pass through `tool.call`, so the guard stops only the model and its subagents.
 
 ## Tests

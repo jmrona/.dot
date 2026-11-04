@@ -92,3 +92,40 @@ test('git status reaches the tool unchanged', async ($, on) => {
   expect(answer.deny).toBeUndefined()
   expect(received).toEqual(['git status'])
 })
+
+test('a git push with a quoted config value holding a space is denied', async ($, on) => {
+  on('tool.call', () => ({ result: {} }))
+  const answer = await $.tool.call({ tool: 'Bash', command: 'git -c user.name="A B" push' })
+  expect(answer.deny).toContain(PUSH_DENIAL)
+})
+
+test('a git push with a single-quoted config value holding a space is denied', async ($, on) => {
+  on('tool.call', () => ({ result: {} }))
+  const answer = await $.tool.call({ tool: 'Bash', command: "git -c a='x y' push" })
+  expect(answer.deny).toContain(PUSH_DENIAL)
+})
+
+test('a git push with a backslash-escaped space in a directory option is denied', async ($, on) => {
+  on('tool.call', () => ({ result: {} }))
+  const answer = await $.tool.call({ tool: 'Bash', command: 'git -C my\\ dir push' })
+  expect(answer.deny).toContain(PUSH_DENIAL)
+})
+
+test('a commit with a quoted config value carrying Co-Authored-By is denied', async ($, on) => {
+  on('tool.call', () => ({ result: {} }))
+  const command = 'git -c user.name="A B" commit -m "x Co-Authored-By: y"'
+  const answer = await $.tool.call({ tool: 'Bash', command })
+  expect(answer.deny).toContain(TRAILER_DENIAL)
+})
+
+test('a commit message that mentions push reaches the tool unchanged', async ($, on) => {
+  on('tool.call', () => ({ result: {} }))
+  const answer = await $.tool.call({ tool: 'Bash', command: 'git commit -m "git push now"' })
+  expect(answer.deny).toBeUndefined()
+})
+
+test('a git push with a quoted config value holding a semicolon is denied', async ($, on) => {
+  on('tool.call', () => ({ result: {} }))
+  const answer = await $.tool.call({ tool: 'Bash', command: 'git -c a="x;y" push' })
+  expect(answer.deny).toContain(PUSH_DENIAL)
+})
