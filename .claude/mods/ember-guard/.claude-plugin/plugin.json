@@ -1,0 +1,12 @@
+{
+  "name": "ember-guard",
+  "version": "0.1.0",
+  "description": "Blocks stack switching, edits to generated code and direct php artisan test in the Ember repository.",
+  "userConfig": {
+    "emberRemote": {
+      "type": "string",
+      "title": "Ember remote",
+      "description": "Host and path of the Ember git remote, without scheme, for example gitlab.example.com/acme/app. Leave empty to turn the mod off."
+    }
+  }
+}
