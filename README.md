@@ -40,7 +40,7 @@ Mods are Claude Code function-hook plugins. They live in `.claude/mods/<mod>/`, 
 
 | Mod | What it does | Scope |
 | --- | --- | --- |
-| `git-guard` | Stops the model and its subagents from pushing and from adding `Co-Authored-By` trailers. | Any repository |
+| `git-guard` | Stops the model and its subagents from pushing, adding `Co-Authored-By` trailers, running destructive git commands, writing commit messages outside the format and committing secret files. | Any repository |
 | `waves` | Shows the subagents that the main loop spawns, grouped in waves, in a pane beside the chat. | Any repository |
 | `ember-guard` | Blocks commands that switch the shared Docker stack, edits to generated code and `php artisan test`. | Ember only |
 | `ember-evals-budget` | Allows one full `just api evals` run, then asks for `/allow-evals` before another. | Ember only |

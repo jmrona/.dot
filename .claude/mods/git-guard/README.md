@@ -1,6 +1,6 @@
 # git-guard
 
-This mod stops the model and its subagents from pushing and from adding a Co-Authored-By trailer to commits. It enforces `rules/common/git.md`.
+This mod stops the model and its subagents from breaking the rules in `rules/common/git.md`. It refuses pushes, destructive git commands, badly formatted commit messages and commits of secret files.
 
 ## Where it acts
 
@@ -8,18 +8,85 @@ It acts in every repository. It does no Ember detection.
 
 ## What it hooks
 
-It guards `tool.call` for `Bash`. The mod splits each command into segments on `&&`, `||`, `;`, `|` and newlines. It then looks for a `git` word anywhere in each segment, followed by any options and then `push` or `commit`. Wrappers such as `sudo` and subshells such as `(git push)` are caught. Before matching, it removes quoted text and backslash-escaped characters, so options such as `-c user.name="A B"` and `-C my\ dir` do not hide the subcommand. A commit message that only mentions push passes.
+It guards `tool.call` for `Bash`. The mod splits each command into segments on `&&`, `||`, `;`, `|`, `|&`, a lone `&` and newlines. It then looks for a `git` word anywhere in each segment, followed by any options and then the subcommand. Wrappers such as `sudo` and subshells such as `(git push)` are caught. Before matching, it removes quoted text and backslash-escaped characters, so options such as `-c user.name="A B"` and `-C my\ dir` do not hide the subcommand.
 
-- A segment that runs `git push` in any form is denied. This includes `git -C <dir> push` and `git push --force`.
-- A `git commit` whose command holds `Co-Authored-By`, in any letter case, is denied. This covers `-m` text and heredocs.
-- Every other command passes through unchanged.
+## What it denies
 
-If the hook itself fails, the guard denies the call.
+- `git push` in any form, including `git -C <dir> push` and `git push --force`.
+- A `git commit` whose command holds `Co-Authored-By`, in any letter case. This covers `-m` text and heredocs.
+- Destructive commands: `git reset --hard`, `git checkout -- <file>`, `git checkout .`, `git checkout -f`, `git switch -f`, `git switch --force`, `git switch --discard-changes`, `git restore` that touches the working tree, `git clean -f`, `git branch -D` (and `--delete --force`), `git stash drop`, `git stash clear` and `git tag -d`.
+- An amend (`git commit --amend`) of a commit that the upstream branch already contains.
+- A `git rebase` of a branch that has an upstream. The `--continue`, `--abort`, `--skip` and `--quit` forms pass.
+- A commit message that breaks the Conventional Commits format.
+- A commit that includes a secret file.
+
+Every other command passes through unchanged. If the hook itself fails, the guard denies the call. The mod has no slash commands and keeps no state.
+
+### Destructive denials
+
+A destructive denial tells the model to ask you. It also tells the model to hand you the command, so that you can run it yourself with `! <command>`. The mod does not print the command itself.
+
+### Commit message format
+
+The guard checks every `-m` or `--message` text, including heredocs in `$(cat <<'EOF' ... EOF)`. The subject must follow these rules:
+
+- It starts with a type: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`, `build`, `style` or `revert`.
+- It has a lowercase scope in brackets, then `: ` and a description that starts in lowercase.
+- It does not end with a full stop.
+- It ends with the ticket key in brackets when the branch name starts with a ticket key. For branch `FEAT-1-fix-tabs`, the suffix is `(FEAT-1)`.
+- It takes no suffix when the branch name has no ticket key, such as `main`.
+- Subjects that start with `Merge ` skip the subject-shape checks. The dash and emoji check still applies.
+
+The whole message must not contain em-dashes, en-dashes or emojis. The guard denies a message whose text starts with a shell expansion. Examples are `$VAR`, `$'...'` and `$(...)` other than the heredoc. The denial gives its own reason.
+
+### Secret files
+
+When a command runs `git commit`, the guard collects the paths that the commit can include. This covers the staged paths and the paths that the command line names, with or without `--`. It skips message and value-flag arguments and redirect targets. It denies the commit if any file name is one of these:
+
+- `.env`, or `.env.` followed by a suffix such as `.env.local`.
+- A key file ending in `.pem`, `.key`, `.p12` or `.pfx`.
+- `id_rsa` or `id_ed25519`.
+
+The templates `.env.example`, `.env.sample`, `.env.dist` and `.env.template` pass. The denial lists the names that matched and says how to unstage them.
+
+## Order of checks
+
+The first denial wins. The guard checks in this order:
+
+1. Push.
+2. Destructive commands.
+3. Amend of a pushed commit and rebase of a pushed branch.
+4. Secret files at commit.
+5. Commit message format.
+6. Co-Authored-By.
+
+## Git queries it runs
+
+The guard runs git in the session directory. It runs a query only when the command needs it.
+
+- `git rev-parse --abbrev-ref @{u}` for a rebase, to find out whether the branch has an upstream.
+- `git merge-base --is-ancestor HEAD @{u}` for an amend, to find out whether the upstream contains HEAD.
+- `git diff --cached --name-only -z` for a commit, to list the staged paths.
+- `git diff --name-only -z` for `git commit -a`, to list the unstaged tracked paths.
+- `git status --porcelain -z --untracked-files=all` when the command also runs `git add`, to list the paths that the add can stage.
+- `git branch --show-current` for a commit with a message, to read the ticket key.
+
+A command that is not git runs no git process.
 
 ## Known limits
 
-- Matching is best effort. A push built through a shell variable, a script or an alias is not caught.
-- A `git commit -F <file>` whose file holds `Co-Authored-By` passes, because the guard reads only the command text.
+- The guard matches on a best-effort basis: it does not catch a command built through a shell variable, a script or an alias.
+- The guard removes quoted text before matching, so `bash -c "git reset --hard"` and `git reset "--hard"` pass.
+- The guard runs its git checks in the session directory, so it checks `git -C other commit` against the session repository.
+- The guard does not catch `git reset <other-branch>` without `--hard`.
+- The guard reads the branch, the upstream and the index before the command runs, so it checks the old branch for `git switch X && git commit`.
+- The guard does not check a `--` used as prose punctuation in a commit body.
+- The guard does not check the format of a commit without a message flag (an editor or `-F`). A `-F` file that holds `Co-Authored-By` passes.
+- The guard does not unquote mid-word quoting in a path after `--`, such as `".e"nv`.
+- The guard blocks a `git add ... && git commit` when an untracked, unignored secret file exists, even if the add does not name it.
+- The guard reads unquoted heredoc or `echo` text as a command, so it denies `echo git reset --hard`.
+- The guard does not catch other history-changing commands such as `git reset --merge`, `git branch -f`, `git rm -rf`, `git worktree remove --force` and `git update-ref -d`.
+- The guard does not read an expansion inside the message, so `-m "feat(app): x $(date)"` passes the format check.
 - Your own `!` commands do not pass through `tool.call`, so the guard stops only the model and its subagents.
 
 ## Tests
