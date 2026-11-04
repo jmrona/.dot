@@ -7,7 +7,7 @@ import {
   REQUIRED_DENY_ENTRIES,
   findBrokenHooks,
   findBrokenReferences,
-  findMissingBashBlockHook,
+  findMissingGitGuard,
   findInvalidRuleFrontmatter,
   findMissingDenyEntries,
 } from './integrity.mjs'
@@ -277,48 +277,14 @@ test('findBrokenHooks sends a benign Bash payload on stdin', () => {
   assert.deepEqual(findBrokenHooks(harnessDir), [])
 })
 
-function settingsWithBashHook(hook) {
-  return { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: '~/.claude/hooks/block-git-commands.mjs', ...hook }] }] } }
-}
-
-test('a PreToolUse Bash hook with onFailure block produces no failure', () => {
+test('the git-guard check passes when the mod entry file exists', () => {
   const harnessDir = makeHarnessDir()
-  writeSettings(harnessDir, settingsWithBashHook({ onFailure: 'block' }))
-  assert.deepEqual(findMissingBashBlockHook(harnessDir), [])
+  writeFile(harnessDir, 'mods/git-guard/hooks/hooks.json', '{}')
+  assert.deepEqual(findMissingGitGuard(harnessDir), [])
 })
 
-test('a PreToolUse Bash hook without onFailure block is reported by name', () => {
-  const harnessDir = makeHarnessDir()
-  writeSettings(harnessDir, settingsWithBashHook({}))
-  const failures = findMissingBashBlockHook(harnessDir)
+test('the git-guard check names the missing mod entry file', () => {
+  const failures = findMissingGitGuard(makeHarnessDir())
   assert.equal(failures.length, 1)
-  assert.match(failures[0], /PreToolUse Bash hook with onFailure block/)
-})
-
-test('settings without any hooks report the missing PreToolUse Bash hook', () => {
-  const harnessDir = makeHarnessDir()
-  writeSettings(harnessDir, {})
-  assert.equal(findMissingBashBlockHook(harnessDir).length, 1)
-})
-
-test('a Grep matcher hook does not satisfy the PreToolUse Bash hook check', () => {
-  const harnessDir = makeHarnessDir()
-  const settings = settingsWithBashHook({ onFailure: 'block' })
-  settings.hooks.PreToolUse[0].matcher = 'Grep|Glob'
-  writeSettings(harnessDir, settings)
-  assert.equal(findMissingBashBlockHook(harnessDir).length, 1)
-})
-
-test('a missing settings file yields a Bash hook failure instead of throwing', () => {
-  const failures = findMissingBashBlockHook(makeHarnessDir())
-  assert.equal(failures.length, 1)
-  assert.match(failures[0], /settings\.json/)
-})
-
-test('a Bash hook with onFailure block that runs another script is reported', () => {
-  const harnessDir = makeHarnessDir()
-  writeSettings(harnessDir, settingsWithBashHook({ onFailure: 'block', command: '~/.claude/hooks/other-guard' }))
-  const failures = findMissingBashBlockHook(harnessDir)
-  assert.equal(failures.length, 1)
-  assert.match(failures[0], /block-git-commands/)
+  assert.match(failures[0], /mods\/git-guard\/hooks\/hooks\.json/)
 })

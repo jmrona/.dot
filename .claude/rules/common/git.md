@@ -26,15 +26,11 @@ You **MUST NOT** run `git push` (or any variant) under any circumstances. The us
 
 You **MUST NOT** run destructive version control commands without explicit, specific permission from the user for that exact action. Permission for one destructive action is not permission for another.
 
-The `block-git-commands.mjs` hook blocks `git reset --hard`, `git clean -f`, `git checkout .`, `git restore .`, `git branch -D` and `git rebase`. If you need one of them, ask the user to run it.
+The `git-guard` mod blocks `git reset --hard`, `git clean -f`, `git branch -D`, `git stash drop`, `git stash clear` and `git tag -d`. It also blocks commands that discard working-tree changes, such as `git checkout -- <file>`, `git checkout .`, `git checkout -f`, `git switch -f` and `git restore`. It blocks an amend of a pushed commit and a rebase of a branch that has an upstream. If you need one of them, ask the user to run it.
 
-**Destructive commands** the hook does not block include but are not limited to:
+**Destructive commands** that `git-guard` does not block include but are not limited to:
 
 - `git reset` onto a different branch, without `--hard`
-- `git checkout -- <file>` / `git restore <file>` that discards working-tree changes
-- `git commit --amend` on commits that have already been pushed
-- `git stash drop` / `git stash clear`
-- `git tag -d` of pushed tags
 - Any `rm` or file deletion of tracked files intended as part of version control
 
 Anything else read-only or non-destructive (`git status`, `git log`, `git diff`, `git add`, `git commit`, `git fetch`, `git switch <existing-branch>`, `git stash push`) is permitted as part of workflows the user has asked you to perform.

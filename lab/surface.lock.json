@@ -6,12 +6,6 @@
       "alwaysLoaded": false,
       "executable": false
     },
-    "hooks/block-git-commands.mjs": {
-      "sha256": "3e8add29dac4684f97b74d3557a323eb17b32c1b9c113ab3b18864cc6f85b99b",
-      "words": 1836,
-      "alwaysLoaded": false,
-      "executable": true
-    },
     "hooks/cbm-code-discovery-gate": {
       "sha256": "be3cd7e4f809207c3fc222e69b29e1059086a5d604702e7ce89939270415fae7",
       "words": 56,
@@ -23,6 +17,318 @@
       "words": 116,
       "alwaysLoaded": false,
       "executable": true
+    },
+    "mods/ember-evals-budget/.claude-plugin/plugin.json": {
+      "sha256": "8f9294ef3627e561fe508d5eb664dfb95d79394f1f5ab9976072b1c2caf9a40a",
+      "words": 56,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-evals-budget/README.md": {
+      "sha256": "9652925bbcf9bdacaa3d339fa585713986a9cf3ad2ab927471b05f5b0115cb62",
+      "words": 658,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-evals-budget/hooks/ember-detection.ts": {
+      "sha256": "e7e74b601efdb2ce22b46e62030a2925f1900e8cad9bdad61e0fc23f1de2298b",
+      "words": 54,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-evals-budget/hooks/hooks.json": {
+      "sha256": "c835c92d8e1159d20a40ca78ad654da7433942c3694ffeda0b376b0c4dfd52cf",
+      "words": 4,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-evals-budget/hooks/register.test.ts": {
+      "sha256": "cec00b969255b1efabe5d6e7b917a8d685f19d572d56f122ace0e4d6adb9e464",
+      "words": 1354,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-evals-budget/hooks/register.ts": {
+      "sha256": "938ba95f96d4308b63d288d3e33d9c399fb4391de08fbffd2a0c58e0b80b1591",
+      "words": 398,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-evals-budget/types/index.d.ts": {
+      "sha256": "edbe351a51d322ab38c7164be3c9e0c09531e23fa582107c58f38411520cec72",
+      "words": 26,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-guard/.claude-plugin/plugin.json": {
+      "sha256": "fab8b7bb49521132ecba7851ae4d55f779061948be04ae3c34d4df37f48c4773",
+      "words": 58,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-guard/README.md": {
+      "sha256": "6fc6dc228c6ba0bdb60b7c83e6d1f648e6afb80ecafd0ef23a9e230de95bd4e5",
+      "words": 455,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-guard/hooks/bash-rules.ts": {
+      "sha256": "50ce71fe8954fe63d968636dbc6bd8bdf957f59082ff588162416cef05770fda",
+      "words": 80,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-guard/hooks/ember.ts": {
+      "sha256": "2f57f1e1f29c046073d910dfd536c896b0dc47c8cb32a001c67730ab98b6c70a",
+      "words": 83,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-guard/hooks/generated-paths.ts": {
+      "sha256": "8aa249f17f9940384e772ef0f3c54ca99a6904f6e73c125391b30b0bfac2e1ed",
+      "words": 324,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-guard/hooks/hooks.json": {
+      "sha256": "c835c92d8e1159d20a40ca78ad654da7433942c3694ffeda0b376b0c4dfd52cf",
+      "words": 4,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-guard/hooks/register.test.ts": {
+      "sha256": "2232609400be5a85fe578ea9655d03b74e5fb1d97bb0d0e27326cfb070984ff5",
+      "words": 1717,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-guard/hooks/register.ts": {
+      "sha256": "3a8bb81c7958b7fb2db1568e7316b5562eb3a1f9d5427f11fbf11ca8c7e810cc",
+      "words": 275,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-stack/.claude-plugin/plugin.json": {
+      "sha256": "98303bd9fadb3ce1e153b1d8939f93783ce56b371725e70287f893773c0df1fb",
+      "words": 57,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-stack/README.md": {
+      "sha256": "cdbfa3426cb647b93b75fe240f41598801f86f4fce570b4a13bd8d270719790c",
+      "words": 442,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-stack/hooks/ember-detection.ts": {
+      "sha256": "e7e74b601efdb2ce22b46e62030a2925f1900e8cad9bdad61e0fc23f1de2298b",
+      "words": 54,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-stack/hooks/hooks.json": {
+      "sha256": "d842d789476d67282d0f04b7e5fdc68a3d981ccec65dd79cfa2d11eed13fb828",
+      "words": 4,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-stack/hooks/register.test.tsx": {
+      "sha256": "cc90f37c393df29c54cf5b97ac24df697b935e5d83c597466c9cb03eed45a379",
+      "words": 1404,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-stack/hooks/register.tsx": {
+      "sha256": "c09a0b1614cdb9ef57f454fd9573f5bb4d357d2ed0881b363299e7fdb1720cc1",
+      "words": 374,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-stack/hooks/warning-text.ts": {
+      "sha256": "28f1b9f3f2990dd2d955f9f7417793249575274559919031ec4666ea05959aa0",
+      "words": 120,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-stack/hooks/which-output.ts": {
+      "sha256": "1d3cadef49caa276214fd0124e775c093a3566a46305d27d313316bef4b5ff83",
+      "words": 45,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-stack/types/index.d.ts": {
+      "sha256": "785ea1f55ea303164e86ca0cf9f8292b5f40e9fda14c5e505123f27890edf117",
+      "words": 38,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-verification/.claude-plugin/plugin.json": {
+      "sha256": "b2e8c88f8013caa55d5a793172d6c4c713b2ad6ef47bc3f96d7a16cf23984647",
+      "words": 61,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-verification/README.md": {
+      "sha256": "a3c6f775b14d3a686ea62082b2217b8efe1ff51a401cf715d766a13792bdd72b",
+      "words": 897,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-verification/hooks/ember-detection.ts": {
+      "sha256": "e7e74b601efdb2ce22b46e62030a2925f1900e8cad9bdad61e0fc23f1de2298b",
+      "words": 54,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-verification/hooks/hooks.json": {
+      "sha256": "d842d789476d67282d0f04b7e5fdc68a3d981ccec65dd79cfa2d11eed13fb828",
+      "words": 4,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-verification/hooks/just-runs.ts": {
+      "sha256": "3ab86c8543a426c092250549e5124f9a2141a54fac708e6441cc408bc5da507c",
+      "words": 262,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-verification/hooks/register.test.tsx": {
+      "sha256": "39800258bf57df6910b63bec4d8e5665fdeb0697c5287a63a7a8b49c005fa22d",
+      "words": 3700,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-verification/hooks/register.tsx": {
+      "sha256": "2bee826f08a44ea35db4680868d802f168c3e6087d775cab8f7e29d592411ed5",
+      "words": 1110,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/ember-verification/types/index.d.ts": {
+      "sha256": "9ff3eb460d08012c8c04269edea6d8c8d8351c5d12b44d07acdcb2ce100ca212",
+      "words": 81,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/.claude-plugin/plugin.json": {
+      "sha256": "a397742ce0ca0227996901e14a96108694f5b39ccf77d3597c36414684512b4c",
+      "words": 20,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/README.md": {
+      "sha256": "da8a576763c22d99bc335937b8d594c31edd04eb404127f179a778796afd3259",
+      "words": 1130,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/command-text.test.ts": {
+      "sha256": "7a4dc08376a765038df56ca2b8fffa92e9e2a94e113536eac5b2c2e7e90b40c3",
+      "words": 450,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/command-text.ts": {
+      "sha256": "ee00d020706aefc0a4fbea617448972ef66faa0c4be9d5873f27396b1a3fc5ff",
+      "words": 93,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/commit-message.test.ts": {
+      "sha256": "2765b9112a18720c861c50bcd8341217eadfb97d4f8112d448dfb366151cf718",
+      "words": 1266,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/commit-message.ts": {
+      "sha256": "94379e64955d9aa9c828d14be83da1a1ac93c0143d68aa624bc608931c12fc79",
+      "words": 1035,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/destructive-commands.test.ts": {
+      "sha256": "725d114bb96f9b2f46f6dbb11fed764d0adfe43864fe5bb0cfee0e70c99d6f3d",
+      "words": 1044,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/destructive-commands.ts": {
+      "sha256": "6674c39dfa1f83173c12a449b199c51a966e0bd103203fa4eab13dfb8afb9ac2",
+      "words": 473,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/hooks.json": {
+      "sha256": "c835c92d8e1159d20a40ca78ad654da7433942c3694ffeda0b376b0c4dfd52cf",
+      "words": 4,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/register.test.ts": {
+      "sha256": "ab70868ead14eed5987c69144eb74bbe08208d125589f8429dfe460932334124",
+      "words": 1435,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/register.ts": {
+      "sha256": "d970ad6f402d6fb0a594199a19de0fd91ae8361a5bd8c3eb391835f1a0d00764",
+      "words": 234,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/run-git.ts": {
+      "sha256": "5d5e0598ed75a2d9c2c53e96b31e01886e80ccfa1f70d176738475cb78aa93a6",
+      "words": 20,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/staged-secrets.test.ts": {
+      "sha256": "1b0288bd1f111795a9d52d188076215df1754ebdec1a81863bd9dfaa02524081",
+      "words": 1533,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/git-guard/hooks/staged-secrets.ts": {
+      "sha256": "b68512f0a4ebc1499eac4b1b1d97318b2b098871b20cba82002bf91124ea0294",
+      "words": 621,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/waves/.claude-plugin/plugin.json": {
+      "sha256": "082995526e42290189b2d2d3a1e0058eba5ee477b8c9795f7aa12d4cceace6a4",
+      "words": 25,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/waves/README.md": {
+      "sha256": "5c8cebd7e3a2d73f875767a87d2e2c6309ad70a2197a9288db2e7655d40ce3a3",
+      "words": 477,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/waves/hooks/hooks.json": {
+      "sha256": "d842d789476d67282d0f04b7e5fdc68a3d981ccec65dd79cfa2d11eed13fb828",
+      "words": 4,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/waves/hooks/register.test.tsx": {
+      "sha256": "bb3355e8a97f963d4e72e4686ce73a140fa19bc110e4673c8ef13e741131bb40",
+      "words": 1537,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/waves/hooks/register.tsx": {
+      "sha256": "7bf6ed71e488b89fd10e6a343b36ec0cdbd75dc486d012d39387218cb14eeed0",
+      "words": 619,
+      "alwaysLoaded": false,
+      "executable": false
+    },
+    "mods/waves/types/index.d.ts": {
+      "sha256": "2d2556bf17f333b4cb7880d18c68cfbd8e4458795ed9e41f310680864baa0c38",
+      "words": 49,
+      "alwaysLoaded": false,
+      "executable": false
     },
     "rules/common/ambiguity.md": {
       "sha256": "eea48ea6d02f1cec11ee1a20c5d3d1fd2d605ac43abbb6df16ca6cd776b480be",
@@ -49,8 +355,8 @@
       "executable": false
     },
     "rules/common/git.md": {
-      "sha256": "6732075a10b1fcd94c6cb49d418491de24e75f1ec8d627fc9a062d9fa139651e",
-      "words": 383,
+      "sha256": "76b973782a4cc5e79f13e0abb132ebb80e309f96499d3056f79ce63af4d45b6c",
+      "words": 389,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -205,8 +511,8 @@
       "executable": false
     },
     "settings.json": {
-      "sha256": "55c601971cc88f9c10d7b54d2553ae55d715ec4db3daa51cd2d5857f375e3105",
-      "words": 221,
+      "sha256": "32833985df82026f6e8332f28469b3a96d15ee04f09b7f8fb069ab73ac45746c",
+      "words": 209,
       "alwaysLoaded": false,
       "executable": false
     },
@@ -434,8 +740,8 @@
       "executable": false
     },
     "skills/test-driven-development/ember-platform-test-value.md": {
-      "sha256": "f6525a511f74ded932e68e795afbe9d88b98977a89c34ca5753374458919fea5",
-      "words": 363,
+      "sha256": "d049007901a634a53dd24aabccd12595574fbd796373bfe30d4afb7ca4664d53",
+      "words": 663,
       "alwaysLoaded": false,
       "executable": false
     },
@@ -472,5 +778,5 @@
       "executable": false
     }
   },
-  "alwaysLoadedWords": 6120
+  "alwaysLoadedWords": 6126
 }

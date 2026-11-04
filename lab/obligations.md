@@ -205,11 +205,11 @@ Rows with strength IMPERATIVE are instructions that carry no modal verb of their
 | GIT-13 | [Body (optional):] Explain *why*, not *what* (the diff shows the what) | IMPERATIVE | commit-msg skill, Full Commit Message Format, Body |
 | GIT-14 | [Body:] Wrap at 72 characters | IMPERATIVE | commit-msg skill, Format (optional body, "wrapped at 72 chars") |
 | GIT-15 | [Body:] Reference tickets or issues where relevant | IMPERATIVE | commit-msg skill, Full Commit Message Format, Body |
-| GIT-16 | You MUST NOT run `git push` (or any variant) under any circumstances. | MUST NOT | git.md, Pushes Are Forbidden, and block-git-commands.mjs hook (blocks every git push) |
+| GIT-16 | You MUST NOT run `git push` (or any variant) under any circumstances. | MUST NOT | git.md, Pushes Are Forbidden, and git-guard mod (blocks every git push, including inside sh -c) |
 | GIT-17 | If a workflow appears to require a push (e.g. opening a pull request), stop and tell the user what needs to... | IMPERATIVE | git.md, Pushes Are Forbidden |
 | GIT-18 | You MUST NOT run destructive version control commands without explicit, specific permission from the user for... | MUST NOT | git.md, Destructive Commands Are Forbidden |
 | GIT-19 | Permission for one destructive action is not permission for another. | IMPERATIVE | git.md, Destructive Commands Are Forbidden |
-| GIT-20 | Destructive commands (reset --hard, reset, checkout/restore, clean -f, branch -D, rebase, amend, stash drop... | MUST NOT | split: block-git-commands.mjs hook (reset --hard, clean -f, checkout ., restore ., branch -D, and every git rebase) and git.md, Destructive Commands Are Forbidden (the remaining commands) |
+| GIT-20 | Destructive commands (reset --hard, reset, checkout/restore, clean -f, branch -D, rebase, amend, stash drop... | MUST NOT | split: git-guard mod (reset --hard, checkout -- and . and -f, switch -f, working-tree restore, clean -f, branch -D, stash drop and clear, tag -d, amend of a pushed commit, rebase of a branch with an upstream) and git.md, Destructive Commands Are Forbidden (the remaining commands) |
 | GIT-21 | Anything else read-only or non-destructive (`git status`, `git log`, `git diff`, `git add`, `git commit`, `git... | MAY | git.md, Destructive Commands Are Forbidden |
 | GIT-22 | You MUST NOT add `Co-Authored-By` lines, AI attribution lines, "Generated with", or any similar bylines to... | MUST NOT | git.md, Co-Authored-By |
 | GIT-23 | Commit messages contain only the description of the change. | IMPERATIVE | git.md, Co-Authored-By |
