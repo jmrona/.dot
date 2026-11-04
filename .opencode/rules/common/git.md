@@ -39,7 +39,7 @@ You **MUST NOT** run `git push` (or any variant) under any circumstances. The us
 
 ## Worktrees
 
-If the repository's justfile has a `worktree-create` recipe, you **MUST** create worktrees with `just worktree-create <branch> [--create|--pull] --path .worktrees/<branch>`. Remove them with `just worktree-drop <branch>`. You **MUST NOT** run `git worktree add` followed by a manual setup.
+If the repository's justfile has a `worktree-create` recipe, you **MUST** create worktrees with `just worktree-create <branch> [--create|--pull] --path <parent>/<repo>-worktrees/<branch>`. `<repo>` is the folder name of the main checkout, and `<parent>` is the absolute path of the folder that contains it. You **MUST** pass an absolute path, because the recipe resolves a relative path from the checkout that runs it. From a worktree, a relative path nests the new worktree inside the current one. Run `dirname "$(git rev-parse --path-format=absolute --git-common-dir)"` from any worktree to print the main checkout, then take `<parent>` and `<repo>` from it. Remove worktrees with `just worktree-drop <branch>`. You **MUST NOT** run `git worktree add` followed by a manual setup.
 
 The recipe copies the environment files and installs the dependencies that a manual `git worktree add` leaves out.
 

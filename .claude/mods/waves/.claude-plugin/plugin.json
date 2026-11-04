@@ -1,0 +1,6 @@
+{
+  "name": "waves",
+  "version": "0.1.0",
+  "description": "Shows the subagents the main loop dispatches, grouped in waves, in a pane beside the chat.",
+  "types": "./types/index.d.ts"
+}

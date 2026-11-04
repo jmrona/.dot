@@ -1,0 +1,14 @@
+{
+  "name": "ember-stack",
+  "version": "0.1.0",
+  "description": "Warns above the prompt when the shared Ember Docker stack mounts another worktree.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "emberRemote": {
+      "type": "string",
+      "title": "Ember remote",
+      "description": "Host and path of the Ember repository remote, without a scheme, for example gitlab.example.com/acme/app. Leave empty to turn the mod off.",
+      "required": false
+    }
+  }
+}

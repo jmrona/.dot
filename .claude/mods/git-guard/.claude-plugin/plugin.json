@@ -1,0 +1,1 @@
+{ "name": "git-guard", "version": "0.1.0", "description": "Refuses pushes, destructive git commands, badly formatted commit messages and committed secret files." }

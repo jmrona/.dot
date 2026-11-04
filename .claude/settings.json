@@ -126,5 +126,8 @@
   "verbose": false,
   "switchModelsOnFlag": true,
   "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "env": {
+    "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/git-guard:~/.claude/mods/ember-guard:~/.claude/mods/ember-evals-budget:~/.claude/mods/ember-stack:~/.claude/mods/ember-verification:~/.claude/mods/waves"
+  }
 }
