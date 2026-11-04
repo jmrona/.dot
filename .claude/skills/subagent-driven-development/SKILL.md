@@ -109,7 +109,7 @@ Record each task in the session's task-tracking tool if one is listed. Otherwise
 
 ## Running a Wave with the Workflow Tool
 
-If the `Workflow` tool is in your tool list, you **MUST** call the `Workflow` tool for each wave. Set `scriptPath` to the absolute path of `implementation-workflow.js` in this skill directory. Set `args` to an actual JSON object:
+If the `Workflow` tool is in your tool list, you **MUST** call the `Workflow` tool for each wave. The standing opt-in in `../../rules/common/subagents.md` is the user's explicit permission for this call. Set `scriptPath` to the absolute path of `implementation-workflow.js` in this skill directory. Set `args` to an actual JSON object:
 
 - `baseSha`: the output of `git rev-parse HEAD`.
 - `dirtyAtBase`: the bare paths from `git status --porcelain -uall`, without the status prefix.

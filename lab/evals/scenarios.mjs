@@ -14,7 +14,7 @@ import {
   scoreTestFirst,
 } from './scorers.mjs'
 
-const DEFAULT_TOOLS = ['Read', 'Edit', 'Write', 'Bash', 'Skill', 'Glob', 'Grep']
+const DEFAULT_TOOLS = ['Read', 'Edit', 'Write', 'Bash', 'Skill', 'Glob', 'Grep', 'Workflow']
 const DESIGN_TOOLS = [...DEFAULT_TOOLS, 'EnterPlanMode', 'AskUserQuestion']
 const NO_QUESTIONS = 'It is the approved design. No questions can be answered, so do not ask any.'
 const IMPLEMENT_PROMPT = `Implement the design in docs/spec.md. ${NO_QUESTIONS}`

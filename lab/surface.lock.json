@@ -73,8 +73,8 @@
       "executable": false
     },
     "rules/common/subagents.md": {
-      "sha256": "ae2291a07822e288703639512b49fd2ce56ba1292f7a10b900352e9478f4d9c6",
-      "words": 369,
+      "sha256": "2a5261d326d341d396ede51e8aa2042fd93600eeb33a991619bb5ab5bf2315ee",
+      "words": 403,
       "alwaysLoaded": true,
       "executable": false
     },
@@ -383,8 +383,8 @@
       "executable": false
     },
     "skills/subagent-driven-development/SKILL.md": {
-      "sha256": "69bc2c326232ea7f2ea6f3bc18aa8fad7bb00ddca111927be0c4ea70a8a7e0b5",
-      "words": 4349,
+      "sha256": "f68103076bd3d8e3f07644dfa14d7502a589a3679a84905ccd29ea283a0a15e4",
+      "words": 4362,
       "alwaysLoaded": false,
       "executable": false,
       "description": "Implements an approved design by decomposing it into tasks and grouping independent tasks into parallel waves. Each task gets a fresh subagent and a combined review, with one user checkpoint per wave. Delegates uniformly simple work to fast-path-implementation via complexity-triage."
@@ -472,5 +472,5 @@
       "executable": false
     }
   },
-  "alwaysLoadedWords": 6086
+  "alwaysLoadedWords": 6120
 }

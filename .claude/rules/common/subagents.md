@@ -31,3 +31,7 @@ You **MUST NOT** accept a subagent's report of success as evidence. Read the cha
 ## Procedural Rules
 
 The procedural rules that bind once a skill is dispatching a subagent, subagent type selection, model selection with identifier resolution and verification (tier table, resolution procedure, and escalation triggers), answering subagent questions, process discipline, and escalation handling, live in `skills/_shared/subagent-dispatch.md` and load when any dispatching skill is invoked.
+
+## Workflow Tool
+
+The user gives a standing opt-in to multi-agent orchestration for the `subagent-driven-development` skill. When that skill tells you to call the `Workflow` tool for a wave, call it without asking again.

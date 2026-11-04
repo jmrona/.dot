@@ -943,3 +943,8 @@ test('every scenario offers the default tools first', () => {
     assert.deepEqual(scenario.tools.slice(0, 7), ['Read', 'Edit', 'Write', 'Bash', 'Skill', 'Glob', 'Grep'])
   }
 })
+
+test('implementation scenarios allow the workflow tool', () => {
+  const scenario = scenarios.find((entry) => entry.id === 'no-comments')
+  assert.ok(scenario.tools.includes('Workflow'))
+})
