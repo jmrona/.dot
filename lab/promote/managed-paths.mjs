@@ -80,7 +80,7 @@ function buildRsyncArgs(entry, sourcePath, targetPath, dryRun) {
   const excludeArgs = entry.excludes.flatMap((pattern) => ['--exclude', pattern])
   const dryRunArgs = dryRun ? ['-n'] : []
   const trailingSlash = entry.kind === 'directory' ? '/' : ''
-  return ['-a', '--delete', '--itemize-changes', ...dryRunArgs, ...excludeArgs, `${sourcePath}${trailingSlash}`, `${targetPath}${trailingSlash}`]
+  return ['-a', '--delete', '--itemize-changes', '--checksum', ...dryRunArgs, ...excludeArgs, `${sourcePath}${trailingSlash}`, `${targetPath}${trailingSlash}`]
 }
 
 function runRsync(entry, args) {

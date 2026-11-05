@@ -145,3 +145,34 @@ test('mirrorEntry throws an error naming the entry and rsync stderr when the sou
     /rsync failed for "rules".*No such file or directory/s,
   )
 })
+
+test('mirrorEntry neither reports nor copies a file whose content matches but whose modification time differs', () => {
+  const sourceDir = makeTempDir()
+  const targetDir = makeTempDir()
+  const targetFilePath = path.join(targetDir, 'rules/style.md')
+  writeFile(path.join(sourceDir, 'rules/style.md'), 'same content')
+  writeFile(targetFilePath, 'same content')
+  const earlierTime = new Date('2020-01-01T00:00:00Z')
+  fs.utimesSync(targetFilePath, earlierTime, earlierTime)
+  const ruleEntry = { relativePath: 'rules', kind: 'directory', excludes: [] }
+
+  const dryRunLines = mirrorEntry(sourceDir, targetDir, ruleEntry, { dryRun: true })
+  const realRunLines = mirrorEntry(sourceDir, targetDir, ruleEntry, { dryRun: false })
+
+  assert.equal(dryRunLines.some((line) => line.startsWith('>f')), false)
+  assert.equal(realRunLines.some((line) => line.startsWith('>f')), false)
+})
+
+test('mirrorEntry copies a file whose content differs even when its size and modification time match the target', () => {
+  const sourceDir = makeTempDir()
+  const targetDir = makeTempDir()
+  const sharedTime = new Date('2020-01-01T00:00:00Z')
+  writeFile(path.join(sourceDir, 'rules/style.md'), 'aaaa')
+  writeFile(path.join(targetDir, 'rules/style.md'), 'bbbb')
+  fs.utimesSync(path.join(sourceDir, 'rules/style.md'), sharedTime, sharedTime)
+  fs.utimesSync(path.join(targetDir, 'rules/style.md'), sharedTime, sharedTime)
+
+  mirrorEntry(sourceDir, targetDir, { relativePath: 'rules', kind: 'directory', excludes: [] }, { dryRun: false })
+
+  assert.equal(fs.readFileSync(path.join(targetDir, 'rules/style.md'), 'utf8'), 'aaaa')
+})
