@@ -316,7 +316,7 @@ test('routes a picked-up ticket through the brainstorming router before implemen
   const workOnTicket = read('skills/work-on-ticket/SKILL.md')
   const policyExample = read('rules/common/skills-policy.md')
     .split('\n')
-    .find((line) => line.includes('"Work on #42"'))
+    .find((line) => line.startsWith('1. **Entry skills first**'))
   const sddTicketLines = read('skills/subagent-driven-development/SKILL.md')
     .split('\n')
     .filter((line) => line.includes('work-on-ticket'))
@@ -528,4 +528,77 @@ test('rules state that a ticket input with a Mode line spares the router mode qu
     assert.match(rule, /`Mode:` line/, path)
     assert.match(rule, /router does not ask again/, path)
   }
+})
+
+test('workflow rule defines the short path with its three criteria', () => {
+  const workflow = read('rules/common/workflow.md')
+  const start = workflow.indexOf('### The Short Path for Small Changes')
+
+  assert.ok(start >= 0, 'workflow has the short path section')
+
+  const section = workflow.slice(start).split('\n### ')[0]
+
+  assert.match(section, /1\. The change is fully determined/)
+  assert.match(section, /2\. The change adds no new surface/)
+  assert.match(section, /3\. A reader can take in the change at a glance/)
+})
+
+test('workflow rule requires approval of the short path statement before any edit', () => {
+  const workflow = read('rules/common/workflow.md')
+  const section = workflow.slice(workflow.indexOf('### The Short Path for Small Changes')).split('\n### ')[0]
+
+  assert.match(section, /wait for explicit approval before you edit/)
+  assert.match(workflow, /A short path statement of the change that the user has explicitly approved/)
+})
+
+test('workflow rule excludes bug fixes from the short path', () => {
+  assert.match(read('rules/common/workflow.md'), /Bug fixes never use the short path/)
+})
+
+test('workflow rule keeps the ticket-run exception beside the short path', () => {
+  const workflow = read('rules/common/workflow.md')
+
+  assert.match(workflow, /Unless the short path below applies, you \*\*MUST\*\* invoke it before any code edit/)
+  assert.match(workflow, /`Source: work-on-ticket` and a `Mode:` line/)
+})
+
+test('skills policy states that the short path waives only the brainstorming router', () => {
+  const policy = read('rules/common/skills-policy.md')
+  const rule = policy.slice(policy.indexOf('## The 1% Rule')).split('\n## ')[0]
+
+  assert.match(rule, /short path in `workflow\.md` waives only the `brainstorming` router, not any other skill/)
+  assert.match(policy, /unless the short path in `workflow\.md` applies/)
+})
+
+test('skills policy lists the mandatory pairings compactly without repeated examples', () => {
+  const policy = read('rules/common/skills-policy.md')
+
+  assert.doesNotMatch(policy, /^Examples:$/m)
+  assert.match(policy, /Each pairing names a trigger and its skill, and the rule file that is named holds the details:/)
+  assert.doesNotMatch(policy, /no matter how small/)
+})
+
+test('brainstorming router description and mistakes table name the short path', () => {
+  const router = read('skills/brainstorming/SKILL.md')
+
+  assert.match(router, /^description: ".*before any code edit, unless the short path in workflow\.md applies:/m)
+  assert.match(router, /does not waive the router unless all three short path criteria hold/)
+  assert.match(router, /The short path never starts this skill/)
+})
+
+test('git rule points to the commit-msg skill for the full commit format', () => {
+  const git = read('rules/common/git.md')
+
+  assert.match(git, /Before you write any commit message, invoke the `commit-msg` skill, which holds the full format\./)
+})
+
+test('git rule keeps the opencode worktree section', () => {
+  assert.match(read('rules/common/git.md'), /## Worktrees[\s\S]*just worktree-create/)
+})
+
+test('git rule keeps the full list of destructive commands', () => {
+  const git = read('rules/common/git.md')
+
+  assert.match(git, /`git stash drop` \/ `git stash clear`/)
+  assert.match(git, /`git tag -d` of pushed tags/)
 })

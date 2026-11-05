@@ -93,6 +93,9 @@ test('keeps commit and diff summarisation as fully supplied text-in text-out wor
   assert.match(commit, /text-in[ /-]text-out/i)
   assert.match(commit, /type\(scope\): summary \(TICKET-KEY\)/)
   assert.match(commit, /at most 72 characters/i)
+  assert.match(commit, /^## Full Commit Message Format$/m)
+  assert.match(commit, /Use the imperative mood/)
+  assert.match(commit, /No trailing full stop/)
   assert.match(commit, /never guess/i)
   assert.match(commit, /Output only the commit message/i)
 
