@@ -2,19 +2,13 @@
 	"$schema": "https://opencode.ai/config.json",
 	"instructions": [
 		"/Users/jose.romero/.config/opencode/rules/common/ambiguity.md",
-		"/Users/jose.romero/.config/opencode/rules/common/code-organisation.md",
 		"/Users/jose.romero/.config/opencode/rules/common/code-review.md",
 		"/Users/jose.romero/.config/opencode/rules/common/coding-style.md",
-		"/Users/jose.romero/.config/opencode/rules/common/consistency.md",
 		"/Users/jose.romero/.config/opencode/rules/common/debugging.md",
-		"/Users/jose.romero/.config/opencode/rules/common/documentation.md",
-		"/Users/jose.romero/.config/opencode/rules/common/errors.md",
 		"/Users/jose.romero/.config/opencode/rules/common/git.md",
 		"/Users/jose.romero/.config/opencode/rules/common/language.md",
 		"/Users/jose.romero/.config/opencode/rules/common/model-routing.md",
-		"/Users/jose.romero/.config/opencode/rules/common/performance.md",
 		"/Users/jose.romero/.config/opencode/rules/common/prose-style.md",
-		"/Users/jose.romero/.config/opencode/rules/common/security.md",
 		"/Users/jose.romero/.config/opencode/rules/common/skills-policy.md",
 		"/Users/jose.romero/.config/opencode/rules/common/subagents.md",
 		"/Users/jose.romero/.config/opencode/rules/common/testing.md",
@@ -177,6 +171,11 @@
 		}
 	},
 	"permission": {
+		"bash": {
+			"*": "allow",
+			"git push": "deny",
+			"git push *": "deny"
+		},
 		"external_directory": {
 			"~/.config/opencode/data/cognitive-profile/**": "allow",
 			"~/.config/opencode/data/ticket-coach/**": "allow",

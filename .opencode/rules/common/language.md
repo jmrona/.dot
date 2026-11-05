@@ -2,40 +2,17 @@
 
 ## British English
 
-You **MUST** use British English spelling and grammar in all:
-
-- Code comments (on the rare occasions they are permitted, see `coding-style.md`)
-- Documentation
-- Commit messages
-- Variable names and identifiers
-- User-facing strings
-
-Examples:
-
-- `colour` not `color`
-- `initialise` not `initialize`
-- `behaviour` not `behavior`
-- `organise` not `organize`
+You **MUST** use British English spelling and grammar in code comments (see `coding-style.md`), documentation, commit messages, identifiers, and user-facing strings. Examples: `colour`, `initialise`, `behaviour`.
 
 ## Emoji Usage
 
-You MUST NOT use emojis, Unicode symbols, or special characters in:
-
-- Code or comments
-- Commit messages
-- Documentation
-- Communication with users
-- Status indicators or checkmarks (use [PASS]/[FAIL]/[OK] instead)
+You MUST NOT use emojis, Unicode symbols, or special characters in code, comments, commit messages, documentation, or communication with users. For status indicators and checkmarks, use [PASS]/[FAIL]/[OK].
 
 ## Em-dashes and En-dashes
 
 You **MUST NOT** use em-dashes (`—`), en-dashes (`–`), or double-hyphens (`--`) as prose punctuation in documentation, commit messages, or user-facing text. Use a comma, a single hyphen, or a full stop instead.
 
-This rule applies to prose only. It does **not** apply to:
-
-- `--` in shell commands, CLI flags, or option parsing (e.g. `--help`, `git commit --amend`)
-- `--` inside code, comments that reference code, or code blocks
-- Hyphens in compound words (e.g. `self-documenting`, `well-named`)
+This rule applies to prose only. It does **not** apply to `--` in shell commands, CLI flags, code, or comments that reference code. It does not apply to hyphens in compound words such as `self-documenting`.
 
 ## Inclusive Language
 

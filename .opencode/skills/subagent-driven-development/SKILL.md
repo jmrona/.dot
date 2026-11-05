@@ -63,7 +63,7 @@ Each task has its own implementer role. If the planner is unsure which role fits
 
 ### File Structure
 
-Review the planner's proposed file map and responsibilities against the approved design, then lock the task scope before implementation. Each file should have one clear responsibility with a well-defined interface (see `../../rules/common/code-organisation.md`). In existing codebases, follow established patterns. Files that change together should live together.
+Review the planner's proposed file map and responsibilities against the approved design, then lock the task scope before implementation. Each file should have one clear responsibility with a well-defined interface (see `../../rules/common/coding-style.md`). In existing codebases, follow established patterns. Files that change together should live together.
 
 ### Task Granularity
 
