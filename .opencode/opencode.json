@@ -170,12 +170,11 @@
 			"description": "Global opencode agents, skills, and rule files"
 		}
 	},
+	"permissions": [
+		{ "action": "shell", "resource": "git push", "effect": "deny" },
+		{ "action": "shell", "resource": "git push *", "effect": "deny" }
+	],
 	"permission": {
-		"bash": {
-			"*": "allow",
-			"git push": "deny",
-			"git push *": "deny"
-		},
 		"external_directory": {
 			"~/.config/opencode/data/cognitive-profile/**": "allow",
 			"~/.config/opencode/data/ticket-coach/**": "allow",
