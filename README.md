@@ -75,6 +75,26 @@ The mods `git-guard` and `waves` work in any repository. Follow these steps:
 
 To check the mods, ask the model to run `git push`. The call is refused with "Pushes are forbidden". Then type `/waves`, and the pane answers "Waves pane opened.".
 
+### Promote the harness
+
+Instead of the manual steps, you can promote the harness with `lab/promote.mjs`. Run these commands from the `.dot` root:
+
+```bash
+node lab/promote.mjs
+node lab/promote.mjs --apply
+node lab/promote.mjs --restore <stamp>
+```
+
+- `node lab/promote.mjs` runs the preflight checks and prints a preview. It writes nothing. The preflight fails if `.claude` or `.opencode` has uncommitted changes, or if `node lab/integrity.mjs` or `node lab/surface.mjs check` fails.
+- `node lab/promote.mjs --apply` backs up the managed paths, copies the harness and runs two canaries. If the copy or a canary fails, it restores the backup.
+- `node lab/promote.mjs --restore <stamp>` restores the backup with that stamp. If the stamp does not exist, the error lists the available stamps.
+
+The command manages the rules, hooks, skills, mods, `statusline-command.sh`, `.mcp.json` and `settings.json` of `~/.claude`. It also manages the rules, agents, commands, scripts, tests, skills, plugins, `AGENTS.md`, `package.json`, `opencode.json` and `cli.json` of `~/.config/opencode`.
+
+Backups go to `~/.harness-backups/<stamp>/`, where the stamp is the local time as `YYYYMMDD-HHMMSS`.
+
+Skills, mods or plugins that exist only in the live folder are listed in the preview as "solo en destino" but never deleted. The JSON files are merged, so local-only keys such as `autoMode` stay. If a scalar differs, the repository value wins and the preview lists the conflict.
+
 ### Ember mods (Ember checkouts and worktrees only)
 
 The mods `ember-guard`, `ember-evals-budget`, `ember-stack` and `ember-verification` work only in an Ember checkout or worktree. Follow these steps:
