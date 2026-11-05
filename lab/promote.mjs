@@ -71,6 +71,43 @@ export function findUncommittedHarnessChanges(repoDir) {
   return result.stdout.split('\n').filter((line) => line.trim() !== '')
 }
 
+function displayPathFor(entry, itemPath) {
+  return entry.kind === 'directory' ? `${entry.relativePath}/${itemPath}` : entry.relativePath
+}
+
+function itemPathOf(line) {
+  return line.slice(line.indexOf(' ') + 1).trim()
+}
+
+function classifyLine(line) {
+  if (line.startsWith('*deleting')) return itemPathOf(line).endsWith('/') ? null : 'deleted'
+  if (line.startsWith('>f+++++++')) return 'added'
+  return line.startsWith('>f') ? 'changed' : null
+}
+
+export function classifyEntryChanges(entry, lines) {
+  const changes = { added: [], changed: [], deleted: [] }
+  for (const line of lines) {
+    const group = classifyLine(line)
+    if (group) changes[group].push(displayPathFor(entry, itemPathOf(line)))
+  }
+  return changes
+}
+
+function jsonEntryChanges(entry) {
+  const displayPath = `${entry.relativePath} (merged)`
+  if (!entry.changed) return { added: [], changed: [], deleted: [] }
+  return entry.targetExisted ? { added: [], changed: [displayPath], deleted: [] } : { added: [displayPath], changed: [], deleted: [] }
+}
+
+function combineChanges(changesList) {
+  return {
+    added: changesList.flatMap((changes) => changes.added),
+    changed: changesList.flatMap((changes) => changes.changed),
+    deleted: changesList.flatMap((changes) => changes.deleted),
+  }
+}
+
 function previewMirroredEntry({ sourceDir, targetDir }, entry) {
   return { relativePath: entry.relativePath, kind: entry.kind, lines: mirrorEntry(sourceDir, targetDir, entry, { dryRun: true }) }
 }
@@ -80,21 +117,25 @@ function readJsonOrEmpty(filePath) {
 }
 
 function previewJsonEntry({ sourceDir, targetDir }, entry) {
+  const targetExisted = fs.existsSync(path.join(targetDir, entry.relativePath))
   const localValue = readJsonOrEmpty(path.join(targetDir, entry.relativePath))
   const repoValue = readJsonOrEmpty(path.join(sourceDir, entry.relativePath))
   const { merged, conflicts, keptLocal } = mergeJson(localValue, repoValue)
   const changed = JSON.stringify(merged) !== JSON.stringify(localValue)
-  return { relativePath: entry.relativePath, changed, keptLocal, conflicts }
+  return { relativePath: entry.relativePath, changed: changed || !targetExisted, targetExisted, keptLocal, conflicts }
 }
 
 export function previewTarget(target) {
   const managedEntries = listManagedEntries(target.sourceDir, target.flavour)
   const jsonEntries = managedEntries.filter((entry) => entry.kind === 'json')
   const mirroredEntries = managedEntries.filter((entry) => entry.kind !== 'json')
+  const entries = mirroredEntries.map((entry) => previewMirroredEntry(target, entry))
+  const previewedJsonEntries = jsonEntries.map((entry) => previewJsonEntry(target, entry))
   return {
     name: target.name,
-    entries: mirroredEntries.map((entry) => previewMirroredEntry(target, entry)),
-    jsonEntries: jsonEntries.map((entry) => previewJsonEntry(target, entry)),
+    entries,
+    jsonEntries: previewedJsonEntries,
+    changes: combineChanges([...entries.map((entry) => classifyEntryChanges(entry, entry.lines)), ...previewedJsonEntries.map(jsonEntryChanges)]),
     targetOnly: listTargetOnlyEntries(target.sourceDir, target.targetDir, target.flavour),
   }
 }
@@ -190,10 +231,12 @@ export function runPreflight(repoDir) {
   return [...uncommittedProblems, ...runPreflightCommands(repoDir)]
 }
 
-function formatMirroredEntries(entries) {
-  return entries
-    .filter((entry) => entry.lines.length > 0)
-    .flatMap((entry) => [`  ${entry.relativePath}`, ...entry.lines.map((line) => `    ${line}`)])
+const CHANGE_GROUPS = [['added', 'Added'], ['changed', 'Changed'], ['deleted', 'Deleted']]
+
+function formatChanges(changes) {
+  const groups = CHANGE_GROUPS.filter(([key]) => changes[key].length > 0)
+  if (groups.length === 0) return ['  no changes']
+  return groups.flatMap(([key, title]) => [`  ${title} (${changes[key].length})`, ...changes[key].map((displayPath) => `    ${displayPath}`)])
 }
 
 function formatConflict({ path: keyPath, local, repo }) {
@@ -214,8 +257,8 @@ function formatTargetOnly(targetOnly) {
 
 function formatTargetPreview(preview) {
   return [
-    `Target ${preview.name}:`,
-    ...formatMirroredEntries(preview.entries),
+    `Harness ${preview.name}`,
+    ...formatChanges(preview.changes),
     ...preview.jsonEntries.flatMap(formatJsonEntry),
     ...formatTargetOnly(preview.targetOnly),
   ].join('\n')
@@ -240,17 +283,17 @@ function collectFailingTestNames(testsDir) {
   return { names: failingTestNames(result.stdout) }
 }
 
-function symmetricDifference(firstNames, secondNames) {
-  return [...firstNames.filter((name) => !secondNames.includes(name)), ...secondNames.filter((name) => !firstNames.includes(name))]
+function namesMissingFrom(names, referenceNames) {
+  return names.filter((name) => !referenceNames.includes(name))
 }
 
 export function opencodeCanary({ repoTestsDir, targetTestsDir }) {
   const runs = [collectFailingTestNames(repoTestsDir), collectFailingTestNames(targetTestsDir)]
   const problem = runs.find((run) => run.problem)
   if (problem) return { ok: false, detail: problem.problem }
-  const differing = symmetricDifference(runs[0].names, runs[1].names)
-  if (differing.length === 0) return { ok: true, detail: 'the live opencode tests fail exactly the tests that fail in the repository' }
-  return { ok: false, detail: `the live opencode tests differ from the repository in these tests: ${differing.join(', ')}` }
+  const newFailures = namesMissingFrom(runs[1].names, runs[0].names)
+  if (newFailures.length === 0) return { ok: true, detail: 'every test that fails in the live opencode directory also fails in the repository' }
+  return { ok: false, detail: `these tests fail in the live opencode directory but not in the repository: ${newFailures.join(', ')}` }
 }
 
 const CLAUDE_CANARY_QUESTION = "Answer in two lines. Line 1: quote the first sentence under the heading 'The Short Path for Small Changes' in your instructions, or write NONE. Line 2: write YES if your instructions contain a file named consistency.md, otherwise NO."

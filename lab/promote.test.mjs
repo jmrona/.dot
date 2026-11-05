@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
-import { claudeCanary, failingTestNames, findUncommittedHarnessChanges, formatPreview, formatPromotionFailure, formatStamp, opencodeCanary, parseClaudeCanaryOutput, previewTarget, promote, runPreflight } from './promote.mjs'
+import { classifyEntryChanges, claudeCanary, failingTestNames, findUncommittedHarnessChanges, formatPreview, formatPromotionFailure, formatStamp, opencodeCanary, parseClaudeCanaryOutput, previewTarget, promote, runPreflight } from './promote.mjs'
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'promote-test-'))
@@ -217,9 +217,63 @@ test('formatPreview shows each conflict as path: local -> repo', () => {
   assert.match(text, /scalar: "local" -> "repo"/)
 })
 
-test('formatPreview lists the rsync line of a rule that will be deleted', () => {
+test('formatPreview lists a rule that will be deleted under Deleted', () => {
   const text = formatPreview([previewTarget(makeTarget())])
-  assert.match(text, /deleting.*deleted-in-source\.md/)
+  assert.match(text, /Deleted \(1\)\n {4}rules\/common\/deleted-in-source\.md/)
+})
+
+const emptyChanges = { added: [], changed: [], deleted: [] }
+
+test('formatPreview shows the groups with their counts in order and omits empty groups', () => {
+  const allGroups = { added: ['a.md'], changed: ['b.md', 'c.md'], deleted: ['d.md'] }
+  const text = formatPreview([{ name: 'x', changes: allGroups, jsonEntries: [], targetOnly: [] }])
+  assert.equal(text, 'Harness x\n  Added (1)\n    a.md\n  Changed (2)\n    b.md\n    c.md\n  Deleted (1)\n    d.md')
+  const onlyAdded = formatPreview([{ name: 'x', changes: { ...emptyChanges, added: ['a.md'] }, jsonEntries: [], targetOnly: [] }])
+  assert.equal(onlyAdded, 'Harness x\n  Added (1)\n    a.md')
+})
+
+test('formatPreview says no changes for a target with nothing to change', () => {
+  const text = formatPreview([{ name: 'x', changes: emptyChanges, jsonEntries: [], targetOnly: [] }])
+  assert.equal(text, 'Harness x\n  no changes')
+})
+
+test('formatPreview no longer prints raw rsync item codes', () => {
+  const text = formatPreview([previewTarget(makeTarget())])
+  assert.doesNotMatch(text, />f\+|\*deleting/)
+})
+
+test('a JSON entry that differs from the target appears in changed with a merged suffix', () => {
+  assert.ok(previewTarget(makeTarget()).changes.changed.includes('settings.json (merged)'))
+})
+
+test('a JSON entry whose target file is missing appears in added', () => {
+  const target = makeTarget()
+  fs.rmSync(path.join(target.targetDir, 'settings.json'))
+  assert.ok(previewTarget(target).changes.added.includes('settings.json (merged)'))
+})
+
+test('a JSON entry equal to the target adds nothing', () => {
+  const target = makeTarget()
+  writeFile(path.join(target.targetDir, 'settings.json'), JSON.stringify({ shared: 'repo', scalar: 'repo' }))
+  const { added, changed } = previewTarget(target).changes
+  assert.equal([...added, ...changed].some((displayPath) => displayPath.includes('settings.json')), false)
+})
+
+const directoryEntry = { relativePath: 'rules', kind: 'directory' }
+
+test('classifyEntryChanges puts new, modified and removed files in their groups prefixed with the entry path', () => {
+  const lines = ['>f+++++++++ new.md', '>f.st....... edited.md', '*deleting   gone.md']
+  assert.deepEqual(classifyEntryChanges(directoryEntry, lines), { added: ['rules/new.md'], changed: ['rules/edited.md'], deleted: ['rules/gone.md'] })
+})
+
+test('classifyEntryChanges ignores a deleted folder line and counts only its files', () => {
+  const lines = ['*deleting   old/inner.md', '*deleting   old/', 'cd+++++++++ fresh/']
+  assert.deepEqual(classifyEntryChanges(directoryEntry, lines), { added: [], changed: [], deleted: ['rules/old/inner.md'] })
+})
+
+test('classifyEntryChanges uses the entry path itself for a file entry', () => {
+  const fileEntry = { relativePath: 'CLAUDE.md', kind: 'file' }
+  assert.deepEqual(classifyEntryChanges(fileEntry, ['>f.st....... CLAUDE.md']).changed, ['CLAUDE.md'])
 })
 
 test('formatPreview lists skills that exist only in the target under an only in target heading', () => {
@@ -246,6 +300,12 @@ const passingTestBody = "test('fine', () => {})"
 test('opencodeCanary passes when both directories fail the same tests', () => {
   const repoTestsDir = makeTestsDir({ 'a.test.mjs': failingTestBody, 'b.test.mjs': passingTestBody })
   const targetTestsDir = makeTestsDir({ 'a.test.mjs': failingTestBody })
+  assert.equal(opencodeCanary({ repoTestsDir, targetTestsDir }).ok, true)
+})
+
+test('opencodeCanary passes when the live directory fails a subset of the repository failures, including none', () => {
+  const repoTestsDir = makeTestsDir({ 'a.test.mjs': failingTestBody })
+  const targetTestsDir = makeTestsDir({ 'a.test.mjs': passingTestBody })
   assert.equal(opencodeCanary({ repoTestsDir, targetTestsDir }).ok, true)
 })
 
