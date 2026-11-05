@@ -21,9 +21,19 @@ function backUpTarget(backupDir, { name, targetDir, relativePaths }) {
   return { name, targetDir, managedPaths: relativePaths, existingPaths }
 }
 
+function makeStampFolder(backupDir) {
+  try {
+    fs.mkdirSync(backupDir)
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error
+    throw new Error(`Backup folder ${backupDir} already exists. Wait a second and run again.`)
+  }
+}
+
 export function createBackup({ backupRoot, stamp, targets }) {
   const backupDir = path.join(backupRoot, stamp)
-  fs.mkdirSync(backupDir, { recursive: true })
+  fs.mkdirSync(backupRoot, { recursive: true })
+  makeStampFolder(backupDir)
   const manifest = { targets: targets.map((target) => backUpTarget(backupDir, target)) }
   fs.writeFileSync(path.join(backupDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
   return backupDir

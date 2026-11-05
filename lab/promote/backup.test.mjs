@@ -89,3 +89,18 @@ test('createBackup throws an error naming the target when tar cannot read a mana
 
   assert.throws(() => createBackup({ backupRoot, stamp: '20260101-000000', targets }), /tar failed for target "claude"/)
 })
+
+test('createBackup with a stamp that already exists throws and leaves the earlier manifest unchanged', () => {
+  const backupRoot = makeTempDir()
+  const targetDir = makeTempDir()
+  writeFile(path.join(targetDir, 'rules/style.md'), 'original')
+  const targets = [{ name: 'claude', targetDir, relativePaths: ['rules'] }]
+  const backupDir = createBackup({ backupRoot, stamp: '20260101-000000', targets })
+  const manifestBefore = readFile(path.join(backupDir, 'manifest.json'))
+
+  assert.throws(
+    () => createBackup({ backupRoot, stamp: '20260101-000000', targets: [] }),
+    /20260101-000000.*[Ww]ait a second/s,
+  )
+  assert.equal(readFile(path.join(backupDir, 'manifest.json')), manifestBefore)
+})
