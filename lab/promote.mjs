@@ -146,7 +146,15 @@ export async function promote({ targets, backupRoot, stamp, canaries, log }) {
   log(`backup written to ${backupDir}`)
   const reason = await applyAndCheck(targets, canaries, log)
   if (reason === null) return { ok: true, backupDir }
-  restoreBackup({ backupRoot, stamp })
+  return restoreAfterFailure({ backupRoot, stamp, backupDir, reason, log })
+}
+
+function restoreAfterFailure({ backupRoot, stamp, backupDir, reason, log }) {
+  try {
+    restoreBackup({ backupRoot, stamp })
+  } catch (error) {
+    return { ok: false, restored: false, reason: `${reason}; restore also failed: ${error.message}`, backupDir }
+  }
   log(`restored the live harness from ${backupDir}`)
   return { ok: false, restored: true, reason, backupDir }
 }
@@ -257,12 +265,14 @@ function describeSpawnFailure(result) {
 }
 
 export function claudeCanary({ claudeDir, environment = process.env }) {
-  const { CLAUDE_CONFIG_DIR: _configDirectory, ...canaryEnvironment } = environment
+  const { CLAUDE_CONFIG_DIR: _configDirectory, CLAUDECODE: _nestingMarker, ...canaryEnvironment } = environment
+  const workingDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'promote-canary-'))
   const result = spawnSync(
     'claude',
     ['-p', CLAUDE_CANARY_QUESTION, '--model', 'haiku', '--output-format', 'stream-json', '--verbose'],
-    { cwd: fs.mkdtempSync(path.join(os.tmpdir(), 'promote-canary-')), env: canaryEnvironment, encoding: 'utf8', timeout: CLAUDE_CANARY_TIMEOUT_MS },
+    { cwd: workingDirectory, env: canaryEnvironment, encoding: 'utf8', timeout: CLAUDE_CANARY_TIMEOUT_MS },
   )
+  fs.rmSync(workingDirectory, { recursive: true, force: true })
   const failure = describeSpawnFailure(result)
   if (failure) return { ok: false, detail: failure }
   return parseClaudeCanaryOutput(result.stdout, path.join(claudeDir, 'mods', 'git-guard'))
@@ -303,19 +313,28 @@ function runPreview(repoDir, homeDir) {
   return 0
 }
 
+export function formatPromotionFailure(outcome, stamp) {
+  const lines = [`Promotion failed: ${outcome.reason}`]
+  if (outcome.backupDir) {
+    lines.push(`Backup: ${outcome.backupDir}`, `To restore it by hand, run: node lab/promote.mjs --restore ${stamp}`)
+  }
+  return lines.join('\n')
+}
+
 async function runApply(repoDir, homeDir) {
   const problems = runPreflight(repoDir)
   if (problems.length > 0) return printProblems(problems)
   printPreview(repoDir, homeDir)
+  const stamp = formatStamp(new Date())
   const outcome = await promote({
     targets: buildRealTargets(repoDir, homeDir),
     backupRoot: path.join(homeDir, '.harness-backups'),
-    stamp: formatStamp(new Date()),
+    stamp,
     canaries: buildRealCanaries(repoDir, homeDir),
     log: console.log,
   })
   if (outcome.ok) console.log(`Promotion finished. Backup: ${outcome.backupDir}`)
-  else console.error(`Promotion failed: ${outcome.reason}${outcome.backupDir ? `\nBackup: ${outcome.backupDir}` : ''}`)
+  else console.error(formatPromotionFailure(outcome, stamp))
   return outcome.ok ? 0 : 1
 }
 

@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
-import { claudeCanary, failingTestNames, findUncommittedHarnessChanges, formatPreview, formatStamp, opencodeCanary, parseClaudeCanaryOutput, previewTarget, promote, runPreflight } from './promote.mjs'
+import { claudeCanary, failingTestNames, findUncommittedHarnessChanges, formatPreview, formatPromotionFailure, formatStamp, opencodeCanary, parseClaudeCanaryOutput, previewTarget, promote, runPreflight } from './promote.mjs'
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'promote-test-'))
@@ -272,8 +272,8 @@ const passingStream = streamJson({
 }).replaceAll("'", "'\\''")
 
 test('claudeCanary passes when claude reports the git-guard plugin and both lines', () => {
-  const binDir = makeFakeClaudeDir(`[ -z "$CLAUDE_CONFIG_DIR" ] || exit 9\nprintf '%s' '${passingStream}'`)
-  const outcome = claudeCanary({ claudeDir, environment: { PATH: binDir, CLAUDE_CONFIG_DIR: '/elsewhere' } })
+  const binDir = makeFakeClaudeDir(`[ -z "$CLAUDE_CONFIG_DIR" ] || exit 9\n[ -z "$CLAUDECODE" ] || exit 9\nprintf '%s' '${passingStream}'`)
+  const outcome = claudeCanary({ claudeDir, environment: { PATH: binDir, CLAUDE_CONFIG_DIR: '/elsewhere', CLAUDECODE: '1' } })
   assert.equal(outcome.ok, true)
 })
 
@@ -312,4 +312,31 @@ test('opencodeCanary fails when a test run ends without a TAP plan line', () => 
   const outcome = opencodeCanary({ repoTestsDir, targetTestsDir })
   assert.equal(outcome.ok, false)
   assert.match(outcome.detail, /no TAP plan/)
+})
+
+test('promote reports both reasons and the backup directory when the restore also fails', async () => {
+  const target = makeTarget()
+  const backupRoot = path.join(makeTempDir(), 'backups')
+  const removeBackupThenFail = async () => {
+    fs.rmSync(backupRoot, { recursive: true, force: true })
+    return { ok: false, detail: 'stub canary failed' }
+  }
+  const outcome = await promote({ targets: [target], backupRoot, stamp: '20261105-090407', canaries: [removeBackupThenFail], log: () => {} })
+  assert.equal(outcome.ok, false)
+  assert.equal(outcome.restored, false)
+  assert.equal(outcome.backupDir, path.join(backupRoot, '20261105-090407'))
+  assert.match(outcome.reason, /stub canary failed; restore also failed: No backup named/)
+})
+
+test('formatPromotionFailure gives the backup path and the manual restore command', () => {
+  const text = formatPromotionFailure({ ok: false, restored: false, reason: 'boom', backupDir: '/b/20261105-090407' }, '20261105-090407')
+  assert.match(text, /\/b\/20261105-090407/)
+  assert.match(text, /node lab\/promote\.mjs --restore 20261105-090407/)
+})
+
+test('claudeCanary removes its temporary working directory after the run', () => {
+  const recordFile = path.join(makeTempDir(), 'cwd.txt')
+  const binDir = makeFakeClaudeDir(`pwd > '${recordFile}'\nexit 1`)
+  claudeCanary({ claudeDir, environment: { PATH: binDir } })
+  assert.equal(fs.existsSync(fs.readFileSync(recordFile, 'utf8').trim()), false)
 })
