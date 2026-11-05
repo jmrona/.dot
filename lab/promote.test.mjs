@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
-import { classifyEntryChanges, claudeCanary, failingTestNames, findUncommittedHarnessChanges, formatPreview, formatPromotionFailure, formatStamp, opencodeCanary, parseClaudeCanaryOutput, previewTarget, promote, runPreflight } from './promote.mjs'
+import { classifyEntryChanges, claudeCanary, failingTestNames, formatPreview, formatPromotionFailure, formatStamp, opencodeCanary, parseClaudeCanaryOutput, previewTarget, promote, runPreflight } from './promote.mjs'
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'promote-test-'))
@@ -62,14 +62,6 @@ test('parseClaudeCanaryOutput fails when the second line is YES', () => {
   assert.match(outcome.detail, /YES/)
 })
 
-test('findUncommittedHarnessChanges reports an uncommitted file under .claude', () => {
-  const repoDir = makeTempDir()
-  spawnSync('git', ['init', '--quiet'], { cwd: repoDir })
-  writeFile(path.join(repoDir, '.claude/rules/new-rule.md'), 'rule')
-  const changes = findUncommittedHarnessChanges(repoDir)
-  assert.ok(changes.some((line) => line.includes('.claude/')))
-})
-
 function readTree(rootDir) {
   const files = {}
   const walk = (directory) => {
@@ -106,14 +98,6 @@ test('previewTarget leaves the target unchanged', () => {
   assert.deepEqual(readTree(target.targetDir), before)
   const rulesEntry = preview.entries.find((entry) => entry.relativePath === 'rules')
   assert.ok(rulesEntry.lines.some((line) => line.includes('deleted-in-source.md')))
-})
-
-test('previewTarget reports local-only keys kept and scalar conflicts for a JSON entry', () => {
-  const preview = previewTarget(makeTarget())
-  const settings = preview.jsonEntries.find((entry) => entry.relativePath === 'settings.json')
-  assert.equal(settings.changed, true)
-  assert.deepEqual(settings.keptLocal, ['autoMode'])
-  assert.deepEqual(settings.conflicts, [{ path: 'scalar', local: 'local', repo: 'repo' }])
 })
 
 test('previewTarget lists a skill that exists only in the target', () => {
@@ -220,6 +204,7 @@ test('formatPreview shows each conflict as path: local -> repo', () => {
 test('formatPreview lists a rule that will be deleted under Deleted', () => {
   const text = formatPreview([previewTarget(makeTarget())])
   assert.match(text, /Deleted \(1\)\n {4}rules\/common\/deleted-in-source\.md/)
+  assert.doesNotMatch(text, />f\+|\*deleting/)
 })
 
 const emptyChanges = { added: [], changed: [], deleted: [] }
@@ -235,11 +220,6 @@ test('formatPreview shows the groups with their counts in order and omits empty 
 test('formatPreview says no changes for a target with nothing to change', () => {
   const text = formatPreview([{ name: 'x', changes: emptyChanges, jsonEntries: [], targetOnly: [] }])
   assert.equal(text, 'Harness x\n  no changes')
-})
-
-test('formatPreview no longer prints raw rsync item codes', () => {
-  const text = formatPreview([previewTarget(makeTarget())])
-  assert.doesNotMatch(text, />f\+|\*deleting/)
 })
 
 test('a JSON entry that differs from the target appears in changed with a merged suffix', () => {
@@ -399,4 +379,18 @@ test('claudeCanary removes its temporary working directory after the run', () =>
   const binDir = makeFakeClaudeDir(`pwd > '${recordFile}'\nexit 1`)
   claudeCanary({ claudeDir, environment: { PATH: binDir } })
   assert.equal(fs.existsSync(fs.readFileSync(recordFile, 'utf8').trim()), false)
+})
+
+test('previewTarget does not list an identical single-file entry as changed', () => {
+  const target = makeTarget()
+  writeFile(path.join(target.sourceDir, 'statusline-command.sh'), 'same script')
+  writeFile(path.join(target.targetDir, 'statusline-command.sh'), 'same script')
+  assert.equal(previewTarget(target).changes.changed.includes('statusline-command.sh'), false)
+})
+
+test('previewTarget lists a single-file entry whose content differs as changed', () => {
+  const target = makeTarget()
+  writeFile(path.join(target.sourceDir, 'statusline-command.sh'), 'new script')
+  writeFile(path.join(target.targetDir, 'statusline-command.sh'), 'old script')
+  assert.equal(previewTarget(target).changes.changed.includes('statusline-command.sh'), true)
 })

@@ -108,6 +108,17 @@ function combineChanges(changesList) {
   }
 }
 
+function compareSingleFileEntry({ sourceDir, targetDir }, entry) {
+  const targetPath = path.join(targetDir, entry.relativePath)
+  if (!fs.existsSync(targetPath)) return { added: [entry.relativePath], changed: [], deleted: [] }
+  const isSame = fs.readFileSync(targetPath).equals(fs.readFileSync(path.join(sourceDir, entry.relativePath)))
+  return { added: [], changed: isSame ? [] : [entry.relativePath], deleted: [] }
+}
+
+function entryChanges(target, entry) {
+  return entry.kind === 'file' ? compareSingleFileEntry(target, entry) : classifyEntryChanges(entry, entry.lines)
+}
+
 function previewMirroredEntry({ sourceDir, targetDir }, entry) {
   return { relativePath: entry.relativePath, kind: entry.kind, lines: mirrorEntry(sourceDir, targetDir, entry, { dryRun: true }) }
 }
@@ -135,7 +146,7 @@ export function previewTarget(target) {
     name: target.name,
     entries,
     jsonEntries: previewedJsonEntries,
-    changes: combineChanges([...entries.map((entry) => classifyEntryChanges(entry, entry.lines)), ...previewedJsonEntries.map(jsonEntryChanges)]),
+    changes: combineChanges([...entries.map((entry) => entryChanges(target, entry)), ...previewedJsonEntries.map(jsonEntryChanges)]),
     targetOnly: listTargetOnlyEntries(target.sourceDir, target.targetDir, target.flavour),
   }
 }
