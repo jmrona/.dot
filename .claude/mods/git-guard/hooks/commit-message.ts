@@ -1,4 +1,4 @@
-import { gitSubcommand, segmentsOf, unquotedSegmentsOf } from './command-text'
+import { gitSubcommand, unquotedSegmentsOf } from './command-text'
 import type { GitResult, RunGit } from './run-git'
 
 interface Piece {
@@ -26,7 +26,7 @@ interface Heredoc {
 const HEREDOC_OPENER = /\$\(\s*cat\s+<<-?\s*(['"]?)(\w+)\1[^\n]*\n/y
 const CLOSING_BRACKET = /\s*\)/y
 const COMMAND_SEPARATOR = /^(?:&&|\|\||;|\||&|\n|\))/
-const DIRECTORY_BREAKING_SEPARATOR = /\|\||\|&|\||(?<!&)&(?!&)/
+const DIRECTORY_CHANGE = /\b(?:cd|pushd)\b/
 const COMMIT_TYPES = 'feat|fix|refactor|docs|test|chore|perf|ci|build|style|revert'
 const SUBJECT_SHAPE = new RegExp(`^(${COMMIT_TYPES})\\([a-z0-9][a-z0-9-]*\\): \\S`)
 const TICKET_SUFFIX = / \([A-Z][A-Z0-9]+-\d+\)$/
@@ -133,19 +133,10 @@ function commitsIn(command: string): Commit[] {
     .filter(commit => !quoted.some(([start, end]) => commit.index >= start && commit.index < end))
     .map(commit => ({
       messages: messagesOf(tokensOf(command.slice(commit.index + commit[0].length))),
-      directories: [
-        ...changedDirectoriesIn(command.slice(0, commit.index)),
-        ...optionDirectoriesIn(commit[0]),
-      ],
+      directories: DIRECTORY_CHANGE.test(command.slice(0, commit.index))
+        ? []
+        : optionDirectoriesIn(commit[0]),
     }))
-}
-
-function changedDirectoriesIn(precedingCommand: string): string[] {
-  if (DIRECTORY_BREAKING_SEPARATOR.test(precedingCommand)) return []
-  return segmentsOf(precedingCommand).flatMap(segment => {
-    const [command, directory] = tokensOf(segment)
-    return command?.text === 'cd' && directory !== undefined ? [directory.text] : []
-  })
 }
 
 function optionDirectoriesIn(gitCommand: string): string[] {

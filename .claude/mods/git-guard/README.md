@@ -69,7 +69,7 @@ The guard runs most git checks in the session directory. It runs a query only wh
 - `git diff --cached --name-only -z` for a commit, to list the staged paths.
 - `git diff --name-only -z` for `git commit -a`, to list the unstaged tracked paths.
 - `git status --porcelain -z --untracked-files=all` when the command also runs `git add`, to list the paths that the add can stage.
-- `git branch --show-current` for a commit with a message, to read the ticket key. It runs in the commit's directory, which comes from a preceding `cd` joined by `&&`, `;` or a newline, and from `-C`. If the query in the commit's directory fails or finds no branch, the guard repeats it in the session directory.
+- `git branch --show-current` for a commit with a message, to read the ticket key. It runs in the directory that the `-C` options of the commit name. If a `cd` or `pushd` comes earlier in the command, the guard ignores `-C` and uses the session directory. If a query fails or finds no branch, the guard repeats it in the session directory.
 
 A command that is not git runs no git process.
 
@@ -80,8 +80,8 @@ A command that is not git runs no git process.
 - The guard does not check a `-c` argument that is built from a variable, an expansion or `eval`.
 - The secret-file and amend checks run in the session directory, so they check `git -C other commit` against the session repository.
 - The guard does not see a `cd` made in an earlier Bash call.
-- If the command has `||`, `|` or `&` before the commit, the guard ignores every `cd` and uses the session branch. A `-C` option of the commit itself still counts.
-- The guard falls back to the session branch for a directory that it cannot resolve or that has no branch, such as one with `~`, a shell variable, `cd --`, `cd -P` or a detached head.
+- The guard does not follow `cd`, so a commit in another worktree must use `git -C <dir> commit` to be checked against the branch of that worktree.
+- The guard falls back to the session branch for a `-C` directory that it cannot resolve or that has no branch, such as one with `~`, a shell variable or a detached head.
 - The guard does not read the attached forms `-Cdir` and `-C=dir`.
 - The guard does not catch `git reset <other-branch>` without `--hard`.
 - The guard reads the branch, the upstream and the index before the command runs, so it checks the old branch for `git switch X && git commit`.

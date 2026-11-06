@@ -271,13 +271,16 @@ function answeringByArguments(answers: Record<string, GitResult>): {
 
 const SUBJECT_FOR_598 = 'feat(mods): add x (VAN3-598)'
 
-test('a commit after cd into another worktree is checked against that worktree branch', async () => {
-  const { runGit } = answeringByArguments({
+const SESSION_SUFFIX_REASON = denialText('the branch VAN3-597 needs the suffix (VAN3-597)')
+
+test('a cd into another worktree is not followed', async () => {
+  const { runGit, runs } = answeringByArguments({
     'branch --show-current': onBranch('VAN3-597'),
     '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
   })
   const command = `cd /wt/598 && ${commitWith(SUBJECT_FOR_598)}`
-  expect(await commitMessageDenial(runGit, command)).toBeUndefined()
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+  expect(runs).toEqual(['branch --show-current'])
 })
 
 test('a commit with -C queries the branch of that directory', async () => {
@@ -298,12 +301,37 @@ test('a quoted -C directory reaches the branch query unquoted', async () => {
   expect(queries).toEqual([['-C', 'my dir', 'branch', '--show-current']])
 })
 
-test('a cd and a -C are queried in order', async () => {
+test('two -C options are queried in order', async () => {
   const { runGit, runs } = answeringByArguments({
     '-C a -C b branch --show-current': onBranch('VAN3-598'),
   })
-  await commitMessageDenial(runGit, `cd a && git -C b commit -m "${SUBJECT_FOR_598}"`)
+  await commitMessageDenial(runGit, `git -C a -C b commit -m "${SUBJECT_FOR_598}"`)
   expect(runs).toEqual(['-C a -C b branch --show-current'])
+})
+
+test('a -C option is ignored after a cd', async () => {
+  const { runGit, runs } = answeringByArguments({})
+  await commitMessageDenial(runGit, `cd /wt/598 && git -C sub commit -m "${SUBJECT_FOR_598}"`)
+  expect(runs).toEqual(['branch --show-current'])
+})
+
+test('a -C option is ignored after a pushd', async () => {
+  const { runGit, runs } = answeringByArguments({
+    'branch --show-current': onBranch('VAN3-597'),
+    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
+  })
+  const command = `pushd /wt/598 && git -C /wt/598 commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+  expect(runs).toEqual(['branch --show-current'])
+})
+
+test('a cd after a failing condition is not followed', async () => {
+  const { runGit } = answeringByArguments({
+    'branch --show-current': onBranch('VAN3-597'),
+    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
+  })
+  const command = `false && cd /wt/598 ; git commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
 })
 
 function failingDirectoryQueries(sessionBranch: string): { runGit: RunGit; runs: string[] } {
@@ -315,60 +343,22 @@ function failingDirectoryQueries(sessionBranch: string): { runGit: RunGit; runs:
   return { runGit, runs }
 }
 
-const SESSION_SUFFIX_REASON = denialText('the branch VAN3-597 needs the suffix (VAN3-597)')
-
-test('a cd into a directory the guard cannot resolve falls back to the session branch', async () => {
+test('a -C directory the guard cannot resolve falls back to the session branch', async () => {
   const { runGit } = failingDirectoryQueries('VAN3-597')
-  const command = 'cd ~/wt/598 && git commit -m "feat(x): y (VAN3-999)"'
+  const command = 'git -C ~/wt/598 commit -m "feat(x): y (VAN3-999)"'
   expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
 })
 
-test('a cd with a double-dash option falls back to the session branch', async () => {
-  const { runGit } = failingDirectoryQueries('VAN3-597')
-  const command = 'cd -- /wt/598 && git commit -m "feat(x): y (VAN3-999)"'
-  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
-})
-
-test('a cd joined to the commit by a double bar is ignored', async () => {
-  const { runGit, runs } = answeringByArguments({
-    'branch --show-current': onBranch('VAN3-597'),
-    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
-  })
-  const command = `cd /wt/598 || git commit -m "${SUBJECT_FOR_598}"`
-  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
-  expect(runs).toEqual(['branch --show-current'])
-})
-
-test('a cd piped into the commit is ignored', async () => {
-  const { runGit } = answeringByArguments({
-    'branch --show-current': onBranch('VAN3-597'),
-    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
-  })
-  const command = `cd /wt/598 | git commit -m "${SUBJECT_FOR_598}"`
-  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
-})
-
-test('a cd after a double bar is ignored even when another cd follows', async () => {
-  const { runGit, runs } = answeringByArguments({
-    'branch --show-current': onBranch('VAN3-597'),
-    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
-    '-C /wt/599 branch --show-current': onBranch('VAN3-599'),
-  })
-  const command = 'cd /wt/598 || cd /wt/599 && git commit -m "feat(x): y (VAN3-599)"'
-  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
-  expect(runs).toEqual(['branch --show-current'])
-})
-
-test('a detached target directory falls back to the session branch', async () => {
+test('a detached -C target falls back to the session branch', async () => {
   const { runGit } = answeringByArguments({
     'branch --show-current': onBranch('VAN3-597'),
     '-C /wt/det branch --show-current': { exitCode: 0, stdout: '' },
   })
-  const command = 'cd /wt/det && git commit -m "feat(x): y (VAN3-999)"'
+  const command = 'git -C /wt/det commit -m "feat(x): y (VAN3-999)"'
   expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
 })
 
-test('a commit without cd or -C queries the session branch', async () => {
+test('a commit without -C queries the session branch', async () => {
   const { runGit, runs } = branchRunner(onBranch('VAN3-598'))
   await commitMessageDenial(runGit, `git commit -m "${SUBJECT_FOR_598}"`)
   expect(runs).toEqual(['branch --show-current'])
