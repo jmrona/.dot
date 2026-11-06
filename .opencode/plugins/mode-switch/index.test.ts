@@ -349,7 +349,7 @@ const DESIGN_ROOT_TEXT =
   'You are the design root on openai/hard. You author design content yourself: design questions, alternatives, sections, the committee agenda, summaries and design revisions. Do not delegate them to stack-planner.'
 
 const DESIGN_EXIT_TEXT =
-  'If the user has explicitly approved the design, either before you presented it or in reply to it, finish the approved design step of your design skill (save the plan file) and then invoke the implementation skill (`subagent-driven-development`, or `fast-path-implementation` when the design skill says so) in this same turn. The mode-switch plugin moves this session to Build when that skill loads, so do not ask the user to switch agents and do not wait for them to press Tab. Only without that approval, stop and wait for it.'
+  'If the user has explicitly approved the design, either before you presented it or in reply to it, continue your design skill without waiting: save the plan file, then, if the user\'s words already choose implementation, invoke `subagent-driven-development` in this same turn; otherwise ask the next-step question that your design skill defines. The mode-switch plugin moves this session to Build when that skill loads, so do not ask the user to switch agents and do not wait for them to press Tab. Only without that approval, stop and wait for it.'
 
 async function runContextHook(
   options: FakeApiOptions,
@@ -367,6 +367,14 @@ test('the design exit instruction tells the root to invoke the implementation sk
   assert.match(DESIGN_EXIT_INSTRUCTION, /moves this session to Build/)
   assert.match(DESIGN_EXIT_INSTRUCTION, /do not ask the user to switch agents and do not wait for them to press Tab/)
   assert.match(DESIGN_EXIT_INSTRUCTION, /either before you presented it or in reply to it/)
+})
+
+test('the design exit instruction asks the design skill next-step question when the words do not choose implementation', () => {
+  assert.match(DESIGN_EXIT_INSTRUCTION, /otherwise ask the next-step question that your design skill defines/)
+})
+
+test('the design exit instruction does not mention fast-path-implementation', () => {
+  assert.doesNotMatch(DESIGN_EXIT_INSTRUCTION, /fast-path-implementation/)
 })
 
 test('the context hook appends the design root instruction for a root plan session', async () => {

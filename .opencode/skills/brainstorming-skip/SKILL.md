@@ -44,7 +44,7 @@ For the rule that no implementation may begin until the user has approved a desi
    **Out of scope:** [anything the user explicitly excluded, or "nothing flagged"]
    ```
 
-   The `exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads)` call IS the explicit approval step. The user accepts or rejects the design by approving or rejecting the plan.
+   Presenting the design and receiving the user's explicit approval, given before you presented it or in reply to it, is the explicit approval step.
 
 5. **Decide the next step.** After the design is approved, save it once with `write` to `/Users/jose.romero/.opencode/plan/<ticket>-<short-topic>.md`. Use the ticket key, or `no-ticket` if there is none. Use a new short topic for each design, so that an earlier plan is never overwritten. Do not write or edit that file before final approval, and do not edit it afterwards. The auto-compact plugin then compacts the session and posts a notice after the compaction that carries the plan path. If the design input has `Source: work-on-ticket`, invoke `subagent-driven-development` without asking. If the user asks for more tickets at final approval in a ticket run, invoke `create-tickets` instead. If the user's approval already asks for implementation (for example 'apply the fix'), that answers the question, so do not ask it and invoke `subagent-driven-development`. If the design input does not have `Source: work-on-ticket`, use `question` to ask whether to create tickets or start implementation:
 
@@ -142,7 +142,7 @@ You **MUST NOT** invoke `create-tickets` or `subagent-driven-development` until 
 
 - The user provided a brief design statement
 - You presented it via `exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads)` and the user approved
-- Without a `Source: work-on-ticket` line, the user picked an implementation next step via `question`
+- Without a `Source: work-on-ticket` line, the user picked an implementation next step via `question` or the user's approval already asked for implementation
 
 If any one of these is false, the gate has not been crossed, and you **MUST NOT** hand off.
 
