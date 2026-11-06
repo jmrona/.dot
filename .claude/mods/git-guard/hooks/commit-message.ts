@@ -1,4 +1,4 @@
-import { gitSubcommand, unquotedSegmentsOf } from './command-text'
+import { gitSubcommand, segmentsOf, unquotedSegmentsOf } from './command-text'
 import type { RunGit } from './run-git'
 
 interface Piece {
@@ -11,6 +11,11 @@ interface Piece {
 interface Message {
   readonly text: string
   readonly isShellExpansion: boolean
+}
+
+interface Commit {
+  readonly messages: readonly Message[]
+  readonly directories: readonly string[]
 }
 
 interface Heredoc {
@@ -46,8 +51,8 @@ export async function commitMessageDenial(
   if (!unquotedSegmentsOf(command).some(segment => gitSubcommand('commit').test(segment))) {
     return undefined
   }
-  for (const messages of commitMessagesIn(command)) {
-    const reason = await reasonForMessages(runGit, messages)
+  for (const commit of commitsIn(command)) {
+    const reason = await reasonForMessages(runGit, commit)
     if (reason !== undefined) return `${DENIAL_PREFIX}${reason}${DENIAL_SUFFIX}`
   }
   return undefined
@@ -55,12 +60,12 @@ export async function commitMessageDenial(
 
 async function reasonForMessages(
   runGit: RunGit,
-  messages: readonly Message[],
+  { messages, directories }: Commit,
 ): Promise<string | undefined> {
   const [first] = messages
   if (first === undefined) return undefined
   const [subjectLine = ''] = first.text.split('\n')
-  const subjectReason = await subjectReasonOf(runGit, subjectLine.trimEnd(), first)
+  const subjectReason = await subjectReasonOf(runGit, subjectLine.trimEnd(), first, directories)
   return subjectReason ?? punctuationReason(messages.map(message => message.text).join('\n\n'))
 }
 
@@ -68,10 +73,11 @@ async function subjectReasonOf(
   runGit: RunGit,
   subject: string,
   message: Message,
+  directories: readonly string[],
 ): Promise<string | undefined> {
   if (subject.startsWith('Merge ')) return undefined
   if (message.isShellExpansion) return LITERAL_REASON
-  return shapeReason(subject) ?? (await ticketReason(runGit, subject))
+  return shapeReason(subject) ?? (await ticketReason(runGit, subject, directories))
 }
 
 function punctuationReason(message: string): string | undefined {
@@ -89,8 +95,13 @@ function shapeReason(subject: string): string | undefined {
   return undefined
 }
 
-async function ticketReason(runGit: RunGit, subject: string): Promise<string | undefined> {
-  const result = await runGit(['branch', '--show-current'])
+async function ticketReason(
+  runGit: RunGit,
+  subject: string,
+  directories: readonly string[],
+): Promise<string | undefined> {
+  const directoryOptions = directories.flatMap(directory => ['-C', directory])
+  const result = await runGit([...directoryOptions, 'branch', '--show-current'])
   const branch = result.stdout.trim()
   if (result.exitCode !== 0 || branch === '') return undefined
   const key = TICKET_KEY.exec(branch)?.[0]
@@ -103,12 +114,33 @@ async function ticketReason(runGit: RunGit, subject: string): Promise<string | u
   return undefined
 }
 
-function commitMessagesIn(command: string): Message[][] {
+function commitsIn(command: string): Commit[] {
   const quoted = quotedRangesIn(command)
   const commits = [...command.matchAll(new RegExp(gitSubcommand('commit').source, 'g'))]
   return commits
     .filter(commit => !quoted.some(([start, end]) => commit.index >= start && commit.index < end))
-    .map(commit => messagesOf(tokensOf(command.slice(commit.index + commit[0].length))))
+    .map(commit => ({
+      messages: messagesOf(tokensOf(command.slice(commit.index + commit[0].length))),
+      directories: [
+        ...changedDirectoriesIn(command.slice(0, commit.index)),
+        ...optionDirectoriesIn(commit[0]),
+      ],
+    }))
+}
+
+function changedDirectoriesIn(precedingCommand: string): string[] {
+  return segmentsOf(precedingCommand).flatMap(segment => {
+    const [command, directory] = tokensOf(segment)
+    return command?.text === 'cd' && directory !== undefined ? [directory.text] : []
+  })
+}
+
+function optionDirectoriesIn(gitCommand: string): string[] {
+  const tokens = tokensOf(gitCommand)
+  return tokens.flatMap((token, position) => {
+    const directory = tokens[position + 1]
+    return token.text === '-C' && directory !== undefined ? [directory.text] : []
+  })
 }
 
 function messageFrom(text: string, isShellExpansion: boolean): Message {

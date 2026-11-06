@@ -69,7 +69,7 @@ The guard runs git in the session directory. It runs a query only when the comma
 - `git diff --cached --name-only -z` for a commit, to list the staged paths.
 - `git diff --name-only -z` for `git commit -a`, to list the unstaged tracked paths.
 - `git status --porcelain -z --untracked-files=all` when the command also runs `git add`, to list the paths that the add can stage.
-- `git branch --show-current` for a commit with a message, to read the ticket key.
+- `git branch --show-current` for a commit with a message, to read the ticket key. It runs in the commit's directory, which comes from a preceding `cd` and from `-C`.
 
 A command that is not git runs no git process.
 
@@ -78,7 +78,11 @@ A command that is not git runs no git process.
 - The guard matches on a best-effort basis: it does not catch a command built through a shell variable, a script or an alias.
 - The guard checks `sh -c`, `bash -c` and `zsh -c` arguments, but `git reset "--hard"` still passes because it removes quoted text before matching.
 - The guard does not check a `-c` argument that is built from a variable, an expansion or `eval`.
-- The guard runs its git checks in the session directory, so it checks `git -C other commit` against the session repository.
+- The secret-file and amend checks run in the session directory, so they check `git -C other commit` against the session repository.
+- The guard does not see a `cd` made in an earlier Bash call.
+- The guard does not expand `~` in a `cd` or `-C` directory.
+- The guard does not handle a `cd` without an argument, `cd -`, or a `cd` inside a subshell.
+- The guard does not read the attached forms `-Cdir` and `-C=dir`.
 - The guard does not catch `git reset <other-branch>` without `--hard`.
 - The guard reads the branch, the upstream and the index before the command runs, so it checks the old branch for `git switch X && git commit`.
 - The guard does not check a `--` used as prose punctuation in a commit body.

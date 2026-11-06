@@ -251,3 +251,58 @@ test('an unquoted message with an escaped leading dollar gets the shape reason',
   const denial = await shapeDenialFor('git commit -m \\$5')
   expect(denial).toBe(denialText(SHAPE_REASON))
 })
+
+function answeringByArguments(answers: Record<string, GitResult>): {
+  runGit: RunGit
+  runs: string[]
+} {
+  const runs: string[] = []
+  const runGit: RunGit = async args => {
+    runs.push(args.join(' '))
+    return answers[args.join(' ')] ?? { exitCode: 1, stdout: '' }
+  }
+  return { runGit, runs }
+}
+
+const SUBJECT_FOR_598 = 'feat(mods): add x (VAN3-598)'
+
+test('a commit after cd into another worktree is checked against that worktree branch', async () => {
+  const { runGit } = answeringByArguments({
+    'branch --show-current': onBranch('VAN3-597'),
+    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
+  })
+  const command = `cd /wt/598 && ${commitWith(SUBJECT_FOR_598)}`
+  expect(await commitMessageDenial(runGit, command)).toBeUndefined()
+})
+
+test('a commit with -C queries the branch of that directory', async () => {
+  const { runGit, runs } = answeringByArguments({
+    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
+  })
+  await commitMessageDenial(runGit, `git -C /wt/598 commit -m "${SUBJECT_FOR_598}"`)
+  expect(runs).toEqual(['-C /wt/598 branch --show-current'])
+})
+
+test('a quoted -C directory reaches the branch query unquoted', async () => {
+  const queries: (readonly string[])[] = []
+  const runGit: RunGit = async args => {
+    queries.push(args)
+    return onBranch('VAN3-598')
+  }
+  await commitMessageDenial(runGit, `git -C "my dir" commit -m "${SUBJECT_FOR_598}"`)
+  expect(queries).toEqual([['-C', 'my dir', 'branch', '--show-current']])
+})
+
+test('a cd and a -C are queried in order', async () => {
+  const { runGit, runs } = answeringByArguments({
+    '-C a -C b branch --show-current': onBranch('VAN3-598'),
+  })
+  await commitMessageDenial(runGit, `cd a && git -C b commit -m "${SUBJECT_FOR_598}"`)
+  expect(runs).toEqual(['-C a -C b branch --show-current'])
+})
+
+test('a commit without cd or -C queries the session branch', async () => {
+  const { runGit, runs } = branchRunner(onBranch('VAN3-598'))
+  await commitMessageDenial(runGit, `git commit -m "${SUBJECT_FOR_598}"`)
+  expect(runs).toEqual(['branch --show-current'])
+})
