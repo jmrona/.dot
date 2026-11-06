@@ -4,12 +4,15 @@ import type { WaveArgs, WavePlan, WaveTask } from './wave-plan.ts'
 
 export const DEFAULT_PROOF_TIMEOUT_SECONDS = 1200
 export const MAX_CORRECTION_ROUNDS = 2
+export const SUBAGENT_PREAMBLE =
+  'You are a subagent dispatched by the implement_wave tool. The user has already approved the design and this task, so the Subagent Exemption of the skills policy applies. Do not run brainstorming, the design router or any other workflow skill, and do not ask the user anything, because nobody can answer. Do the task below and report in the required format.'
 export const IMPLEMENTER_FIELDS = ['status', 'summary', 'tddEvidence', 'concerns', 'environmentFailures'] as const
 export const REVIEWER_FIELDS = ['verdict', 'findings'] as const
 export interface ReviewVerdict { readonly verdict: 'PASS' | 'FAIL'; readonly findings: readonly string[] }
 export interface TaskOutcome { readonly state: 'verified' | 'reviewed' | 'blocked' | 'stopped'; readonly rounds: number; readonly reviews: readonly ReviewVerdict[]; readonly report: Readonly<Record<string, unknown>> | null; readonly reason?: string }
 export interface WaveResult { readonly status: 'completed' | 'gate-failed' | 'aborted'; readonly wave: readonly string[]; readonly tasks: Readonly<Record<string, TaskOutcome>>; readonly gate: GateResult | null; readonly held: readonly string[]; readonly remaining: readonly string[]; readonly reason?: string }
-export interface WaveRunnerDependencies { readonly runChild: (spec: ChildRunSpec) => Promise<ChildRunResult>; readonly runGate: (input: GateInput) => Promise<GateResult>; readonly directory: string; readonly rootSessionID: string; readonly signal?: AbortSignal }
+export interface PromptTemplates { readonly implementer: string; readonly reviewer: string }
+export interface WaveRunnerDependencies { readonly prompts: PromptTemplates; readonly runChild: (spec: ChildRunSpec) => Promise<ChildRunResult>; readonly runGate: (input: GateInput) => Promise<GateResult>; readonly directory: string; readonly rootSessionID: string; readonly signal?: AbortSignal }
 
 type WaveKind = Extract<WavePlan, { kind: 'wave' }>
 type Report = Readonly<Record<string, unknown>>
@@ -43,9 +46,10 @@ function correctionSections(findings: readonly string[]): string[] {
   ]
 }
 
-function buildImplementPrompt(args: WaveArgs, task: WaveTask, findings: readonly string[]): string {
+function buildImplementPrompt(args: WaveArgs, prompts: PromptTemplates, task: WaveTask, findings: readonly string[]): string {
   return [
-    args.prompts.implementer,
+    SUBAGENT_PREAMBLE,
+    prompts.implementer,
     '## Task',
     `Id: ${task.id}`,
     `Title: ${task.title}`,
@@ -59,9 +63,10 @@ function buildImplementPrompt(args: WaveArgs, task: WaveTask, findings: readonly
   ].join('\n\n')
 }
 
-function buildReviewPrompt(args: WaveArgs, task: WaveTask, report: Report): string {
+function buildReviewPrompt(args: WaveArgs, prompts: PromptTemplates, task: WaveTask, report: Report): string {
   return [
-    args.prompts.reviewer,
+    SUBAGENT_PREAMBLE,
+    prompts.reviewer,
     '## Task under review',
     `Id: ${task.id}`,
     `Title: ${task.title}`,
@@ -90,7 +95,7 @@ function childSpec(context: RunContext, task: WaveTask, text: string, requiredFi
 }
 
 async function implement(context: RunContext, task: WaveTask, findings: readonly string[], attempt: number): Promise<ImplementAttempt> {
-  const text = buildImplementPrompt(context.args, task, findings)
+  const text = buildImplementPrompt(context.args, context.dependencies.prompts, task, findings)
   const spec = childSpec(context, task, text, IMPLEMENTER_FIELDS, `${task.id}:implement:${attempt}`)
   const result = await context.dependencies.runChild(spec)
   if (!result.ok) return { report: null, failure: result.reason }
@@ -101,7 +106,7 @@ async function implement(context: RunContext, task: WaveTask, findings: readonly
 }
 
 async function review(context: RunContext, task: WaveTask, report: Report, round: number): Promise<ReviewStep> {
-  const text = buildReviewPrompt(context.args, task, report)
+  const text = buildReviewPrompt(context.args, context.dependencies.prompts, task, report)
   const result = await context.dependencies.runChild(childSpec(context, task, text, REVIEWER_FIELDS, `${task.id}:review:${round}`))
   if (result.ok) return { verdict: result.value as unknown as ReviewVerdict }
   if (result.reason === 'invalid-report') return { verdict: NO_VALID_VERDICT }

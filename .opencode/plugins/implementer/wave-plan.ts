@@ -15,7 +15,6 @@ export interface WaveArgs {
   readonly baseSha: string
   readonly dirtyAtBase: readonly string[]
   readonly models: Readonly<Record<string, string>>
-  readonly prompts: { readonly implementer: string; readonly reviewer: string }
   readonly proofCommands: readonly string[]
   readonly completed: readonly string[]
   readonly stopped: readonly string[]
@@ -49,16 +48,10 @@ const TOP_LEVEL_SHAPE: readonly FieldRule[] = [
   ['baseSha', 'string'],
   ['dirtyAtBase', 'array'],
   ['models', 'object'],
-  ['prompts', 'object'],
   ['proofCommands', 'array'],
   ['completed', 'array'],
   ['stopped', 'array'],
   ['tasks', 'array'],
-]
-
-const PROMPT_SHAPE: readonly FieldRule[] = [
-  ['implementer', 'string'],
-  ['reviewer', 'string'],
 ]
 
 const TASK_SHAPE: readonly FieldRule[] = [
@@ -140,9 +133,6 @@ function findArgsProblem(input: unknown): string | null {
   const args = input as UnknownRecord
   const topLevelViolation = findShapeViolation(args, TOP_LEVEL_SHAPE)
   if (topLevelViolation) return fieldMessage(`args.${topLevelViolation[0]}`, topLevelViolation[1])
-  const prompts = args.prompts as UnknownRecord
-  const promptViolation = findShapeViolation(prompts, PROMPT_SHAPE)
-  if (promptViolation) return fieldMessage(`args.prompts.${promptViolation[0]}`, promptViolation[1])
   return findTaskProblem(args.tasks as readonly unknown[]) ?? findTimeoutProblem(args)
 }
 

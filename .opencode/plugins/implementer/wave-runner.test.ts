@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import type { ChildRunResult, ChildRunSpec } from './child-session.ts'
 import type { GateInput, GateResult } from './gate.ts'
 import type { WavePlan } from './wave-plan.ts'
-import { runWave } from './wave-runner.ts'
+import { runWave, SUBAGENT_PREAMBLE } from './wave-runner.ts'
 
 type WaveKind = Extract<WavePlan, { kind: 'wave' }>
 
@@ -16,7 +16,6 @@ function buildPlan(taskIds: readonly string[] = ['T1']): WaveKind {
   }))
   const args = {
     baseSha: BASE_SHA, dirtyAtBase: ['notes.md'], models: { standard: 'model-a' },
-    prompts: { implementer: 'IMPLEMENTER PROMPT', reviewer: 'REVIEWER PROMPT' },
     proofCommands: ['npm test'], completed: [], stopped: [], tasks: wave,
   }
   return { kind: 'wave', args, wave, held: ['H1'], remaining: ['R1'] }
@@ -52,7 +51,8 @@ function gateRecorder(result: GateResult = PASSING_GATE) {
 function dependenciesFor(script: readonly ChildRunResult[], gateResult?: GateResult, signal?: AbortSignal) {
   const runner = scriptedRunner(script)
   const gate = gateRecorder(gateResult)
-  const dependencies = { runChild: runner.runChild, runGate: gate.runGate, directory: '/repo', rootSessionID: 'root', signal }
+  const prompts = { implementer: 'TEMPLATE IMPLEMENTER', reviewer: 'TEMPLATE REVIEWER' }
+  const dependencies = { runChild: runner.runChild, runGate: gate.runGate, directory: '/repo', rootSessionID: 'root', signal, prompts }
   return { dependencies, runner, gate }
 }
 
@@ -179,5 +179,29 @@ describe('runWave', () => {
     assert.equal(result.reason, 'cancelled')
     assert.equal(result.gate, null)
     assert.equal(gate.inputs.length, 0)
+  })
+})
+
+describe('child prompts', () => {
+  it('starts each implementer text with the subagent preamble and then the implementer template from the dependencies', async () => {
+    const { dependencies, runner } = dependenciesFor([DONE, PASS])
+
+    await runWave(buildPlan(), dependencies)
+
+    assert.ok(runner.specs[0].text.startsWith(`${SUBAGENT_PREAMBLE}\n\nTEMPLATE IMPLEMENTER`))
+  })
+
+  it('starts each reviewer text with the subagent preamble and then the reviewer template from the dependencies', async () => {
+    const { dependencies, runner } = dependenciesFor([DONE, PASS])
+
+    await runWave(buildPlan(), dependencies)
+
+    assert.ok(runner.specs[1].text.startsWith(`${SUBAGENT_PREAMBLE}\n\nTEMPLATE REVIEWER`))
+  })
+
+  it('the subagent preamble invokes the Subagent Exemption and forbids brainstorming and questions to the user', () => {
+    assert.match(SUBAGENT_PREAMBLE, /Subagent Exemption/)
+    assert.match(SUBAGENT_PREAMBLE, /brainstorming/)
+    assert.match(SUBAGENT_PREAMBLE, /ask the user/)
   })
 })

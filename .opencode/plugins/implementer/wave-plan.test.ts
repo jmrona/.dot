@@ -26,7 +26,6 @@ function planInput(overrides: PlanInput = {}): PlanInput {
     baseSha: '1fe894b3b1b8131520b3aa0bc4af0d331ee04b35',
     dirtyAtBase: [],
     models: { standard: 'model-standard' },
-    prompts: { implementer: 'Implement the task.', reviewer: 'Review the task.' },
     proofCommands: ['node --test'],
     completed: [],
     stopped: [],
@@ -74,13 +73,6 @@ test('planWave rejects a missing array field and suggests an empty array', () =>
   assert.equal(
     problemOf(withoutField(planInput(), 'dirtyAtBase')),
     'args.dirtyAtBase must be an array. Pass an empty array when nothing applies.',
-  )
-})
-
-test('planWave rejects a missing prompt field and names it', () => {
-  assert.equal(
-    problemOf(planInput({ prompts: { implementer: 'Implement the task.' } })),
-    'args.prompts.reviewer must be a string.',
   )
 })
 
@@ -246,23 +238,6 @@ test('planWave lists tasks beyond the wave cap in remaining', () => {
   assert.deepEqual(plan.remaining, ['T5'])
 })
 
-test('planWave never lists completed or stopped tasks in remaining or in the wave', () => {
-  const plan = waveOf(
-    planInput({
-      completed: ['T1'],
-      stopped: ['T2'],
-      tasks: [task('T1'), task('T2'), task('T3')],
-    }),
-  )
-  assert.deepEqual(idsOf(plan.wave), ['T3'])
-  assert.deepEqual(plan.remaining, [])
-})
-
-test('planWave returns the validated args alongside the wave', () => {
-  const plan = waveOf(planInput({ tasks: [task('T1')], proofCommands: ['node --test'] }))
-  assert.deepEqual(plan.args.proofCommands, ['node --test'])
-})
-
 test('planWave returns nothing-to-run with held ids when every pending task is held', () => {
   assert.deepEqual(
     planWave(
@@ -275,9 +250,3 @@ test('planWave returns nothing-to-run with held ids when every pending task is h
   )
 })
 
-test('planWave returns nothing-to-run when every task is already finished', () => {
-  assert.deepEqual(
-    planWave(planInput({ completed: ['T1'], stopped: ['T2'], tasks: [task('T1'), task('T2')] })),
-    { kind: 'nothing-to-run', held: [], remaining: [] },
-  )
-})

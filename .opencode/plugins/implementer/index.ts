@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { applySwitch, type ModeSwitchApi } from '../mode-switch/index.ts'
@@ -6,10 +8,19 @@ import { createSlotSemaphore, type SlotSemaphore } from '../rate-guard/semaphore
 import { createChildSessionRunner, type ChildSessionApi } from './child-session.ts'
 import { runGate, type GateInput, type GateResult } from './gate.ts'
 import { planWave, type WavePlan } from './wave-plan.ts'
-import { runWave } from './wave-runner.ts'
+import { runWave, type PromptTemplates } from './wave-runner.ts'
 
 export const HARD_MODEL = 'openai/hard'
 export const DEFAULT_CHILD_TIMEOUT_SECONDS = 1800
+export const PROMPT_TEMPLATE_DIRECTORY = fileURLToPath(new URL('../../skills/subagent-driven-development/', import.meta.url))
+
+export async function readPromptTemplates(directory: string): Promise<PromptTemplates> {
+  const [implementer, reviewer] = await Promise.all([
+    readFile(join(directory, 'implementer-prompt.md'), 'utf8'),
+    readFile(join(directory, 'reviewer-prompt.md'), 'utf8'),
+  ])
+  return { implementer, reviewer }
+}
 
 const IMPLEMENT_WAVE_DESCRIPTION =
   'Run one wave of the approved implementation plan. Call it once per wave of the subagent-driven-development skill, after the user approved the design. It blocks until the wave ends and returns the wave result as JSON.'
@@ -48,6 +59,7 @@ export interface ImplementerApi {
 export interface ImplementWaveDependencies {
   readonly api: ImplementerApi
   readonly semaphore: SlotSemaphore
+  readonly prompts: PromptTemplates
   readonly runGate: (input: GateInput) => Promise<GateResult>
 }
 
@@ -103,6 +115,7 @@ async function runPlannedWave(
     timeoutSeconds: plan.args.childTimeoutSeconds ?? DEFAULT_CHILD_TIMEOUT_SECONDS,
   })
   return runWave(plan, {
+    prompts: dependencies.prompts,
     runChild: (spec) => runner.run(spec),
     runGate: dependencies.runGate,
     directory,
@@ -178,7 +191,6 @@ export function buildImplementWaveSchemas(schema: SchemaModule): { input: unknow
     baseSha: schema.String,
     dirtyAtBase: strings,
     models: schema.Record(schema.String, schema.String),
-    prompts: schema.Struct({ implementer: schema.String, reviewer: schema.String }),
     proofCommands: strings,
     completed: strings,
     stopped: strings,
@@ -202,8 +214,9 @@ async function setup(api: ImplementerApi): Promise<void> {
   const configPath = fileURLToPath(new URL('../rate-guard/config.json', import.meta.url))
   const limit = await loadHardLimit(configPath, console.warn)
   const semaphore = createSlotSemaphore(limit, (sessionID) => isSessionAlive(api, sessionID))
+  const prompts = await readPromptTemplates(PROMPT_TEMPLATE_DIRECTORY)
   const { Schema } = await import('effect')
-  await registerImplementWave({ api, semaphore, runGate }, buildImplementWaveSchemas(Schema as unknown as SchemaModule))
+  await registerImplementWave({ api, semaphore, prompts, runGate }, buildImplementWaveSchemas(Schema as unknown as SchemaModule))
 }
 
 export default { id: 'implementer', setup }

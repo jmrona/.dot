@@ -38,3 +38,10 @@ test('implementer prompt does not ask for background true', () => {
 test('reviewer prompt does not ask for background true', () => {
   assert.doesNotMatch(reviewer(), /background: true/)
 })
+
+test('skill lets implement_wave read the prompt templates instead of passing them as arguments', () => {
+  const body = skill()
+  const section = body.slice(body.indexOf('## Running a Wave with implement_wave'), body.indexOf('## Per-Wave Pipeline'))
+  assert.doesNotMatch(section, /`prompts`:/)
+  assert.match(section, /`implement_wave` reads `\.\/implementer-prompt\.md` and `\.\/reviewer-prompt\.md` itself/)
+})

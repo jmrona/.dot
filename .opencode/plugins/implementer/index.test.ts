@@ -2,8 +2,11 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import implementerPlugin, {
+  buildImplementWaveSchemas,
   DEFAULT_CHILD_TIMEOUT_SECONDS,
   executeImplementWave,
+  PROMPT_TEMPLATE_DIRECTORY,
+  readPromptTemplates,
   registerImplementWave,
   type ImplementWaveContext,
   type ImplementWaveDependencies,
@@ -46,7 +49,7 @@ function validInput(overrides: Record<string, unknown> = {}): Record<string, unk
   }
   return {
     baseSha: 'base000', dirtyAtBase: [], models: { standard: 'openai/routine' },
-    prompts: { implementer: 'IMPLEMENTER', reviewer: 'REVIEWER' }, proofCommands: ['npm test'],
+    proofCommands: ['npm test'],
     completed: [], stopped: [], tasks: [task], ...overrides,
   }
 }
@@ -102,6 +105,7 @@ function createDependencies(options: FakeApiOptions = {}) {
   const dependencies: ImplementWaveDependencies = {
     api: fake.api,
     semaphore: createSlotSemaphore(2, async () => true),
+    prompts: { implementer: 'TEMPLATE IMPLEMENTER', reviewer: 'TEMPLATE REVIEWER' },
     runGate: async (input) => {
       gateInputs.push(input)
       return PASSING_GATE
@@ -236,4 +240,34 @@ test('the registered implement_wave tool delegates to executeImplementWave', asy
 test('the default export is the implementer plugin', () => {
   assert.equal(implementerPlugin.id, 'implementer')
   assert.equal(typeof implementerPlugin.setup, 'function')
+})
+
+test('executeImplementWave sends child sessions the implementer template from the dependencies', async () => {
+  const { calls } = await runWaveToResult({ replies: [DONE_REPLY, PASS_REPLY] })
+
+  const firstPrompt = calls.find((call) => call.method === 'session.prompt')?.args as { text: string }
+  assert.match(firstPrompt.text, /TEMPLATE IMPLEMENTER/)
+})
+
+test('readPromptTemplates reads the implementer and reviewer templates of the subagent-driven-development skill', async () => {
+  const templates = await readPromptTemplates(PROMPT_TEMPLATE_DIRECTORY)
+
+  assert.match(templates.implementer, /^# Implementer Subagent Prompt Template/)
+  assert.match(templates.reviewer, /^# Combined Reviewer Prompt Template/)
+})
+
+test('buildImplementWaveSchemas declares no prompts field in the tool input', () => {
+  const fakeSchema = {
+    Struct: (fields: Record<string, unknown>) => fields,
+    String: 'string',
+    Number: 'number',
+    Array: (item: unknown) => [item],
+    Record: (key: unknown, value: unknown) => ({ key, value }),
+    optional: (schema: unknown) => ({ optional: schema }),
+  }
+
+  const { input } = buildImplementWaveSchemas(fakeSchema) as { input: Record<string, unknown> }
+
+  assert.ok(Object.hasOwn(input, 'baseSha'))
+  assert.equal(Object.hasOwn(input, 'prompts'), false)
 })

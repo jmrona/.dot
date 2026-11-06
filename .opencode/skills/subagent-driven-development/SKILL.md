@@ -133,13 +133,12 @@ If the `implement_wave` tool is in your tool list, you **MUST** call the `implem
 - `baseSha`: the output of `git rev-parse HEAD`.
 - `dirtyAtBase`: the bare paths from `git status --porcelain -uall`, without the status prefix.
 - `models`: each tier name that a task uses, mapped to an opencode model id of the form `provider/id`, for example `openai/routine`, `openai/easy` and `openai/hard`.
-- `prompts`: an object with `implementer` and `reviewer`, holding the full text of `./implementer-prompt.md` and `./reviewer-prompt.md`, read with the Read tool.
 - `proofCommands`: the whole-project checks of the wave gate.
 - `completed` and `stopped`: the task ids from earlier waves.
 - `tasks`: the decomposition. Each task needs `id`, `title`, `brief`, `writes`, `dependsOn`, `acceptance`, `tier` and `agentType`. The `agentType` is an opencode agent name. The `brief` holds the full task text and its context.
 - `proofTimeoutSeconds` and `childTimeoutSeconds`: optional, with defaults of 1200 and 1800.
 
-Every other field of the arguments must be present, with an empty array where nothing applies.
+Every other field of the arguments must be present, with an empty array where nothing applies. Do not pass the prompt templates: `implement_wave` reads `./implementer-prompt.md` and `./reviewer-prompt.md` itself.
 
 On entry, the tool switches the root session to the `build` agent. It runs the implementer and reviewer child sessions, with up to 2 correction rounds. Then it runs the proof commands in its own code and reads the git HEAD and the git status. The tool owns dispatch, review, correction rounds, the gate and task states. You **MUST NOT** dispatch implementers or reviewers yourself for a wave that the tool runs. You **MUST NOT** change a state that the tool returned.
 
