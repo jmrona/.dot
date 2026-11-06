@@ -26,7 +26,7 @@ interface Heredoc {
 const HEREDOC_OPENER = /\$\(\s*cat\s+<<-?\s*(['"]?)(\w+)\1[^\n]*\n/y
 const CLOSING_BRACKET = /\s*\)/y
 const COMMAND_SEPARATOR = /^(?:&&|\|\||;|\||&|\n|\))/
-const DIRECTORY_BREAKING_SEPARATOR = /\|\||\|&|\||(?<!&)&(?!&)/g
+const DIRECTORY_BREAKING_SEPARATOR = /\|\||\|&|\||(?<!&)&(?!&)/
 const COMMIT_TYPES = 'feat|fix|refactor|docs|test|chore|perf|ci|build|style|revert'
 const SUBJECT_SHAPE = new RegExp(`^(${COMMIT_TYPES})\\([a-z0-9][a-z0-9-]*\\): \\S`)
 const TICKET_SUFFIX = / \([A-Z][A-Z0-9]+-\d+\)$/
@@ -120,8 +120,10 @@ async function currentBranchResult(
 ): Promise<GitResult> {
   const query = ['branch', '--show-current']
   if (directories.length === 0) return runGit(query)
-  const inDirectories = await runGit([...directories.flatMap(directory => ['-C', directory]), ...query])
-  return inDirectories.exitCode === 0 ? inDirectories : runGit(query)
+  const directoryOptions = directories.flatMap(directory => ['-C', directory])
+  const inDirectories = await runGit([...directoryOptions, ...query])
+  const isResolved = inDirectories.exitCode === 0 && inDirectories.stdout.trim() !== ''
+  return isResolved ? inDirectories : runGit(query)
 }
 
 function commitsIn(command: string): Commit[] {
@@ -139,12 +141,8 @@ function commitsIn(command: string): Commit[] {
 }
 
 function changedDirectoriesIn(precedingCommand: string): string[] {
-  const lastBreak = [...precedingCommand.matchAll(DIRECTORY_BREAKING_SEPARATOR)].at(-1)
-  const reachable =
-    lastBreak === undefined
-      ? precedingCommand
-      : precedingCommand.slice(lastBreak.index + lastBreak[0].length)
-  return segmentsOf(reachable).flatMap(segment => {
+  if (DIRECTORY_BREAKING_SEPARATOR.test(precedingCommand)) return []
+  return segmentsOf(precedingCommand).flatMap(segment => {
     const [command, directory] = tokensOf(segment)
     return command?.text === 'cd' && directory !== undefined ? [directory.text] : []
   })
