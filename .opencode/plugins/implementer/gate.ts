@@ -15,6 +15,15 @@ function lastLines(output: string): string {
   return output.split('\n').slice(-OUTPUT_TAIL_LINES - 1).join('\n').trimEnd()
 }
 
+function terminateProcessGroup(pid: number | undefined, chunks: Buffer[]): void {
+  if (pid === undefined) return
+  try {
+    process.kill(-pid, 'SIGTERM')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') chunks.push(Buffer.from(`${(error as Error).message}\n`))
+  }
+}
+
 function runOnce(command: string, directory: string, timeoutSeconds: number): Promise<CommandRun> {
   return new Promise((resolve) => {
     const child = spawn('sh', ['-c', command], { cwd: directory, detached: true })
@@ -22,8 +31,9 @@ function runOnce(command: string, directory: string, timeoutSeconds: number): Pr
     let timedOut = false
     const timer = setTimeout(() => {
       timedOut = true
-      process.kill(-child.pid!, 'SIGTERM')
+      terminateProcessGroup(child.pid, chunks)
     }, timeoutSeconds * 1000)
+    child.on('error', (error) => chunks.push(Buffer.from(`${error.message}\n`)))
     child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk))
     child.stderr.on('data', (chunk: Buffer) => chunks.push(chunk))
     child.on('close', (exitCode) => {

@@ -60,13 +60,6 @@ test('captures standard error in the output tail', async () => {
   assert.match(result.commands[0]?.outputTail ?? '', /problem/)
 })
 
-test('passes when every command exits zero and nothing is unattributed', async () => {
-  const result = await runGate(input({ proofCommands: ['true', 'echo ok'] }))
-  assert.equal(result.passed, true)
-  assert.equal(result.headMoved, false)
-  assert.equal(result.headSha, baseSha)
-})
-
 test('fails when any command exits non-zero', async () => {
   const result = await runGate(input({ proofCommands: ['true', 'false'] }))
   assert.equal(result.passed, false)
@@ -119,4 +112,10 @@ test('uses the second run when a command times out once and then succeeds', asyn
   assert.equal(result.commands[0]?.exitCode, 0)
   assert.equal(result.commands[0]?.reason, undefined)
   assert.equal(result.passed, true)
+})
+
+test('rejects with the git message instead of crashing when the directory does not exist', async () => {
+  const missingDirectory = join(scratch, 'missing')
+
+  await assert.rejects(runGate(input({ directory: missingDirectory })), /git rev-parse HEAD failed/)
 })

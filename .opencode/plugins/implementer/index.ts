@@ -14,10 +14,27 @@ export const HARD_MODEL = 'openai/hard'
 export const DEFAULT_CHILD_TIMEOUT_SECONDS = 1800
 export const PROMPT_TEMPLATE_DIRECTORY = fileURLToPath(new URL('../../skills/subagent-driven-development/', import.meta.url))
 
+const TEXT_BLOCK_OPENING = '```text\n'
+const BLOCK_INDENT = /^ {4}/
+
+function childPromptBody(template: string, fileName: string): string {
+  const start = template.lastIndexOf(TEXT_BLOCK_OPENING)
+  const end = template.indexOf('\n```', start + TEXT_BLOCK_OPENING.length)
+  if (start < 0 || end < 0) {
+    throw new Error(`${fileName} has no closed text block holding the child prompt. Restore the "Use this prompt" text block.`)
+  }
+  const body = template.slice(start + TEXT_BLOCK_OPENING.length, end)
+  return body.split('\n').map((line) => line.replace(BLOCK_INDENT, '')).join('\n')
+}
+
+async function readChildPrompt(directory: string, fileName: string): Promise<string> {
+  return childPromptBody(await readFile(join(directory, fileName), 'utf8'), fileName)
+}
+
 export async function readPromptTemplates(directory: string): Promise<PromptTemplates> {
   const [implementer, reviewer] = await Promise.all([
-    readFile(join(directory, 'implementer-prompt.md'), 'utf8'),
-    readFile(join(directory, 'reviewer-prompt.md'), 'utf8'),
+    readChildPrompt(directory, 'implementer-prompt.md'),
+    readChildPrompt(directory, 'reviewer-prompt.md'),
   ])
   return { implementer, reviewer }
 }

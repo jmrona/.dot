@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 
 import implementerPlugin, {
@@ -252,8 +255,20 @@ test('executeImplementWave sends child sessions the implementer template from th
 test('readPromptTemplates reads the implementer and reviewer templates of the subagent-driven-development skill', async () => {
   const templates = await readPromptTemplates(PROMPT_TEMPLATE_DIRECTORY)
 
-  assert.match(templates.implementer, /^# Implementer Subagent Prompt Template/)
-  assert.match(templates.reviewer, /^# Combined Reviewer Prompt Template/)
+  assert.match(templates.implementer, /^You are implementing Task N/)
+  assert.match(templates.reviewer, /^You are reviewing an implementation/)
+  assert.doesNotMatch(templates.implementer, /subagent\(\{/)
+  assert.doesNotMatch(templates.reviewer, /subagent\(\{/)
+})
+
+test('readPromptTemplates rejects a template without a closed text block and says how to fix it', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'templates-'))
+  writeFileSync(join(directory, 'implementer-prompt.md'), '# Implementer\n\nNo block here.\n')
+  writeFileSync(join(directory, 'reviewer-prompt.md'), '# Reviewer\n\nNo block here.\n')
+
+  await assert.rejects(readPromptTemplates(directory), /has no closed text block holding the child prompt/)
+
+  rmSync(directory, { recursive: true, force: true })
 })
 
 test('buildImplementWaveSchemas declares no prompts field in the tool input', () => {

@@ -5,7 +5,7 @@ import type { WaveArgs, WavePlan, WaveTask } from './wave-plan.ts'
 export const DEFAULT_PROOF_TIMEOUT_SECONDS = 1200
 export const MAX_CORRECTION_ROUNDS = 2
 export const SUBAGENT_PREAMBLE =
-  'You are a subagent dispatched by the implement_wave tool. The user has already approved the design and this task, so the Subagent Exemption of the skills policy applies. Do not run brainstorming, the design router or any other workflow skill, and do not ask the user anything, because nobody can answer. Do the task below and report in the required format.'
+  'You are a subagent dispatched by the implement_wave tool. The user has already approved the design and this task, so the Subagent Exemption of the skills policy applies. Do not run brainstorming, the design router or any other workflow skill, and do not ask the user anything, because nobody can answer. The Task section below gives the value of every bracketed placeholder in the instructions. Do the task and report in the required format.'
 export const IMPLEMENTER_FIELDS = ['status', 'summary', 'tddEvidence', 'concerns', 'environmentFailures'] as const
 export const REVIEWER_FIELDS = ['verdict', 'findings'] as const
 export interface ReviewVerdict { readonly verdict: 'PASS' | 'FAIL'; readonly findings: readonly string[] }
@@ -76,6 +76,7 @@ function buildReviewPrompt(args: WaveArgs, prompts: PromptTemplates, task: WaveT
     `Base SHA: ${args.baseSha}`,
     `Writes: ${task.writes.join(', ')}`,
     `Read the change with: git diff ${args.baseSha} -- ${task.writes.join(' ')}`,
+    'Read every path in writes in full, because git diff omits new untracked files.',
     'Edit nothing. Report a verdict and findings only.',
     GIT_RULE,
     REVIEWER_REPLY_INSTRUCTION,

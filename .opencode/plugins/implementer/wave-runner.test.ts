@@ -199,9 +199,18 @@ describe('child prompts', () => {
     assert.ok(runner.specs[1].text.startsWith(`${SUBAGENT_PREAMBLE}\n\nTEMPLATE REVIEWER`))
   })
 
+  it('tells the reviewer to read every written path in full because git diff omits new untracked files', async () => {
+    const { dependencies, runner } = dependenciesFor([DONE, PASS])
+
+    await runWave(buildPlan(), dependencies)
+
+    assert.match(runner.specs[1].text, /Read every path in writes in full, because git diff omits new untracked files\./)
+  })
+
   it('the subagent preamble invokes the Subagent Exemption and forbids brainstorming and questions to the user', () => {
     assert.match(SUBAGENT_PREAMBLE, /Subagent Exemption/)
     assert.match(SUBAGENT_PREAMBLE, /brainstorming/)
     assert.match(SUBAGENT_PREAMBLE, /ask the user/)
+    assert.match(SUBAGENT_PREAMBLE, /Task section below gives the value of every bracketed placeholder/)
   })
 })
