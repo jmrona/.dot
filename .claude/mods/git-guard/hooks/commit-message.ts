@@ -1,5 +1,5 @@
 import { gitSubcommand, segmentsOf, unquotedSegmentsOf } from './command-text'
-import type { RunGit } from './run-git'
+import type { GitResult, RunGit } from './run-git'
 
 interface Piece {
   readonly text: string
@@ -26,6 +26,7 @@ interface Heredoc {
 const HEREDOC_OPENER = /\$\(\s*cat\s+<<-?\s*(['"]?)(\w+)\1[^\n]*\n/y
 const CLOSING_BRACKET = /\s*\)/y
 const COMMAND_SEPARATOR = /^(?:&&|\|\||;|\||&|\n|\))/
+const DIRECTORY_BREAKING_SEPARATOR = /\|\||\|&|\||(?<!&)&(?!&)/g
 const COMMIT_TYPES = 'feat|fix|refactor|docs|test|chore|perf|ci|build|style|revert'
 const SUBJECT_SHAPE = new RegExp(`^(${COMMIT_TYPES})\\([a-z0-9][a-z0-9-]*\\): \\S`)
 const TICKET_SUFFIX = / \([A-Z][A-Z0-9]+-\d+\)$/
@@ -100,8 +101,7 @@ async function ticketReason(
   subject: string,
   directories: readonly string[],
 ): Promise<string | undefined> {
-  const directoryOptions = directories.flatMap(directory => ['-C', directory])
-  const result = await runGit([...directoryOptions, 'branch', '--show-current'])
+  const result = await currentBranchResult(runGit, directories)
   const branch = result.stdout.trim()
   if (result.exitCode !== 0 || branch === '') return undefined
   const key = TICKET_KEY.exec(branch)?.[0]
@@ -112,6 +112,16 @@ async function ticketReason(
     return `the branch ${branch} has no ticket key, so the subject takes no suffix`
   }
   return undefined
+}
+
+async function currentBranchResult(
+  runGit: RunGit,
+  directories: readonly string[],
+): Promise<GitResult> {
+  const query = ['branch', '--show-current']
+  if (directories.length === 0) return runGit(query)
+  const inDirectories = await runGit([...directories.flatMap(directory => ['-C', directory]), ...query])
+  return inDirectories.exitCode === 0 ? inDirectories : runGit(query)
 }
 
 function commitsIn(command: string): Commit[] {
@@ -129,7 +139,12 @@ function commitsIn(command: string): Commit[] {
 }
 
 function changedDirectoriesIn(precedingCommand: string): string[] {
-  return segmentsOf(precedingCommand).flatMap(segment => {
+  const lastBreak = [...precedingCommand.matchAll(DIRECTORY_BREAKING_SEPARATOR)].at(-1)
+  const reachable =
+    lastBreak === undefined
+      ? precedingCommand
+      : precedingCommand.slice(lastBreak.index + lastBreak[0].length)
+  return segmentsOf(reachable).flatMap(segment => {
     const [command, directory] = tokensOf(segment)
     return command?.text === 'cd' && directory !== undefined ? [directory.text] : []
   })
