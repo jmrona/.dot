@@ -39,6 +39,9 @@ export interface ContextEvent {
 export const DESIGN_ROOT_INSTRUCTION =
   'You are the design root on openai/hard. You author design content yourself: design questions, alternatives, sections, the committee agenda, summaries and design revisions. Do not delegate them to stack-planner.'
 
+export const DESIGN_EXIT_INSTRUCTION =
+  'If the user has explicitly approved the design, either before you presented it or in reply to it, finish the approved design step of your design skill (save the plan file) and then invoke the implementation skill (`subagent-driven-development`, or `fast-path-implementation` when the design skill says so) in this same turn. The mode-switch plugin moves this session to Build when that skill loads, so do not ask the user to switch agents and do not wait for them to press Tab. Only without that approval, stop and wait for it.'
+
 export interface ModeSwitchApi {
   readonly session: {
     get(input: { sessionID: string }): Promise<ModeSwitchSession>
@@ -174,6 +177,7 @@ export async function handleContext(api: ModeSwitchApi, event: ContextEvent): Pr
     return
   }
   event.system.push({ type: 'text', text: DESIGN_ROOT_INSTRUCTION })
+  event.system.push({ type: 'text', text: DESIGN_EXIT_INSTRUCTION })
 }
 
 interface ModeSwitchPlugin {
