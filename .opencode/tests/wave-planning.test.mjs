@@ -72,11 +72,11 @@ test('dispatch rules do not name a per-task pipeline', () => {
   assert.doesNotMatch(dispatch(), /per-task pipeline/i, 'the per-task pipeline wording is absent')
 })
 
-test('dispatch rules state that the tasks of one wave are independent work dispatched in background', () => {
+test('dispatch rules state that waves run through implement_wave', () => {
   assert.match(
     dispatch(),
-    /tasks of one wave[^.]*independent[^.]*`background: true`/i,
-    'wave tasks are independent work dispatched with background: true',
+    /waves run through the `implement_wave` tool/i,
+    'waves run through implement_wave',
   )
 })
 
@@ -124,11 +124,11 @@ test('dispatch rules do not say to proceed to the next task while a review has i
   )
 })
 
-test('dispatch rules state that reviewers and a wave of one use background true', () => {
+test('dispatch rules state that the fallback dispatches wave children in the foreground', () => {
   assert.match(
     dispatch(),
-    /reviewers and a wave of one[^.]*`background: true`/i,
-    'reviewers and a wave of one are dispatched in background',
+    /not available, dispatch[^.]*foreground and omit `background`/i,
+    'the fallback dispatches in the foreground',
   )
 })
 

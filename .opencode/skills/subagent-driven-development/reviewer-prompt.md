@@ -6,7 +6,7 @@ Use this template when dispatching a reviewer subagent on the full path.
 
 **Reviewer role:** Use `code-reviewer` on `openai/hard` for this independent implementation review. For design or architecture review use `architect-reviewer` on `openai/hard`. If the required role is unavailable, report `BLOCKED`; do not silently substitute.
 
-The parent dispatches each task's reviewer as soon as that implementer returns `DONE` or `DONE_WITH_CONCERNS`, without waiting for siblings.
+The `implement_wave` tool dispatches each task's reviewer as soon as that implementer returns `DONE` or `DONE_WITH_CONCERNS`. In the fallback pipeline the parent does this in the foreground and omits `background`.
 
 Native subagent call:
 
@@ -14,8 +14,7 @@ Native subagent call:
 subagent({
   agent: "code-reviewer",
   description: "Review Task N: [task name]",
-  prompt: "[complete review prompt below]",
-  background: true
+  prompt: "[complete review prompt below]"
 })
 ```
 
