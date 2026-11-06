@@ -301,6 +301,56 @@ test('a cd and a -C are queried in order', async () => {
   expect(runs).toEqual(['-C a -C b branch --show-current'])
 })
 
+function failingDirectoryQueries(sessionBranch: string): { runGit: RunGit; runs: string[] } {
+  const runs: string[] = []
+  const runGit: RunGit = async args => {
+    runs.push(args.join(' '))
+    return args[0] === '-C' ? { exitCode: 128, stdout: '' } : onBranch(sessionBranch)
+  }
+  return { runGit, runs }
+}
+
+const SESSION_SUFFIX_REASON = denialText('the branch VAN3-597 needs the suffix (VAN3-597)')
+
+test('a cd into a directory the guard cannot resolve falls back to the session branch', async () => {
+  const { runGit } = failingDirectoryQueries('VAN3-597')
+  const command = 'cd ~/wt/598 && git commit -m "feat(x): y (VAN3-999)"'
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('a cd with a double-dash option falls back to the session branch', async () => {
+  const { runGit } = failingDirectoryQueries('VAN3-597')
+  const command = 'cd -- /wt/598 && git commit -m "feat(x): y (VAN3-999)"'
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('a cd joined to the commit by a double bar is ignored', async () => {
+  const { runGit, runs } = answeringByArguments({
+    'branch --show-current': onBranch('VAN3-597'),
+    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
+  })
+  const command = `cd /wt/598 || git commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+  expect(runs).toEqual(['branch --show-current'])
+})
+
+test('a cd piped into the commit is ignored', async () => {
+  const { runGit } = answeringByArguments({
+    'branch --show-current': onBranch('VAN3-597'),
+    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
+  })
+  const command = `cd /wt/598 | git commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('a successful directory query with an empty branch passes', async () => {
+  const { runGit } = answeringByArguments({
+    '-C /wt/598 branch --show-current': { exitCode: 0, stdout: '' },
+  })
+  const command = `cd /wt/598 && git commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBeUndefined()
+})
+
 test('a commit without cd or -C queries the session branch', async () => {
   const { runGit, runs } = branchRunner(onBranch('VAN3-598'))
   await commitMessageDenial(runGit, `git commit -m "${SUBJECT_FOR_598}"`)
