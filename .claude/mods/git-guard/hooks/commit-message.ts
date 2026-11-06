@@ -23,11 +23,28 @@ interface Heredoc {
   readonly end: number
 }
 
-const HEREDOC_OPENER = /\$\(\s*cat\s+<<-?\s*(['"]?)(\w+)\1[^\n]*\n/y
+const HEREDOC_OPENER = /\$\(\s*cat\s+<<-?\s*(['"]?)(\w+)\1[ \t]*\n/y
 const CLOSING_BRACKET = /\s*\)/y
 const COMMAND_SEPARATOR = /^(?:&&|\|\||;|\||&|\n|\))/
 const QUOTED_OR_ESCAPED = /\\[\s\S]|"(?:\\[\s\S]|[^"\\])*"|'[^']*'/g
 const UNTRUSTED_DIRECTORY_CONTEXT = /GIT_|--git-dir|--work-tree|\\|`|[$(){}]/
+const COMMAND_SUBSTITUTION = /\$\(|`/
+const SESSION_ONLY_DIRECTORY = /^~|[*?[]/
+const READ_ONLY_SUBCOMMANDS: readonly string[] = [
+  'add',
+  'status',
+  'diff',
+  'log',
+  'show',
+  'rev-parse',
+]
+const OPTIONS_WITH_VALUE: readonly string[] = [
+  '-C',
+  '-c',
+  '--namespace',
+  '--attr-source',
+  '--config-env',
+]
 const COMMIT_TYPES = 'feat|fix|refactor|docs|test|chore|perf|ci|build|style|revert'
 const SUBJECT_SHAPE = new RegExp(`^(${COMMIT_TYPES})\\([a-z0-9][a-z0-9-]*\\): \\S`)
 const TICKET_SUFFIX = / \([A-Z][A-Z0-9]+-\d+\)$/
@@ -130,19 +147,59 @@ async function currentBranchResult(
 function commitsIn(command: string): Commit[] {
   const quoted = quotedRangesIn(command)
   const commits = [...command.matchAll(new RegExp(gitSubcommand('commit').source, 'g'))]
+  const isPlainChain = isPlainGitChain(command)
   return commits
     .filter(commit => !quoted.some(([start, end]) => commit.index >= start && commit.index < end))
     .map(commit => ({
       messages: messagesOf(tokensOf(command.slice(commit.index + commit[0].length))),
-      directories: isPlainGitChain(command) ? optionDirectoriesIn(commit[0]) : [],
+      directories:
+        isPlainChain && isReadOnlyBefore(command.slice(0, commit.index))
+          ? trustedDirectoriesIn(commit[0])
+          : [],
     }))
 }
 
+function withoutQuotesKeepingEscapes(command: string): string {
+  return command.replace(QUOTED_OR_ESCAPED, match => (match[0] === '\\' ? match : ''))
+}
+
 function isPlainGitChain(command: string): boolean {
-  const unquoted = command.replace(QUOTED_OR_ESCAPED, match => (match[0] === '\\' ? match : ''))
+  const unquoted = withoutQuotesKeepingEscapes(command)
   const segments = segmentsOf(unquoted).filter(segment => segment !== '')
   const isEveryCommandGit = segments.every(segment => /^git(?:\s|$)/.test(segment))
-  return isEveryCommandGit && !UNTRUSTED_DIRECTORY_CONTEXT.test(unquoted)
+  const isUntrusted = UNTRUSTED_DIRECTORY_CONTEXT.test(unquoted)
+  return isEveryCommandGit && !isUntrusted && !hasCommandSubstitution(command)
+}
+
+function hasCommandSubstitution(command: string): boolean {
+  let exemptUntil = 0
+  for (const match of command.matchAll(/\$\(|`/g)) {
+    if (match.index < exemptUntil) continue
+    const heredoc = heredocAt(command, match.index)
+    if (heredoc === undefined || COMMAND_SUBSTITUTION.test(heredoc.body)) return true
+    exemptUntil = heredoc.end
+  }
+  return false
+}
+
+function isReadOnlyBefore(textBeforeCommit: string): boolean {
+  return segmentsOf(withoutQuotesKeepingEscapes(textBeforeCommit))
+    .filter(segment => segment !== '')
+    .every(segment => READ_ONLY_SUBCOMMANDS.includes(subcommandOf(segment) ?? ''))
+}
+
+function subcommandOf(gitSegment: string): string | undefined {
+  const words = gitSegment.split(/\s+/).slice(1)
+  let position = 0
+  while (words[position]?.startsWith('-')) {
+    position += OPTIONS_WITH_VALUE.includes(words[position] ?? '') ? 2 : 1
+  }
+  return words[position]
+}
+
+function trustedDirectoriesIn(gitCommand: string): string[] {
+  const directories = optionDirectoriesIn(gitCommand)
+  return directories.some(directory => SESSION_ONLY_DIRECTORY.test(directory)) ? [] : directories
 }
 
 function optionDirectoriesIn(gitCommand: string): string[] {

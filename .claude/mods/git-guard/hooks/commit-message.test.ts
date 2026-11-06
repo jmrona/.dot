@@ -342,9 +342,22 @@ test('a heredoc message with -C passes on the worktree branch', async () => {
   expect(await commitMessageDenial(runGit, command)).toBeUndefined()
 })
 
+test('a command on the heredoc opener line is denied as not literal', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const opener = `$(cat <<'EOF' && git switch V`
+  const command = `git -C /wt/598 commit -m "${opener}\n${SUBJECT_FOR_598}\nEOF\n)"`
+  expect(await commitMessageDenial(runGit, command)).toBe(denialText(LITERAL_REASON))
+})
+
 test('a -C commit after another git command still uses the worktree branch', async () => {
   const { runGit } = sessionOn597AndDirectoryOn598()
   const command = `git add -A -- a && git -C /wt/598 commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBeUndefined()
+})
+
+test('a -C commit after a status command still uses the worktree branch', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const command = `git -C /wt/598 status && git -C /wt/598 commit -m "${SUBJECT_FOR_598}"`
   expect(await commitMessageDenial(runGit, command)).toBeUndefined()
 })
 
@@ -408,6 +421,34 @@ test('a detached -C target falls back to the session branch', async () => {
     '-C /wt/det branch --show-current': { exitCode: 0, stdout: '' },
   })
   const command = 'git -C /wt/det commit -m "feat(x): y (VAN3-999)"'
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('a branch switch before a -C commit makes the guard use the session branch', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const command = `git -C /wt/598 switch VAN3-599 && git -C /wt/598 commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('a substitution inside the message makes the guard use the session branch', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const message = `feat(x): $(git -C /wt/598 switch -q VAN3-599)y (VAN3-598)`
+  const command = `git -C /wt/598 commit -m "${message}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('a -C directory starting with a tilde makes the guard use the session branch', async () => {
+  const { runGit } = answeringByArguments({
+    'branch --show-current': onBranch('VAN3-597'),
+    '-C ~/wt/598 branch --show-current': onBranch('VAN3-598'),
+  })
+  const command = `git -C ~/wt/598 commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('a separate-word global option value before a switch uses the session branch', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const command = `git --namespace status switch V && git -C /wt/598 commit -m "${SUBJECT_FOR_598}"`
   expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
 })
 
