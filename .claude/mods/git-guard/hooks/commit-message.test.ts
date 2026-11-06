@@ -315,22 +315,75 @@ test('a -C option is ignored after a cd', async () => {
   expect(runs).toEqual(['branch --show-current'])
 })
 
-test('a -C option is ignored after a pushd', async () => {
-  const { runGit, runs } = answeringByArguments({
+function sessionOn597AndDirectoryOn598(): { runGit: RunGit; runs: string[] } {
+  return answeringByArguments({
     'branch --show-current': onBranch('VAN3-597'),
     '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
   })
-  const command = `pushd /wt/598 && git -C /wt/598 commit -m "${SUBJECT_FOR_598}"`
-  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
-  expect(runs).toEqual(['branch --show-current'])
+}
+
+test('a commit with a matching -C worktree suffix passes', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const command = `git -C /wt/598 commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBeUndefined()
 })
 
-test('a cd after a failing condition is not followed', async () => {
+test('a commit with the session suffix is denied by the -C worktree branch', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const command = 'git -C /wt/598 commit -m "feat(mods): add x (VAN3-597)"'
+  expect(await commitMessageDenial(runGit, command)).toBe(
+    denialText('the branch VAN3-598 needs the suffix (VAN3-598)'),
+  )
+})
+
+test('a heredoc message with -C passes on the worktree branch', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const command = `git -C /wt/598 commit -m "$(cat <<'EOF'\n${SUBJECT_FOR_598}\nEOF\n)"`
+  expect(await commitMessageDenial(runGit, command)).toBeUndefined()
+})
+
+test('a -C commit after another git command still uses the worktree branch', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const command = `git add -A -- a && git -C /wt/598 commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBeUndefined()
+})
+
+test('a GIT_DIR variable before git makes the guard use the session branch', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const command = `GIT_DIR=/wt/598/.git git -C /wt/598 commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('a --git-dir option after -C makes the guard use the session branch', async () => {
+  const { runGit } = sessionOn597AndDirectoryOn598()
+  const command = `git -C /wt/598 --git-dir=/x/.git commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('an env wrapper with its own -C makes the guard use the session branch', async () => {
   const { runGit } = answeringByArguments({
     'branch --show-current': onBranch('VAN3-597'),
-    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
+    '-C rel branch --show-current': onBranch('VAN3-598'),
   })
-  const command = `false && cd /wt/598 ; git commit -m "${SUBJECT_FOR_598}"`
+  const command = `env -C /x git -C rel commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('a quote-split cd makes the guard use the session branch', async () => {
+  const { runGit } = answeringByArguments({
+    'branch --show-current': onBranch('VAN3-597'),
+    '-C rel branch --show-current': onBranch('VAN3-598'),
+  })
+  const command = `c''d /x && git -C rel commit -m "${SUBJECT_FOR_598}"`
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+})
+
+test('a backslash-split cd makes the guard use the session branch', async () => {
+  const { runGit } = answeringByArguments({
+    'branch --show-current': onBranch('VAN3-597'),
+    '-C rel branch --show-current': onBranch('VAN3-598'),
+  })
+  const command = `c\\d /x && git -C rel commit -m "${SUBJECT_FOR_598}"`
   expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
 })
 
