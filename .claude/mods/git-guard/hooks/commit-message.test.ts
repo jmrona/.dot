@@ -66,6 +66,11 @@ test('a detached head skips the ticket check', async () => {
   expect(await denialFor(commitWith('feat(mods): add x'), detached)).toBeUndefined()
 })
 
+test('an empty session branch skips the ticket check', async () => {
+  const empty = { exitCode: 0, stdout: '' }
+  expect(await denialFor(commitWith('feat(mods): add x'), empty)).toBeUndefined()
+})
+
 const SHAPE_REASON =
   'the subject must start with a type from git.md and a lowercase scope in brackets'
 
@@ -343,12 +348,24 @@ test('a cd piped into the commit is ignored', async () => {
   expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
 })
 
-test('a successful directory query with an empty branch passes', async () => {
-  const { runGit } = answeringByArguments({
-    '-C /wt/598 branch --show-current': { exitCode: 0, stdout: '' },
+test('a cd after a double bar is ignored even when another cd follows', async () => {
+  const { runGit, runs } = answeringByArguments({
+    'branch --show-current': onBranch('VAN3-597'),
+    '-C /wt/598 branch --show-current': onBranch('VAN3-598'),
+    '-C /wt/599 branch --show-current': onBranch('VAN3-599'),
   })
-  const command = `cd /wt/598 && git commit -m "${SUBJECT_FOR_598}"`
-  expect(await commitMessageDenial(runGit, command)).toBeUndefined()
+  const command = 'cd /wt/598 || cd /wt/599 && git commit -m "feat(x): y (VAN3-599)"'
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
+  expect(runs).toEqual(['branch --show-current'])
+})
+
+test('a detached target directory falls back to the session branch', async () => {
+  const { runGit } = answeringByArguments({
+    'branch --show-current': onBranch('VAN3-597'),
+    '-C /wt/det branch --show-current': { exitCode: 0, stdout: '' },
+  })
+  const command = 'cd /wt/det && git commit -m "feat(x): y (VAN3-999)"'
+  expect(await commitMessageDenial(runGit, command)).toBe(SESSION_SUFFIX_REASON)
 })
 
 test('a commit without cd or -C queries the session branch', async () => {
