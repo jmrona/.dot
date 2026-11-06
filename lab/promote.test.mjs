@@ -62,6 +62,11 @@ test('parseClaudeCanaryOutput fails when the second line is YES', () => {
   assert.match(outcome.detail, /YES/)
 })
 
+test('parseClaudeCanaryOutput passes when the first line is wrapped in double quotes', () => {
+  const output = streamJson({ plugins: [gitGuardPlugin], resultText: `"${skipRouterSentence}"\nNO` })
+  assert.equal(parseClaudeCanaryOutput(output, gitGuardPath).ok, true)
+})
+
 function readTree(rootDir) {
   const files = {}
   const walk = (directory) => {
