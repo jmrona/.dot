@@ -217,8 +217,8 @@
       "executable": false
     },
     "mods/git-guard/README.md": {
-      "sha256": "da8a576763c22d99bc335937b8d594c31edd04eb404127f179a778796afd3259",
-      "words": 1130,
+      "sha256": "fa75718a9038b37f961df63767a57bc00592de4a5cb353adb0edcb8c15297a01",
+      "words": 1363,
       "alwaysLoaded": false,
       "executable": false
     },
@@ -235,14 +235,14 @@
       "executable": false
     },
     "mods/git-guard/hooks/commit-message.test.ts": {
-      "sha256": "2765b9112a18720c861c50bcd8341217eadfb97d4f8112d448dfb366151cf718",
-      "words": 1266,
+      "sha256": "343a713a530e98b9a20313411bce510d85707748bdb1722334619ff082f3a088",
+      "words": 2362,
       "alwaysLoaded": false,
       "executable": false
     },
     "mods/git-guard/hooks/commit-message.ts": {
-      "sha256": "94379e64955d9aa9c828d14be83da1a1ac93c0143d68aa624bc608931c12fc79",
-      "words": 1035,
+      "sha256": "dcb205c7d8c892458ab1f686f17d0acd1f70ea4c58a3a2ff28f9820e75818405",
+      "words": 1363,
       "alwaysLoaded": false,
       "executable": false
     },
