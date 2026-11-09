@@ -213,7 +213,7 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter(null), promptMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, false).prompt, {
-      heading: 'Prompt · 3 lines',
+      heading: 'Prompt - 3 lines',
       lines: ['Read the plan'],
       hidden: 2,
     })
@@ -223,7 +223,7 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter(null), promptMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, true).prompt, {
-      heading: 'Prompt · 3 lines',
+      heading: 'Prompt - 3 lines',
       lines: ['Read the plan', 'Then edit the file', 'Run the tests'],
       hidden: 0,
     })
@@ -233,7 +233,7 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter(null), fiveCallMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, false).activity, {
-      heading: 'Activity · last 3 of 5 tool calls',
+      heading: 'Activity - last 3 of 5 tool calls',
       lines: ['grep(grep.ts)', 'edit(edit.ts)', 'bash(bash.ts)'],
       hidden: 2,
     })
@@ -243,7 +243,7 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter(null), fiveCallMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, true).activity, {
-      heading: 'Activity · 5 tool calls',
+      heading: 'Activity - 5 tool calls',
       lines: ['read(read.ts)', 'glob(glob.ts)', 'grep(grep.ts)', 'edit(edit.ts)', 'bash(bash.ts)'],
       hidden: 0,
     })
@@ -263,7 +263,7 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter('done'), fourOutcomeMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, false).outcome, {
-      heading: 'Outcome · 4 lines',
+      heading: 'Outcome - 4 lines',
       lines: ['One', 'Two', 'Three'],
       hidden: 1,
     })
@@ -273,7 +273,7 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter('done'), fourOutcomeMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, true).outcome, {
-      heading: 'Outcome · 4 lines',
+      heading: 'Outcome - 4 lines',
       lines: ['One', 'Two', 'Three', 'Four'],
       hidden: 0,
     })

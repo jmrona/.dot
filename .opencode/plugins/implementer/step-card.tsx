@@ -32,7 +32,7 @@ interface ScrollControls {
 type KeyActions = Readonly<Record<string, (() => void) | undefined>>
 
 const SCROLL_STEP = 1
-const SEPARATOR = ' · '
+const SEPARATOR = ' - '
 
 function blockList(blocks: CardBlocks): readonly BlockView[] {
   return [blocks.prompt, blocks.activity, blocks.outcome]
@@ -97,7 +97,7 @@ export default function StepCard(props: StepCardProps): JSX.Element {
               <text>{block.heading}</text>
               <For each={block.lines}>{(line) => <text>{line}</text>}</For>
               <Show when={block.hidden > 0}>
-                <text>{`… ${block.hidden} more lines`}</text>
+                <text>{`... ${block.hidden} more lines`}</text>
               </Show>
             </box>
           )}

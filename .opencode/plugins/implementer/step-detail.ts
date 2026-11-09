@@ -17,7 +17,7 @@ const STATUS_BY_STATE: Readonly<Record<StepState, StepDetail['status']>> = {
   done: 'Completed',
   failed: 'Failed',
 }
-const SEPARATOR = ' · '
+const SEPARATOR = ' - '
 const ACTIVITY_VISIBLE_COUNT = 3
 const OUTCOME_VISIBLE_COUNT = 3
 const PROMPT_VISIBLE_COUNT = 1
