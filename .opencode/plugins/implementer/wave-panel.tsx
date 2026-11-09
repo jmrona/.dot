@@ -4,7 +4,7 @@ import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import type { Accessor, JSX } from 'solid-js'
 import { gateRow, phaseRows, stepRows } from './progress-view.ts'
 import type { GateRow, PanelPhase, StepRow } from './progress-view.ts'
-import type { ProgressStep, StepState, WaveProgress } from './progress.ts'
+import type { ProgressStep, StepKey, StepState, WaveProgress } from './progress.ts'
 import StepCard from './step-card.tsx'
 
 export const PANEL_NAME = 'implementer.wave'
@@ -26,6 +26,7 @@ export interface WavePanelProps {
 
 interface Entry {
   readonly phase: PanelPhase
+  readonly key: StepKey | undefined
   readonly stepIndex: number
 }
 
@@ -35,7 +36,8 @@ interface StepLine {
 }
 
 const LEFT_COLUMN_WIDTH = 22
-const NO_ENTRY: Entry = { phase: 'implement', stepIndex: -1 }
+const NO_ENTRY: Entry = { phase: 'implement', key: undefined, stepIndex: -1 }
+const INITIAL_SELECTION: Entry = { phase: 'implement', key: undefined, stepIndex: 0 }
 export const NO_SESSION: StepSession = { messages: [], agent: undefined }
 const STATE_MARKERS: Readonly<Record<StepState, string>> = { running: '[RUN]', done: '[OK]', failed: '[FAIL]' }
 
@@ -43,10 +45,41 @@ function entriesOf(progress: WaveProgress | undefined): readonly Entry[] {
   if (progress === undefined) {
     return []
   }
-  return phaseRows(progress).flatMap((row) => {
-    const count = row.phase === 'gate' ? 1 : Math.max(row.total, 1)
-    return Array.from({ length: count }, (_, stepIndex) => ({ phase: row.phase, stepIndex }))
-  })
+  return phaseRows(progress).flatMap((row) => entriesOfPhase(progress, row.phase))
+}
+
+function keyOf(step: ProgressStep): StepKey {
+  return { taskID: step.taskID, phase: step.phase, attempt: step.attempt }
+}
+
+function entriesOfPhase(progress: WaveProgress, phase: PanelPhase): readonly Entry[] {
+  const steps = progress.steps.filter((step) => step.phase === phase)
+  if (steps.length === 0) {
+    return [{ phase, key: undefined, stepIndex: 0 }]
+  }
+  return steps.map((step, stepIndex) => ({ phase, key: keyOf(step), stepIndex }))
+}
+
+function keysMatch(first: StepKey | undefined, second: StepKey | undefined): boolean {
+  if (first === undefined || second === undefined) {
+    return first === second
+  }
+  return first.taskID === second.taskID && first.phase === second.phase && first.attempt === second.attempt
+}
+
+function resolveEntry(entries: readonly Entry[], selection: Entry): Entry {
+  const entriesOfSelectedPhase = entries.filter((candidate) => candidate.phase === selection.phase)
+  const exactMatch = entriesOfSelectedPhase.find((candidate) => keysMatch(candidate.key, selection.key))
+  const nearestIndex = Math.min(selection.stepIndex, entriesOfSelectedPhase.length - 1)
+  return exactMatch ?? entriesOfSelectedPhase[nearestIndex] ?? entries[0] ?? NO_ENTRY
+}
+
+function neighbourOf(candidates: readonly Entry[], current: Entry, delta: number): Entry | undefined {
+  const index = candidates.indexOf(current)
+  if (index === -1) {
+    return undefined
+  }
+  return candidates[Math.max(0, Math.min(candidates.length - 1, index + delta))]
 }
 
 function stepOf(progress: WaveProgress | undefined, entry: Entry): ProgressStep | undefined {
@@ -61,7 +94,7 @@ function markerOf(isSelected: boolean): string {
 }
 
 function stepListText(row: StepRow, isSelected: boolean): string {
-  return `${markerOf(isSelected)} ${STATE_MARKERS[row.state]} ${row.label}  ${row.model} · ${row.tokens}  ${row.duration}`
+  return `${markerOf(isSelected)} ${STATE_MARKERS[row.state]} ${row.label}  ${row.model} - ${row.tokens}  ${row.duration}`
 }
 
 function gateListText(row: GateRow): string {
@@ -101,6 +134,8 @@ interface CursorState {
   readonly entry: Accessor<Entry>
   readonly moveUp: () => void
   readonly moveDown: () => void
+  readonly moveStepUp: () => void
+  readonly moveStepDown: () => void
   readonly selectStep: (stepIndex: number) => void
 }
 
@@ -118,27 +153,37 @@ interface PanelLines {
 }
 
 function createCursor(entries: Accessor<readonly Entry[]>): CursorState {
-  const [cursor, setCursor] = createSignal(0)
-  const entry = createMemo(() => entries()[cursor()] ?? NO_ENTRY)
+  const [selection, setSelection] = createSignal<Entry>(INITIAL_SELECTION)
+  const entry = createMemo(() => resolveEntry(entries(), selection()))
 
-  function moveBy(delta: number): void {
-    setCursor(Math.max(0, Math.min(entries().length - 1, cursor() + delta)))
+  function entriesOfSelectedPhase(): readonly Entry[] {
+    return entries().filter((candidate) => candidate.phase === entry().phase)
   }
 
-  function moveUp(): void {
-    moveBy(-1)
-  }
-
-  function moveDown(): void {
-    moveBy(1)
+  function moveAmong(candidates: () => readonly Entry[], delta: number): () => void {
+    return function move(): void {
+      const target = neighbourOf(candidates(), entry(), delta)
+      if (target !== undefined) {
+        setSelection(target)
+      }
+    }
   }
 
   function selectStep(stepIndex: number): void {
-    const index = entries().findIndex((candidate) => candidate.phase === entry().phase && candidate.stepIndex === stepIndex)
-    setCursor(Math.max(index, 0))
+    const target = entriesOfSelectedPhase().find((candidate) => candidate.stepIndex === stepIndex)
+    if (target !== undefined) {
+      setSelection(target)
+    }
   }
 
-  return { entry, moveUp, moveDown, selectStep }
+  return {
+    entry,
+    moveUp: moveAmong(entries, -1),
+    moveDown: moveAmong(entries, 1),
+    moveStepUp: moveAmong(entriesOfSelectedPhase, -1),
+    moveStepDown: moveAmong(entriesOfSelectedPhase, 1),
+    selectStep,
+  }
 }
 
 function createCardState(props: WavePanelProps, entry: Accessor<Entry>): CardState {
@@ -146,6 +191,7 @@ function createCardState(props: WavePanelProps, entry: Accessor<Entry>): CardSta
   const [session, setSession] = createSignal<StepSession>(NO_SESSION)
   let latestLoad = 0
   const step = createMemo(() => (isOpen() ? stepOf(props.progress, entry()) : undefined))
+  const sessionIDOfStep = createMemo(() => step()?.sessionID ?? undefined)
 
   async function loadSession(sessionID: string): Promise<void> {
     const thisLoad = ++latestLoad
@@ -162,6 +208,12 @@ function createCardState(props: WavePanelProps, entry: Accessor<Entry>): CardSta
     }
   }
 
+  function discardLoadedSession(): void {
+    sessionIDOfStep()
+    latestLoad += 1
+    setSession(NO_SESSION)
+  }
+
   function enter(): void {
     if (stepOf(props.progress, entry())?.sessionID) {
       setSession(NO_SESSION)
@@ -174,6 +226,7 @@ function createCardState(props: WavePanelProps, entry: Accessor<Entry>): CardSta
     setIsOpen(false)
   }
 
+  createEffect(discardLoadedSession)
   createEffect(loadSessionOfStep)
   return { step, session, enter, leave, isOpen }
 }
@@ -198,15 +251,18 @@ function useListAndCardKeys(props: WavePanelProps, cursor: CursorState, card: Ca
     escape: props.onClose,
   }
 
+  const cardActions: Readonly<Record<string, (() => void) | undefined>> = {
+    up: cursor.moveStepUp,
+    down: cursor.moveStepDown,
+    escape: card.leave,
+  }
+
   function handleKey(key: { name: string }): void {
     if (!props.isFocused()) {
       return
     }
-    if (!card.isOpen()) {
-      listActions[key.name]?.()
-    } else if (key.name === 'escape') {
-      card.leave()
-    }
+    const actions = card.isOpen() ? cardActions : listActions
+    actions[key.name]?.()
   }
 
   useKeyboard(handleKey)
