@@ -27,7 +27,6 @@ import {
 import { GATE_STATE_TONES, STEP_STATE_TONES } from './tone.ts'
 import type { Segment } from './tone.ts'
 import {
-  barLabel,
   barSegments,
   cardStepLineSegments,
   gateLineSegments,
@@ -280,27 +279,6 @@ describe('formatTokens', () => {
 
   it('shows millions with one decimal place', () => {
     assert.equal(formatTokens(1_400_000), '1.4m tok')
-  })
-})
-
-describe('barLabel', () => {
-  it('shows the wave bar, finished count, duration and total tokens', () => {
-    const tokens = new Map([
-      ['session-0', 400_000],
-      ['session-1', 240_000],
-    ])
-    assert.equal(
-      barLabel(waveWithSteps(14, 9), tokens, 130_000),
-      'implementation-wave ======---- 9/14 2m10s 640.0k tok',
-    )
-  })
-
-  it('shows no total tokens when no step session has a known total', () => {
-    assert.equal(barLabel(waveWithSteps(2, 1), new Map(), 0), 'implementation-wave =====----- 1/2 0s - tok')
-  })
-
-  it('shows an empty bar and no total tokens when the wave has no steps', () => {
-    assert.equal(barLabel(waveWithSteps(0, 0), new Map(), 5_000), 'implementation-wave ---------- 0/0 5s - tok')
   })
 })
 

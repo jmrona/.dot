@@ -6,6 +6,7 @@ import { progressFilePath } from './progress.ts'
 import type { WaveProgress } from './progress.ts'
 import { collectSessionTokens, readWaveProgress, rootSessionOf } from './progress-view.ts'
 import type { ProgressData } from './progress-view.ts'
+import type { ThemeTokens } from './tone.ts'
 import WaveBar from './wave-bar.tsx'
 import WavePanel, { NO_SESSION, PANEL_NAME } from './wave-panel.tsx'
 import type { StepSession } from './wave-panel.tsx'
@@ -22,6 +23,7 @@ interface PanelSlotInput {
 }
 
 interface TuiContext {
+  readonly theme: ThemeTokens
   readonly data: ProgressData & {
     on(event: string, handler: (event: unknown) => void): () => void
     readonly session: { family(rootSessionID: string): unknown }
@@ -200,8 +202,20 @@ function registerWaveCommand(ctx: TuiContext): void {
 function registerBar(ctx: TuiContext, store: ProgressStore): void {
   const onOpen = panelOpener(ctx)
 
+  function readTheme(): ThemeTokens {
+    return ctx.theme
+  }
+
   function renderBar(): unknown {
-    return <WaveBar progress={store.progress()} tokens={store.tokens()} now={store.now()} onOpen={onOpen} />
+    return (
+      <WaveBar
+        progress={store.progress()}
+        tokens={store.tokens()}
+        now={store.now()}
+        theme={readTheme}
+        onOpen={onOpen}
+      />
+    )
   }
 
   ctx.ui.slot({ append: 'session.composer.top', render: renderBar })
@@ -210,6 +224,10 @@ function registerBar(ctx: TuiContext, store: ProgressStore): void {
 function registerPanel(ctx: TuiContext, store: ProgressStore): void {
   const loadSession = stepSessionLoader(ctx)
   const onOpenSession = sessionOpener(ctx)
+
+  function readTheme(): ThemeTokens {
+    return ctx.theme
+  }
 
   function renderPanel(panel: PanelSlotInput): unknown {
     if (panel.name !== PANEL_NAME) {
@@ -223,6 +241,7 @@ function registerPanel(ctx: TuiContext, store: ProgressStore): void {
         progress={store.progress()}
         tokens={store.tokens()}
         now={store.now()}
+        theme={readTheme}
         isFocused={isPanelFocused}
         onClose={panel.close.bind(panel)}
         loadSession={loadSession}

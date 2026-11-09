@@ -139,14 +139,6 @@ export function formatTokens(tokens: number | undefined): string {
   return `${(tokens / 1_000_000).toFixed(1)}m tok`
 }
 
-export function barLabel(progress: WaveProgress, tokensBySession: ReadonlyMap<string, number>, now: number): string {
-  const started = progress.steps.length
-  const done = progress.steps.filter(isFinishedStep).length
-  const elapsed = formatDuration(now - progress.startedAt)
-  const total = formatTokens(totalTokens(progress, tokensBySession))
-  return `implementation-wave ${progressBar(done, started)} ${done}/${started} ${elapsed} ${total}`
-}
-
 export function barSegments(
   progress: WaveProgress,
   tokensBySession: ReadonlyMap<string, number>,
@@ -319,10 +311,6 @@ function isFinishedStep(step: ProgressStep): boolean {
 
 function filledCells(done: number, started: number): number {
   return started === 0 ? 0 : Math.round((BAR_WIDTH * done) / started)
-}
-
-function progressBar(done: number, started: number): string {
-  return '='.repeat(filledCells(done, started)).padEnd(BAR_WIDTH, '-')
 }
 
 function markerSegment(isSelected: boolean): Segment {
