@@ -108,12 +108,12 @@ node lab/promote.mjs --apply
 
 The first command prints a preview and writes nothing. The second command copies the harness. See the section "Promote the harness" in the root `README.md`.
 
-The plugin imports code from two other plugins, so install them too:
+The plugin imports code from two other plugins. Promote copies them with the rest of the harness, so do not remove them:
 
 - `rate-guard`: the semaphore, the limit loader and `config.json`.
 - `mode-switch`: the code that switches the root session to `build`.
 
-The plugin also reads the two templates of the skill `subagent-driven-development`. Without `rate-guard/config.json`, the plugin still works with the limit 2.
+The plugin also reads the two templates of the skill `subagent-driven-development`. Promote skips `config.json` inside plugin folders, so a first install has no `rate-guard/config.json`. Copy it by hand as the `rate-guard` README describes. Without it, the plugin still works with the limit 2.
 
 ## Known limits
 
