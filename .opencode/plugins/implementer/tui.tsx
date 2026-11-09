@@ -23,7 +23,7 @@ interface PanelSlotInput {
 
 interface TuiContext {
   readonly data: ProgressData & {
-    on(event: string, handler: (event: unknown) => void): unknown
+    on(event: string, handler: (event: unknown) => void): () => void
     readonly session: { family(rootSessionID: string): unknown }
   }
   readonly keymap: { layer(factory: () => unknown): unknown }
@@ -62,7 +62,6 @@ interface ProgressStore {
   readonly tokens: Accessor<ReadonlyMap<string, number>>
   readonly now: Accessor<number>
   readonly refresh: () => Promise<void>
-  readonly refreshIfPresent: () => void
   readonly isInFamily: (sessionID: string) => boolean
 }
 
@@ -116,17 +115,11 @@ function createProgressStore(ctx: TuiContext): ProgressStore {
     closePanelWithoutProgress(ctx, loaded.progress)
   }
 
-  function refreshIfPresent(): void {
-    if (progress() !== undefined) {
-      void refresh()
-    }
-  }
-
   function isInFamily(sessionID: string): boolean {
     return family.includes(sessionID)
   }
 
-  return { progress, tokens, now, refresh, refreshIfPresent, isInFamily }
+  return { progress, tokens, now, refresh, isInFamily }
 }
 
 function panelOpener(ctx: TuiContext): () => void {
@@ -153,7 +146,7 @@ function stepSessionLoader(ctx: TuiContext): (sessionID: string) => Promise<Step
   }
 }
 
-function registerRefreshTriggers(ctx: TuiContext, store: ProgressStore): void {
+function registerRefreshTriggers(ctx: TuiContext, store: ProgressStore): () => void {
   function refreshOnRouteChange(): void {
     ctx.ui.router.current()
     void store.refresh()
@@ -166,10 +159,21 @@ function registerRefreshTriggers(ctx: TuiContext, store: ProgressStore): void {
     }
   }
 
+  function refreshOnInterval(): void {
+    void store.refresh()
+  }
+
   createEffect(refreshOnRouteChange)
-  ctx.data.on('session.step.ended', refreshOnFamilyEvent)
-  ctx.data.on('session.status', refreshOnFamilyEvent)
-  setInterval(store.refreshIfPresent, REFRESH_INTERVAL_MILLISECONDS)
+  const unsubscribers = [
+    ctx.data.on('session.step.ended', refreshOnFamilyEvent),
+    ctx.data.on('session.status', refreshOnFamilyEvent),
+  ]
+  const intervalHandle = setInterval(refreshOnInterval, REFRESH_INTERVAL_MILLISECONDS)
+
+  return function disposeRefreshTriggers(): void {
+    unsubscribers.forEach((unsubscribe) => unsubscribe())
+    clearInterval(intervalHandle)
+  }
 }
 
 function registerWaveCommand(ctx: TuiContext): void {
@@ -232,11 +236,12 @@ function registerPanel(ctx: TuiContext, store: ProgressStore): void {
 
 export default {
   id: 'implementer-progress',
-  setup(ctx: TuiContext): void {
+  setup(ctx: TuiContext): () => void {
     const store = createProgressStore(ctx)
-    registerRefreshTriggers(ctx, store)
+    const disposeRefreshTriggers = registerRefreshTriggers(ctx, store)
     registerBar(ctx, store)
     registerPanel(ctx, store)
     registerWaveCommand(ctx)
+    return disposeRefreshTriggers
   },
 }
