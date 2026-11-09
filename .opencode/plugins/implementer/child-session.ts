@@ -27,6 +27,7 @@ export interface ChildRunSpec {
   readonly requiredFields: readonly string[]
   readonly slotKey: string
   readonly signal?: AbortSignal
+  readonly onSessionCreated?: (sessionID: string) => void
 }
 
 export type ChildRunResult =
@@ -129,6 +130,7 @@ async function runChild(
   let sessionID: string | undefined
   try {
     sessionID = (await api.session.create({ parentID: spec.parentID, agent: spec.agent, model })).id
+    spec.onSessionCreated?.(sessionID)
     await api.session.prompt({ sessionID, text: spec.text })
     const outcome = await raceWait(api, sessionID, timeoutSeconds, spec.signal)
     if (outcome === 'finished') return await readReport(api, sessionID, spec)
