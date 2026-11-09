@@ -29,10 +29,37 @@ type World = {
   openPanes: string[]
   resolvedModel?: string
   invalidated: string[]
+  completions: CompletionRequest[]
+  answerCompletion: (request: CompletionRequest) => Promise<Completion>
+}
+
+type Completion =
+  | { isAnswered: true; text: string; usage: Usage }
+  | { isAnswered: false; reason: 'api-error' | 'empty-reply' | 'aborted'; usage: Usage }
+type Usage = { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
+type CompletionRequest = { model: string; prompt: string; system?: string; effort?: string; maxTokens?: number; timeoutMs?: number }
+
+const NO_USAGE: Usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
+
+function answered(text: string): Completion {
+  return { isAnswered: true, text, usage: NO_USAGE }
+}
+
+function unanswered(): Completion {
+  return { isAnswered: false, reason: 'empty-reply', usage: NO_USAGE }
 }
 
 function newWorld(roster: Roster = []): World {
-  return { current: roster, listCalls: 0, opened: [], closed: [], openPanes: [], invalidated: [] }
+  return {
+    current: roster,
+    listCalls: 0,
+    opened: [],
+    closed: [],
+    openPanes: [],
+    invalidated: [],
+    completions: [],
+    answerCompletion: async () => unanswered(),
+  }
 }
 
 function stubWorld(on: On, roster: World = newWorld()) {
@@ -85,6 +112,11 @@ function stubWorld(on: On, roster: World = newWorld()) {
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'tool_use', usage: null }
   })
   on('turn.complete', () => ({ text: '' }))
+  on('model.complete', async (_, e) => {
+    roster.completions.push(e)
+
+    return { value: await roster.answerCompletion(e) }
+  })
 
   return clock
 }
@@ -103,6 +135,7 @@ type SpawnOverrides = {
   description?: string
   runId?: string
   resumeAgentId?: string
+  prompt?: string
 }
 
 async function spawn($: Engine, overrides: SpawnOverrides = {}) {
@@ -144,6 +177,19 @@ async function lineTexts($: Engine, surface: 'terminal' | 'desktop'): Promise<st
 
 async function headerTexts($: Engine, surface: 'terminal' | 'desktop'): Promise<string[]> {
   return (await lineTexts($, surface)).filter(line => /Wave \d/.test(line))
+}
+
+function settle(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, 0))
+}
+
+function deferred<T>() {
+  let resolve: (value: T) => void = () => {}
+  const promise = new Promise<T>(done => {
+    resolve = done
+  })
+
+  return { promise, resolve }
 }
 
 const SURFACES = ['terminal', 'desktop'] as const
@@ -567,5 +613,206 @@ test('clearing the conversation resets the list of waves', async ($, on) => {
 
   for (const surface of SURFACES) {
     expect(await lineTexts($, surface)).toEqual([])
+  }
+})
+
+test('a task line shows the description until its title arrives', async ($, on) => {
+  const world = newWorld()
+  const reply = deferred<Completion>()
+  world.answerCompletion = () => reply.promise
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($, { description: 'Add parser tests' })
+  await settle()
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [ ] Add parser tests')
+  }
+})
+
+test('a task line shows the title once the model answers', async ($, on) => {
+  const world = newWorld()
+  world.answerCompletion = async () => answered('Parser test coverage')
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($, { description: 'Add parser tests' })
+  await settle()
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [ ] Parser test coverage')
+  }
+})
+
+test('the task title request uses model haiku and effort low', async ($, on) => {
+  const world = newWorld()
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($)
+  await settle()
+
+  expect(world.completions[0]).toMatchObject({ model: 'haiku', effort: 'low', maxTokens: 256, timeoutMs: 15000 })
+})
+
+test('the task title prompt holds the description and only the first 2000 characters of the spawn prompt', async ($, on) => {
+  const world = newWorld()
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($, { description: 'Add parser tests', prompt: `${'a'.repeat(2000)}${'b'.repeat(50)}` })
+  await settle()
+
+  expect(world.completions[0]?.prompt).toBe(`Add parser tests\n\n${'a'.repeat(2000)}`)
+})
+
+test('a failed title reply keeps the description', async ($, on) => {
+  const world = newWorld()
+  world.answerCompletion = async () => unanswered()
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($, { description: 'Add parser tests' })
+  await settle()
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [ ] Add parser tests')
+  }
+})
+
+test('the reply is cleaned to its first line without surrounding quotes', async ($, on) => {
+  const world = newWorld()
+  world.answerCompletion = async () => answered('\n  "Parser test coverage"  \nSecond line')
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($, { description: 'Add parser tests' })
+  await settle()
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [ ] Parser test coverage')
+  }
+})
+
+test('a cleaned title is cut to 60 characters', async ($, on) => {
+  const world = newWorld()
+  world.answerCompletion = async () => answered('t'.repeat(80))
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($, { description: 'Add parser tests' })
+  await settle()
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain(`    [ ] ${'t'.repeat(60)}`)
+  }
+})
+
+function isWaveRequest(request: CompletionRequest): boolean {
+  return request.system?.includes('sums up these tasks') ?? false
+}
+
+test('the wave header shows the wave title once one is stored', async ($, on) => {
+  const world = newWorld()
+  world.answerCompletion = async request => answered(isWaveRequest(request) ? 'Parser work' : 'Task title')
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($)
+  await settle()
+
+  for (const surface of SURFACES) {
+    expect(await headerTexts($, surface)).toEqual(['[ ] Wave 1   Parser work   0/1 done'])
+  }
+})
+
+test('the wave title is requested again when a later task title arrives, with both task titles in its prompt', async ($, on) => {
+  const world = newWorld()
+  let taskCount = 0
+  world.answerCompletion = async request => {
+    if (isWaveRequest(request)) {
+      return answered('Wave title')
+    }
+    taskCount += 1
+
+    return answered(`Task ${taskCount}`)
+  }
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($)
+  await settle()
+  await spawn($)
+  await settle()
+
+  const waveRequests = world.completions.filter(isWaveRequest)
+  expect(waveRequests).toHaveLength(2)
+  expect(waveRequests[1]?.prompt).toBe('Task 1\nTask 2')
+})
+
+test('a stale wave title reply that arrives after a newer one does not replace it', async ($, on) => {
+  const world = newWorld()
+  const waveReplies = [deferred<Completion>(), deferred<Completion>()]
+  let waveCount = 0
+  let taskCount = 0
+  world.answerCompletion = request => {
+    if (isWaveRequest(request)) {
+      waveCount += 1
+
+      return waveReplies[waveCount - 1]!.promise
+    }
+    taskCount += 1
+
+    return Promise.resolve(answered(`Task ${taskCount}`))
+  }
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($)
+  await settle()
+  await spawn($)
+  await settle()
+  waveReplies[1]!.resolve(answered('Newer wave title'))
+  await settle()
+  waveReplies[0]!.resolve(answered('Stale wave title'))
+  await settle()
+
+  for (const surface of SURFACES) {
+    expect(await headerTexts($, surface)).toEqual(['[ ] Wave 1   Newer wave title   0/2 done'])
+  }
+})
+
+test('a resumed agent makes no new title request', async ($, on) => {
+  const world = newWorld()
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($, { runId: 'wf_1' })
+  await settle()
+  const requestsBeforeResume = world.completions.length
+  await spawn($, { runId: 'wf_1', resumeAgentId: 'agent-1' })
+  await settle()
+
+  expect(world.completions.length).toBe(requestsBeforeResume)
+})
+
+test('clearing the conversation empties the wave titles', async ($, on) => {
+  const world = newWorld()
+  world.answerCompletion = async request => answered(isWaveRequest(request) ? 'Parser work' : 'Task title')
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($, { description: 'first' })
+  await settle()
+  await $.session.end({ reason: 'clear', sessionId: 'session-1', resume: { id: 'session-1' } })
+  world.answerCompletion = async () => unanswered()
+  await takeStep($, 0)
+  await spawn($, { description: 'second' })
+  await settle()
+
+  for (const surface of SURFACES) {
+    const headers = await headerTexts($, surface)
+    expect(headers.some(header => header.includes('Parser work'))).toBe(false)
   }
 })
