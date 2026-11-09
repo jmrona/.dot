@@ -816,3 +816,64 @@ test('clearing the conversation empties the wave titles', async ($, on) => {
     expect(headers.some(header => header.includes('Parser work'))).toBe(false)
   }
 })
+
+test('a task title reply that arrives after a clear starts no wave title request', async ($, on) => {
+  const world = newWorld()
+  const taskReply = deferred<Completion>()
+  world.answerCompletion = request => (isWaveRequest(request) ? Promise.resolve(answered('Wave')) : taskReply.promise)
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($)
+  await settle()
+  await $.session.end({ reason: 'clear', sessionId: 'session-1', resume: { id: 'session-1' } })
+  taskReply.resolve(answered('Late task title'))
+  await settle()
+
+  expect(world.completions.filter(isWaveRequest)).toHaveLength(0)
+})
+
+test('a wave title reply that arrives after a clear does not title a new wave with the same key', async ($, on) => {
+  const world = newWorld()
+  const oldWaveReply = deferred<Completion>()
+  let taskCount = 0
+  world.answerCompletion = request => {
+    if (isWaveRequest(request)) {
+      return oldWaveReply.promise
+    }
+    taskCount += 1
+
+    return Promise.resolve(taskCount === 1 ? answered('Old task') : unanswered())
+  }
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($)
+  await settle()
+  await $.session.end({ reason: 'clear', sessionId: 'session-1', resume: { id: 'session-1' } })
+  await takeStep($, 0)
+  await spawn($)
+  await settle()
+  oldWaveReply.resolve(answered('Old wave title'))
+  await settle()
+
+  for (const surface of SURFACES) {
+    expect(await headerTexts($, surface)).toEqual(['[ ] Wave 1   0/1 done'])
+  }
+})
+
+test('a rejected title request keeps the description', async ($, on) => {
+  const world = newWorld()
+  world.answerCompletion = async () => {
+    throw new Error('model blocked')
+  }
+  stubWorld(on, world)
+
+  await takeStep($, 0)
+  await spawn($, { description: 'Add parser tests' })
+  await settle()
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [ ] Add parser tests')
+  }
+})

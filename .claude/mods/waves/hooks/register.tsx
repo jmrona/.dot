@@ -21,6 +21,7 @@ const TASK_TITLE_SYSTEM = 'Write a title of at most six words, in British Englis
 const WAVE_TITLE_SYSTEM =
   'Write a title of at most six words, in British English, that sums up these tasks. Reply with the title only.'
 const waveRequestCounters = new Map<string, number>()
+const titleGeneration = { current: 0 }
 
 const RUNNING: readonly AgentStatus[] = ['pending', 'running', 'waiting']
 const FAILED: readonly AgentStatus[] = ['failed', 'killed']
@@ -130,14 +131,19 @@ function cleanTitle(text: string): string {
 }
 
 async function requestTitle($: Engine, system: string, prompt: string): Promise<string | undefined> {
-  const reply = await $.model.complete({
-    model: TITLE_MODEL,
-    effort: 'low',
-    maxTokens: 256,
-    timeoutMs: 15000,
-    system,
-    prompt,
-  })
+  const reply = await $.model
+    .complete({
+      model: TITLE_MODEL,
+      effort: 'low',
+      maxTokens: 256,
+      timeoutMs: 15000,
+      system,
+      prompt,
+    })
+    .catch(() => undefined)
+  if (reply === undefined) {
+    return undefined
+  }
   const title = reply.isAnswered ? cleanTitle(reply.text) : ''
 
   return title === '' ? undefined : title
@@ -145,15 +151,21 @@ async function requestTitle($: Engine, system: string, prompt: string): Promise<
 
 async function requestWaveTitle($: Engine, list: readonly WaveAgent[], waveKey: string): Promise<void> {
   const taskTitles = list.filter(agent => agent.waveKey === waveKey && agent.title !== undefined)
+  if (taskTitles.length === 0) {
+    return
+  }
+  const generation = titleGeneration.current
   const requestNumber = (waveRequestCounters.get(waveKey) ?? 0) + 1
   waveRequestCounters.set(waveKey, requestNumber)
   const title = await requestTitle($, WAVE_TITLE_SYSTEM, taskTitles.map(agent => agent.title).join('\n'))
-  if (title !== undefined && waveRequestCounters.get(waveKey) === requestNumber) {
+  const isCurrent = titleGeneration.current === generation && waveRequestCounters.get(waveKey) === requestNumber
+  if (title !== undefined && isCurrent) {
     await update($, waveTitles, titles => ({ ...titles, [waveKey]: title }))
   }
 }
 
 async function generateTitles($: Engine, record: WaveAgent, taskPrompt: string): Promise<void> {
+  const generation = titleGeneration.current
   const prompt = `${record.description}\n\n${taskPrompt.slice(0, TASK_PROMPT_MAX_LENGTH)}`
   const title = await requestTitle($, TASK_TITLE_SYSTEM, prompt)
   if (title === undefined) {
@@ -162,7 +174,10 @@ async function generateTitles($: Engine, record: WaveAgent, taskPrompt: string):
   const stored = await update($, agents, list =>
     list.map(agent => (agent.agentId === record.agentId ? { ...agent, title } : agent)),
   )
-  await requestWaveTitle($, stored, record.waveKey)
+  const hasRow = stored.some(agent => agent.agentId === record.agentId)
+  if (titleGeneration.current === generation && hasRow) {
+    await requestWaveTitle($, stored, record.waveKey)
+  }
 }
 
 const polling: { timer: Timer | null } = { timer: null }
@@ -206,6 +221,7 @@ export const register: Register = on => {
   on('session.end', async ($, e, next) => {
     if (e.reason === 'clear') {
       stopPolling()
+      titleGeneration.current += 1
       await update($, agents, () => [])
       await update($, step, () => 0)
       await update($, waveTitles, () => ({}))
