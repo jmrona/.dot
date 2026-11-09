@@ -70,7 +70,7 @@ interface HarnessOptions {
 const ROOT_SESSION: AutoCompactSession = { id: 'session-1' }
 const CONFIRMATION_TIMEOUT_MS = 20
 const WAIT_LIMIT_MS = 1000
-const SETUP_PLAN_DIRECTORY = '/Users/jose.romero/.config/opencode/plans'
+const SETUP_PLAN_DIRECTORY = '/Users/jose.romero/.opencode/plan'
 const THRESHOLD_MODEL = {
   id: 'model-a',
   providerID: 'provider-a',

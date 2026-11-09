@@ -179,8 +179,7 @@
 			"~/.config/opencode/data/cognitive-profile/**": "allow",
 			"~/.config/opencode/data/ticket-coach/**": "allow",
 			"~/.config/opencode/skills/**": "allow",
-			"~/.config/opencode/rules/**": "allow",
-			"~/.config/opencode/plans/**": "allow"
+			"~/.config/opencode/rules/**": "allow"
 		},
 		"edit": {
 			"~/.config/opencode/data/cognitive-profile/profile.json": "allow",
@@ -189,8 +188,7 @@
 			"~/.config/opencode/data/cognitive-profile/onboarding-preference.json": "allow",
 			"~/.config/opencode/data/ticket-coach/**": "allow",
 			"~/.config/opencode/skills/**": "ask",
-			"~/.config/opencode/rules/**": "ask",
-			"~/.config/opencode/plans/**": "allow"
+			"~/.config/opencode/rules/**": "ask"
 		},
 		"read": {
 			"~/.config/opencode/data/cognitive-profile/profile.json": "allow",
