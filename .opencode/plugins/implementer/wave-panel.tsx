@@ -2,10 +2,20 @@
 import { useKeyboard } from '@opentui/solid'
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import type { Accessor, JSX } from 'solid-js'
-import { gateRow, phaseRows, stepRows } from './progress-view.ts'
-import type { GateRow, PanelPhase, StepRow } from './progress-view.ts'
-import type { ProgressStep, StepKey, StepState, WaveProgress } from './progress.ts'
+import {
+  cardStepLineSegments,
+  gateLineSegments,
+  gateRow,
+  phaseLineSegments,
+  phaseRows,
+  stepLineSegments,
+  stepRows,
+} from './progress-view.ts'
+import type { PanelPhase } from './progress-view.ts'
+import type { ProgressStep, StepKey, WaveProgress } from './progress.ts'
+import SegmentLine from './segment-line.tsx'
 import StepCard from './step-card.tsx'
+import type { Segment, ThemeTokens } from './tone.ts'
 
 export const PANEL_NAME = 'implementer.wave'
 
@@ -18,6 +28,7 @@ export interface WavePanelProps {
   readonly progress: WaveProgress | undefined
   readonly tokens: ReadonlyMap<string, number>
   readonly now: number
+  readonly theme: () => ThemeTokens
   readonly isFocused: () => boolean
   readonly onClose: () => void
   readonly loadSession: (sessionID: string) => Promise<StepSession>
@@ -30,8 +41,12 @@ interface Entry {
   readonly stepIndex: number
 }
 
-interface StepLine {
-  readonly text: string
+interface PanelLine {
+  readonly segments: readonly Segment[]
+  readonly isSelected: boolean
+}
+
+interface StepLine extends PanelLine {
   readonly stepIndex: number
 }
 
@@ -39,7 +54,6 @@ const LEFT_COLUMN_WIDTH = 22
 const NO_ENTRY: Entry = { phase: 'implement', key: undefined, stepIndex: -1 }
 const INITIAL_SELECTION: Entry = { phase: 'implement', key: undefined, stepIndex: 0 }
 export const NO_SESSION: StepSession = { messages: [], agent: undefined }
-const STATE_MARKERS: Readonly<Record<StepState, string>> = { running: '[RUN]', done: '[OK]', failed: '[FAIL]' }
 
 function entriesOf(progress: WaveProgress | undefined): readonly Entry[] {
   if (progress === undefined) {
@@ -89,45 +103,37 @@ function stepOf(progress: WaveProgress | undefined, entry: Entry): ProgressStep 
   return progress.steps.filter((step) => step.phase === entry.phase)[entry.stepIndex]
 }
 
-function markerOf(isSelected: boolean): string {
-  return isSelected ? '>' : ' '
-}
-
-function stepListText(row: StepRow, isSelected: boolean): string {
-  return `${markerOf(isSelected)} ${STATE_MARKERS[row.state]} ${row.label}  ${row.model} - ${row.tokens}  ${row.duration}`
-}
-
-function gateListText(row: GateRow): string {
-  return `> ${row.label}  ${row.state}  ${row.duration}`
-}
-
 function listLinesOf(props: WavePanelProps, entry: Entry): readonly StepLine[] {
   if (props.progress === undefined) {
     return []
   }
   if (entry.phase === 'gate') {
-    return [{ text: gateListText(gateRow(props.progress, props.now)), stepIndex: 0 }]
+    return [{ segments: gateLineSegments(gateRow(props.progress, props.now), true), isSelected: true, stepIndex: 0 }]
   }
-  return stepRows(props.progress, entry.phase, props.tokens, props.now).map((row, stepIndex) => ({
-    text: stepListText(row, stepIndex === entry.stepIndex),
-    stepIndex,
-  }))
+  return stepRows(props.progress, entry.phase, props.tokens, props.now).map((row, stepIndex) => {
+    const isSelected = stepIndex === entry.stepIndex
+    return { segments: stepLineSegments(row, isSelected), isSelected, stepIndex }
+  })
 }
 
-function phaseLinesOf(progress: WaveProgress | undefined, entry: Entry): readonly string[] {
+function phaseLinesOf(progress: WaveProgress | undefined, entry: Entry): readonly PanelLine[] {
   if (progress === undefined) {
     return []
   }
-  return phaseRows(progress).map((row) => `${markerOf(row.phase === entry.phase)} ${row.label} ${row.done}/${row.total}`)
+  return phaseRows(progress).map((row) => {
+    const isSelected = row.phase === entry.phase
+    return { segments: phaseLineSegments(row, isSelected), isSelected }
+  })
 }
 
-function cardLinesOf(props: WavePanelProps, entry: Entry): readonly string[] {
+function cardLinesOf(props: WavePanelProps, entry: Entry): readonly PanelLine[] {
   if (props.progress === undefined || entry.phase === 'gate') {
     return []
   }
-  return stepRows(props.progress, entry.phase, props.tokens, props.now).map(
-    (row, stepIndex) => `${markerOf(stepIndex === entry.stepIndex)} ${row.label}`,
-  )
+  return stepRows(props.progress, entry.phase, props.tokens, props.now).map((row, stepIndex) => {
+    const isSelected = stepIndex === entry.stepIndex
+    return { segments: cardStepLineSegments(row, isSelected), isSelected }
+  })
 }
 
 interface CursorState {
@@ -148,7 +154,7 @@ interface CardState {
 }
 
 interface PanelLines {
-  readonly left: Accessor<readonly string[]>
+  readonly left: Accessor<readonly PanelLine[]>
   readonly list: Accessor<readonly StepLine[]>
 }
 
@@ -248,6 +254,7 @@ function useListAndCardKeys(props: WavePanelProps, cursor: CursorState, card: Ca
     up: cursor.moveUp,
     down: cursor.moveDown,
     return: enterAfterKeyDispatch,
+    right: enterAfterKeyDispatch,
     escape: props.onClose,
   }
 
@@ -255,6 +262,7 @@ function useListAndCardKeys(props: WavePanelProps, cursor: CursorState, card: Ca
     up: cursor.moveStepUp,
     down: cursor.moveStepDown,
     escape: card.leave,
+    left: card.leave,
   }
 
   function handleKey(key: { name: string }): void {
@@ -295,7 +303,7 @@ export default function WavePanel(props: WavePanelProps): JSX.Element {
       <text>implementation-wave</text>
       <box flexDirection="row" flexGrow={1}>
         <box flexDirection="column" width={LEFT_COLUMN_WIDTH}>
-          <For each={lines.left()}>{(line) => <text>{line}</text>}</For>
+          <For each={lines.left()}>{(line) => <SegmentLine segments={line.segments} theme={props.theme} isBold={line.isSelected} />}</For>
         </box>
         <box flexDirection="column" flexGrow={1} paddingLeft={2}>
           <Show
@@ -304,7 +312,7 @@ export default function WavePanel(props: WavePanelProps): JSX.Element {
               <For each={lines.list()}>
                 {(line) => (
                   <box onMouseUp={stepSelector(line.stepIndex)}>
-                    <text>{line.text}</text>
+                    <SegmentLine segments={line.segments} theme={props.theme} isBold={line.isSelected} />
                   </box>
                 )}
               </For>
@@ -317,6 +325,7 @@ export default function WavePanel(props: WavePanelProps): JSX.Element {
                 agent={card.session().agent}
                 tokens={props.tokens.get(step().sessionID ?? '')}
                 now={props.now}
+                theme={props.theme}
                 isFocused={props.isFocused}
                 onOpenSession={openSelectedSession}
               />
