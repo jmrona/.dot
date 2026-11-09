@@ -2,10 +2,11 @@
 import { useKeyboard } from '@opentui/solid'
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
-import { formatDuration, formatTokens } from './progress-view.ts'
 import type { ProgressStep } from './progress.ts'
-import { buildStepDetail, visibleBlocks } from './step-detail.ts'
-import type { BlockView, CardBlocks, StepDetail } from './step-detail.ts'
+import SegmentLine from './segment-line.tsx'
+import { buildStepDetail, countsSegments, headerSegments, visibleBlocks } from './step-detail.ts'
+import type { BlockView, CardBlocks } from './step-detail.ts'
+import type { Segment, ThemeTokens } from './tone.ts'
 
 export interface StepCardProps {
   readonly step: ProgressStep
@@ -13,6 +14,7 @@ export interface StepCardProps {
   readonly agent: string | undefined
   readonly tokens: number | undefined
   readonly now: number
+  readonly theme: () => ThemeTokens
   readonly isFocused: () => boolean
   readonly onOpenSession: () => void
 }
@@ -32,19 +34,18 @@ interface ScrollControls {
 type KeyActions = Readonly<Record<string, (() => void) | undefined>>
 
 const SCROLL_STEP = 1
-const SEPARATOR = ' - '
+const OPEN_SESSION_SEGMENTS: readonly Segment[] = [{ text: 'open session', tone: 'info' }]
 
 function blockList(blocks: CardBlocks): readonly BlockView[] {
   return [blocks.prompt, blocks.activity, blocks.outcome]
 }
 
-function headerLine(detail: StepDetail): string {
-  return [detail.status, detail.model, detail.agent].join(SEPARATOR)
+function hiddenNotice(hidden: number): readonly Segment[] {
+  return [{ text: `... ${hidden} more lines`, tone: 'muted' }]
 }
 
-function countsLine(props: StepCardProps, detail: StepDetail): string {
-  const duration = formatDuration((props.step.endedAt ?? props.now) - props.step.startedAt)
-  return [formatTokens(props.tokens), `${detail.toolCallCount} tool calls`, duration].join(SEPARATOR)
+function durationOf(step: ProgressStep, now: number): number {
+  return (step.endedAt ?? now) - step.startedAt
 }
 
 function createScrollControls(): ScrollControls {
@@ -88,23 +89,26 @@ export default function StepCard(props: StepCardProps): JSX.Element {
 
   return (
     <box flexDirection="column" flexGrow={1}>
-      <text>{headerLine(detail())}</text>
-      <text>{countsLine(props, detail())}</text>
+      <SegmentLine segments={headerSegments(detail())} theme={props.theme} />
+      <SegmentLine
+        segments={countsSegments(detail(), props.tokens, durationOf(props.step, props.now))}
+        theme={props.theme}
+      />
       <scrollbox ref={scroll.assign} flexGrow={1}>
         <For each={blocks()}>
           {(block) => (
             <box flexDirection="column">
-              <text>{block.heading}</text>
+              <SegmentLine segments={block.heading} theme={props.theme} />
               <For each={block.lines}>{(line) => <text>{line}</text>}</For>
               <Show when={block.hidden > 0}>
-                <text>{`... ${block.hidden} more lines`}</text>
+                <SegmentLine segments={hiddenNotice(block.hidden)} theme={props.theme} />
               </Show>
             </box>
           )}
         </For>
       </scrollbox>
       <box onMouseUp={props.onOpenSession}>
-        <text>open session</text>
+        <SegmentLine segments={OPEN_SESSION_SEGMENTS} theme={props.theme} />
       </box>
     </box>
   )
