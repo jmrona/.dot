@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { test } from 'node:test'
+import { after, test } from 'node:test'
+import { setTimeout as sleep } from 'node:timers/promises'
 
 import implementerPlugin, {
   buildImplementWaveSchemas,
@@ -16,6 +18,7 @@ import implementerPlugin, {
   type ImplementerApi,
 } from './index.ts'
 import type { GateInput, GateResult } from './gate.ts'
+import type { WaveProgress } from './progress.ts'
 import { createSlotSemaphore } from '../rate-guard/semaphore.ts'
 
 interface RecordedCall {
@@ -102,6 +105,38 @@ function createFakeApi(options: FakeApiOptions = {}) {
   return { api, calls, tools }
 }
 
+const progressDirectories: string[] = []
+
+function createProgressDirectory(): string {
+  const directory = mkdtempSync(join(tmpdir(), 'implementer-progress-'))
+  progressDirectories.push(directory)
+  return directory
+}
+
+const PROGRESS_FILE_ATTEMPTS = 50
+const PROGRESS_FILE_DELAY_MS = 10
+
+async function waitForProgressFile(progressFile: string): Promise<WaveProgress> {
+  for (let attempt = 0; attempt < PROGRESS_FILE_ATTEMPTS; attempt += 1) {
+    const text = await readFile(progressFile, 'utf8').catch(() => undefined)
+    if (text !== undefined) {
+      const progress: WaveProgress = JSON.parse(text)
+      return progress
+    }
+    await sleep(PROGRESS_FILE_DELAY_MS)
+  }
+  throw new Error(
+    `The wave progress file ${progressFile} did not appear after ${PROGRESS_FILE_ATTEMPTS} attempts ` +
+      `of ${PROGRESS_FILE_DELAY_MS} ms each.`,
+  )
+}
+
+after(() => {
+  for (const directory of progressDirectories) {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 function createDependencies(options: FakeApiOptions = {}) {
   const fake = createFakeApi(options)
   const gateInputs: GateInput[] = []
@@ -113,6 +148,7 @@ function createDependencies(options: FakeApiOptions = {}) {
       gateInputs.push(input)
       return PASSING_GATE
     },
+    progressDirectory: createProgressDirectory(),
   }
   return { ...fake, dependencies, gateInputs }
 }
@@ -212,6 +248,46 @@ test('executeImplementWave stops a slow child after childTimeoutSeconds from the
   const output = await executeImplementWave(fixture.dependencies, validInput({ childTimeoutSeconds: 0.01 }), rootContext())
 
   assert.equal(JSON.parse(output.output).tasks.T1.state, 'blocked')
+})
+
+test('executeImplementWave writes the wave progress file while a child session runs', async () => {
+  const fixture = createDependencies({ replies: [DONE_REPLY, PASS_REPLY] })
+  const progressFile = join(fixture.dependencies.progressDirectory, 'root-session-id.json')
+  let progressSeenByChild: WaveProgress | undefined
+  let progressWaitError: unknown
+  fixture.api.session.wait = async () => {
+    try {
+      progressSeenByChild = await waitForProgressFile(progressFile)
+    } catch (error: unknown) {
+      progressWaitError = error
+    }
+  }
+
+  await executeImplementWave(fixture.dependencies, validInput(), { sessionID: 'root-session-id', agent: 'build' })
+
+  assert.equal(progressWaitError, undefined)
+  assert.equal(progressSeenByChild?.version, 1)
+})
+
+test('executeImplementWave removes the wave progress file once the wave ends', async () => {
+  const fixture = createDependencies({ replies: [DONE_REPLY, PASS_REPLY] })
+  const progressFile = join(fixture.dependencies.progressDirectory, 'root-session-id.json')
+  let progressExistedDuringWave = false
+  let progressWaitError: unknown
+  fixture.api.session.wait = async () => {
+    try {
+      await waitForProgressFile(progressFile)
+      progressExistedDuringWave = true
+    } catch (error: unknown) {
+      progressWaitError = error
+    }
+  }
+
+  await executeImplementWave(fixture.dependencies, validInput(), { sessionID: 'root-session-id', agent: 'build' })
+
+  assert.equal(progressWaitError, undefined)
+  assert.equal(progressExistedDuringWave, true)
+  assert.equal(existsSync(progressFile), false)
 })
 
 test('the default child timeout is 1800 seconds', () => {

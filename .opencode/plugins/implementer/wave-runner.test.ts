@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { ChildRunResult, ChildRunSpec } from './child-session.ts'
 import type { GateInput, GateResult } from './gate.ts'
+import { startWave } from './progress.ts'
+import type { ProgressRecorder, WaveProgress } from './progress.ts'
 import type { WavePlan } from './wave-plan.ts'
 import { runWave, SUBAGENT_PREAMBLE } from './wave-runner.ts'
 
@@ -34,6 +36,7 @@ function scriptedRunner(script: readonly ChildRunResult[]) {
   const queue = [...script]
   const runChild = async (spec: ChildRunSpec): Promise<ChildRunResult> => {
     specs.push(spec)
+    spec.onSessionCreated?.(`child-${specs.length - 1}`)
     return queue.shift() ?? childFailure('script exhausted')
   }
   return { specs, runChild }
@@ -46,6 +49,16 @@ function gateRecorder(result: GateResult = PASSING_GATE) {
     return result
   }
   return { inputs, runGate }
+}
+
+function progressRecorder() {
+  let current: WaveProgress = startWave('root', 0)
+  let removals = 0
+  const recorder: ProgressRecorder = {
+    update: async (change) => { current = change(current) },
+    remove: async () => { removals += 1 },
+  }
+  return { recorder, state: () => current, removals: () => removals }
 }
 
 function dependenciesFor(script: readonly ChildRunResult[], gateResult?: GateResult, signal?: AbortSignal) {
@@ -212,5 +225,121 @@ describe('child prompts', () => {
     assert.match(SUBAGENT_PREAMBLE, /brainstorming/)
     assert.match(SUBAGENT_PREAMBLE, /ask the user/)
     assert.match(SUBAGENT_PREAMBLE, /Task section below gives the value of every bracketed placeholder/)
+  })
+})
+
+describe('runWave progress', () => {
+  const stepSummary = (progress: WaveProgress) =>
+    progress.steps.map((step) => `${step.phase}:${step.attempt}:${step.state}:${step.sessionID}`)
+
+  it('records implement and review steps as done with their session IDs', async () => {
+    const { dependencies } = dependenciesFor([DONE, PASS])
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.deepEqual(stepSummary(progress.state()), ['implement:0:done:child-0', 'review:0:done:child-1'])
+  })
+
+  it('records the title and model of a step', async () => {
+    const { dependencies } = dependenciesFor([DONE, PASS])
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.equal(progress.state().steps[0].title, 'Title T1')
+    assert.equal(progress.state().steps[0].model, 'model-a')
+  })
+
+  it('records review 0, correct 1 and review 1 after a FAIL review', async () => {
+    const { dependencies } = dependenciesFor([DONE, failVerdict('x'), DONE, PASS])
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.deepEqual(stepSummary(progress.state()), [
+      'implement:0:done:child-0', 'review:0:done:child-1', 'correct:1:done:child-2', 'review:1:done:child-3',
+    ])
+  })
+
+  it('records a failed child step as failed', async () => {
+    const { dependencies } = dependenciesFor([childFailure('child-timeout')])
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.deepEqual(stepSummary(progress.state()), ['implement:0:failed:child-0'])
+  })
+
+  it('records a review with an invalid report as failed', async () => {
+    const { dependencies } = dependenciesFor([DONE, childFailure('invalid-report'), DONE, PASS])
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.equal(stepSummary(progress.state())[1], 'review:0:failed:child-1')
+  })
+
+  it('records the gate as passed after a passing gate', async () => {
+    const { dependencies } = dependenciesFor([DONE, PASS])
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.equal(progress.state().gate.state, 'passed')
+  })
+
+  it('records the gate as running while the proof commands run', async () => {
+    const { dependencies } = dependenciesFor([DONE, PASS])
+    const progress = progressRecorder()
+    let stateDuringGate = ''
+    const runGate = async (): Promise<GateResult> => {
+      stateDuringGate = progress.state().gate.state
+      return PASSING_GATE
+    }
+    await runWave(buildPlan(), { ...dependencies, runGate, progress: progress.recorder })
+    assert.equal(stateDuringGate, 'running')
+  })
+
+  it('records the gate as failed after a failing gate', async () => {
+    const { dependencies } = dependenciesFor([DONE, PASS], { ...PASSING_GATE, passed: false })
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.equal(progress.state().gate.state, 'failed')
+  })
+
+  it('records the gate as failed when HEAD moved', async () => {
+    const { dependencies } = dependenciesFor([DONE, PASS], { ...PASSING_GATE, headMoved: true })
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.equal(progress.state().gate.state, 'failed')
+  })
+
+  it('records the gate as skipped when no task reaches review', async () => {
+    const { dependencies } = dependenciesFor([childFailure('boom')])
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.equal(progress.state().gate.state, 'skipped')
+  })
+
+  it('records the gate as skipped when the signal is aborted', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const { dependencies } = dependenciesFor([DONE, PASS], undefined, controller.signal)
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.equal(progress.state().gate.state, 'skipped')
+  })
+
+  it('removes the progress once after a normal wave', async () => {
+    const { dependencies } = dependenciesFor([DONE, PASS])
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.equal(progress.removals(), 1)
+  })
+
+  it('removes the progress once after an aborted wave', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const { dependencies } = dependenciesFor([DONE, PASS], undefined, controller.signal)
+    const progress = progressRecorder()
+    await runWave(buildPlan(), { ...dependencies, progress: progress.recorder })
+    assert.equal(progress.removals(), 1)
+  })
+
+  it('removes the progress once and rethrows when runGate throws', async () => {
+    const { dependencies } = dependenciesFor([DONE, PASS])
+    const progress = progressRecorder()
+    const runGate = async (): Promise<GateResult> => { throw new Error('gate exploded') }
+    await assert.rejects(runWave(buildPlan(), { ...dependencies, runGate, progress: progress.recorder }), /gate exploded/)
+    assert.equal(progress.removals(), 1)
   })
 })

@@ -1,5 +1,7 @@
 import type { ChildRunResult, ChildRunSpec } from './child-session.ts'
 import type { GateInput, GateResult } from './gate.ts'
+import type { ProgressPhase, ProgressRecorder, StepKey } from './progress.ts'
+import { attachSession, finishGate, finishStep, startGate, startStep } from './progress.ts'
 import type { WaveArgs, WavePlan, WaveTask } from './wave-plan.ts'
 
 export const DEFAULT_PROOF_TIMEOUT_SECONDS = 1200
@@ -12,7 +14,7 @@ export interface ReviewVerdict { readonly verdict: 'PASS' | 'FAIL'; readonly fin
 export interface TaskOutcome { readonly state: 'verified' | 'reviewed' | 'blocked' | 'stopped'; readonly rounds: number; readonly reviews: readonly ReviewVerdict[]; readonly report: Readonly<Record<string, unknown>> | null; readonly reason?: string }
 export interface WaveResult { readonly status: 'completed' | 'gate-failed' | 'aborted'; readonly wave: readonly string[]; readonly tasks: Readonly<Record<string, TaskOutcome>>; readonly gate: GateResult | null; readonly held: readonly string[]; readonly remaining: readonly string[]; readonly reason?: string }
 export interface PromptTemplates { readonly implementer: string; readonly reviewer: string }
-export interface WaveRunnerDependencies { readonly prompts: PromptTemplates; readonly runChild: (spec: ChildRunSpec) => Promise<ChildRunResult>; readonly runGate: (input: GateInput) => Promise<GateResult>; readonly directory: string; readonly rootSessionID: string; readonly signal?: AbortSignal }
+export interface WaveRunnerDependencies { readonly prompts: PromptTemplates; readonly runChild: (spec: ChildRunSpec) => Promise<ChildRunResult>; readonly runGate: (input: GateInput) => Promise<GateResult>; readonly directory: string; readonly rootSessionID: string; readonly signal?: AbortSignal; readonly progress?: ProgressRecorder }
 
 type WaveKind = Extract<WavePlan, { kind: 'wave' }>
 type Report = Readonly<Record<string, unknown>>
@@ -83,7 +85,22 @@ function buildReviewPrompt(args: WaveArgs, prompts: PromptTemplates, task: WaveT
   ].join('\n\n')
 }
 
-function childSpec(context: RunContext, task: WaveTask, text: string, requiredFields: readonly string[], slotKey: string): ChildRunSpec {
+function stepKeyFor(task: WaveTask, phase: ProgressPhase, attempt: number): StepKey {
+  return { taskID: task.id, phase, attempt }
+}
+
+async function recordStepStart(context: RunContext, task: WaveTask, key: StepKey): Promise<void> {
+  const step = { ...key, title: task.title, model: context.args.models[task.tier] }
+  await context.dependencies.progress?.update((current) => startStep(current, step, Date.now()))
+}
+
+async function recordStepEnd(context: RunContext, key: StepKey, isFailure: boolean): Promise<void> {
+  const state = isFailure ? 'failed' : 'done'
+  await context.dependencies.progress?.update((current) => finishStep(current, key, state, Date.now()))
+}
+
+function childSpec(context: RunContext, task: WaveTask, text: string, requiredFields: readonly string[], slotKey: string, key: StepKey): ChildRunSpec {
+  const progress = context.dependencies.progress
   return {
     parentID: context.dependencies.rootSessionID,
     agent: task.agentType,
@@ -92,13 +109,19 @@ function childSpec(context: RunContext, task: WaveTask, text: string, requiredFi
     requiredFields,
     slotKey,
     signal: context.dependencies.signal,
+    onSessionCreated: (sessionID: string): void => {
+      void progress?.update((current) => attachSession(current, key, sessionID))
+    },
   }
 }
 
 async function implement(context: RunContext, task: WaveTask, findings: readonly string[], attempt: number): Promise<ImplementAttempt> {
   const text = buildImplementPrompt(context.args, context.dependencies.prompts, task, findings)
-  const spec = childSpec(context, task, text, IMPLEMENTER_FIELDS, `${task.id}:implement:${attempt}`)
+  const key = stepKeyFor(task, attempt === 0 ? 'implement' : 'correct', attempt)
+  const spec = childSpec(context, task, text, IMPLEMENTER_FIELDS, `${task.id}:implement:${attempt}`, key)
+  await recordStepStart(context, task, key)
   const result = await context.dependencies.runChild(spec)
+  await recordStepEnd(context, key, !result.ok || !IMPLEMENTATION_STATUSES.includes(result.value.status))
   if (!result.ok) return { report: null, failure: result.reason }
   if (!IMPLEMENTATION_STATUSES.includes(result.value.status)) {
     return { report: result.value, failure: `implementer returned ${String(result.value.status)}` }
@@ -108,7 +131,10 @@ async function implement(context: RunContext, task: WaveTask, findings: readonly
 
 async function review(context: RunContext, task: WaveTask, report: Report, round: number): Promise<ReviewStep> {
   const text = buildReviewPrompt(context.args, context.dependencies.prompts, task, report)
-  const result = await context.dependencies.runChild(childSpec(context, task, text, REVIEWER_FIELDS, `${task.id}:review:${round}`))
+  const key = stepKeyFor(task, 'review', round)
+  await recordStepStart(context, task, key)
+  const result = await context.dependencies.runChild(childSpec(context, task, text, REVIEWER_FIELDS, `${task.id}:review:${round}`, key))
+  await recordStepEnd(context, key, !result.ok)
   if (result.ok) return { verdict: result.value as unknown as ReviewVerdict }
   if (result.reason === 'invalid-report') return { verdict: NO_VALID_VERDICT }
   return { failure: result.reason }
@@ -166,17 +192,38 @@ function headMovedReason(baseSha: string, headSha: string): string {
 }
 
 async function gateWave(plan: WaveKind, dependencies: WaveRunnerDependencies, tasks: WaveResult['tasks']): Promise<WaveResult> {
+  await dependencies.progress?.update((current) => startGate(current, Date.now()))
   const gate = await dependencies.runGate(gateInputFor(plan, dependencies.directory))
+  const state = gate.passed && !gate.headMoved ? 'passed' : 'failed'
+  await dependencies.progress?.update((current) => finishGate(current, state, Date.now()))
   if (gate.headMoved) return buildResult(plan, 'aborted', tasks, gate, headMovedReason(plan.args.baseSha, gate.headSha))
   if (!gate.passed) return buildResult(plan, 'gate-failed', tasks, gate)
   return buildResult(plan, 'completed', markVerified(tasks), gate)
 }
 
-export async function runWave(plan: WaveKind, dependencies: WaveRunnerDependencies): Promise<WaveResult> {
+async function skipGate(dependencies: WaveRunnerDependencies): Promise<void> {
+  await dependencies.progress?.update((current) => finishGate(current, 'skipped', Date.now()))
+}
+
+async function runWaveBody(plan: WaveKind, dependencies: WaveRunnerDependencies): Promise<WaveResult> {
   const context: RunContext = { args: plan.args, dependencies }
   const outcomes = await Promise.all(plan.wave.map((task) => runTask(context, task)))
   const tasks = Object.fromEntries(plan.wave.map((task, index) => [task.id, outcomes[index]]))
-  if (dependencies.signal?.aborted) return buildResult(plan, 'aborted', tasks, null, 'cancelled')
-  if (!outcomes.some((outcome) => outcome.state === 'reviewed')) return buildResult(plan, 'completed', tasks, null)
+  if (dependencies.signal?.aborted) {
+    await skipGate(dependencies)
+    return buildResult(plan, 'aborted', tasks, null, 'cancelled')
+  }
+  if (!outcomes.some((outcome) => outcome.state === 'reviewed')) {
+    await skipGate(dependencies)
+    return buildResult(plan, 'completed', tasks, null)
+  }
   return gateWave(plan, dependencies, tasks)
+}
+
+export async function runWave(plan: WaveKind, dependencies: WaveRunnerDependencies): Promise<WaveResult> {
+  try {
+    return await runWaveBody(plan, dependencies)
+  } finally {
+    await dependencies.progress?.remove()
+  }
 }

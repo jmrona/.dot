@@ -3,6 +3,7 @@ node_modules/
 .opencode/service.json
 .opencode/data/
 .opencode/vendor/
+.opencode/plugins/implementer/progress/
 .opencode/package-lock.json
 .opencode/bun.lock
 .opencode/.claude/settings.local.json

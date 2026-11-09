@@ -189,6 +189,19 @@ test('run interrupts the child and returns cancelled when the signal fires', asy
   assert.equal(methodsOf(fake.calls).at(-1), 'interrupt')
 })
 
+test('reports the created child session ID before prompting it', async () => {
+  const fake = createFakeApi()
+  await createRunner(fake).runner.run(
+    specFor({
+      onSessionCreated: (sessionID) => {
+        fake.calls.push({ method: 'reported', args: sessionID })
+      },
+    }),
+  )
+  assert.deepEqual(methodsOf(fake.calls).slice(0, 3), ['create', 'reported', 'prompt'])
+  assert.equal(fake.calls[1].args, CHILD_ID)
+})
+
 test('run returns cancelled without creating a child when the signal is already aborted', async () => {
   const fake = createFakeApi()
   const result = await createRunner(fake).runner.run(specFor({ signal: AbortSignal.abort() }))
