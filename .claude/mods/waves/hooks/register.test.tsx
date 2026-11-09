@@ -21,7 +21,14 @@ const PANE = {
 } as const
 
 type Roster = { id: string; status: AgentStatus }[]
-type World = { current: Roster; listCalls: number; opened: string[]; closed: string[]; openPanes: string[] }
+type World = {
+  current: Roster
+  listCalls: number
+  opened: string[]
+  closed: string[]
+  openPanes: string[]
+  resolvedModel?: string
+}
 
 function newWorld(roster: Roster = []): World {
   return { current: roster, listCalls: 0, opened: [], closed: [], openPanes: [] }
@@ -66,11 +73,12 @@ function stubWorld(on: On, roster: World = newWorld()) {
   on('agent.spawn', (_, e) => {
     spawned += 1
 
-    return { model: e.model ?? e.parentModel, agentId: `agent-${spawned}` }
+    return { model: roster.resolvedModel ?? e.model ?? e.parentModel, agentId: `agent-${spawned}` }
   })
   on('turn.step', async function* (_, e) {
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'tool_use', usage: null }
   })
+  on('turn.complete', () => ({ text: '' }))
 
   return clock
 }
@@ -83,7 +91,11 @@ async function takeStep($: Engine, index: number, agentId?: string): Promise<voi
   }
 }
 
-async function spawn($: Engine, overrides: { model?: string; parentAgentId?: string } = {}) {
+type SpawnOverrides = { model?: string; parentAgentId?: string; description?: string; runId?: string }
+
+async function spawn($: Engine, overrides: SpawnOverrides = {}) {
+  const { runId, ...rest } = overrides
+
   return $.agent.spawn({
     tool_use_id: 'toolu-1',
     prompt: 'Do the work.',
@@ -93,27 +105,50 @@ async function spawn($: Engine, overrides: { model?: string; parentAgentId?: str
     parentModel: 'opus',
     background: true,
     fork: false,
-    ...overrides,
+    ...(runId === undefined ? {} : { workflow: { runId, agentIndex: 0 } }),
+    ...rest,
   })
 }
 
-test('spawns made in one step form one wave', async ($, on) => {
+function completeTurn($: Engine, agentId: string, reason: 'answer' | 'error' | 'aborted') {
+  return $.turn.complete({
+    answer: '',
+    durationMs: 1,
+    isAborted: reason === 'aborted',
+    turnId: 'turn-1',
+    agentId,
+    reason,
+  })
+}
+
+async function lineTexts($: Engine, surface: 'terminal' | 'desktop'): Promise<string[]> {
+  const ui = await $.ui.mount({ ...PANE, surface })
+  const rows = await ui.findAll({ type: 'Text' })
+  await ui.unmount()
+
+  return rows.map(row => row.text ?? '')
+}
+
+async function headerTexts($: Engine, surface: 'terminal' | 'desktop'): Promise<string[]> {
+  return (await lineTexts($, surface)).filter(line => /Wave \d/.test(line))
+}
+
+const SURFACES = ['terminal', 'desktop'] as const
+
+test('workflow agents of one run spawned in different steps render under one wave', async ($, on) => {
   stubWorld(on)
 
   await takeStep($, 0)
-  await spawn($)
-  await spawn($)
+  await spawn($, { runId: 'wf_1' })
+  await takeStep($, 1)
+  await spawn($, { runId: 'wf_1' })
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ ...PANE, surface })
-    const rows = await ui.findAll({ type: 'Text', text: /Wave/ })
-    expect(rows.map(row => row.text)).toEqual([expect.stringContaining('Wave 1')])
-    expect(rows[0]?.text).toContain('2 agents')
-    await ui.unmount()
+  for (const surface of SURFACES) {
+    expect(await headerTexts($, surface)).toEqual([expect.stringContaining('Wave 1')])
   }
 })
 
-test('spawns made in two steps form two waves', async ($, on) => {
+test('agent tool spawns made in different steps render as separate waves', async ($, on) => {
   stubWorld(on)
 
   await takeStep($, 0)
@@ -121,38 +156,52 @@ test('spawns made in two steps form two waves', async ($, on) => {
   await takeStep($, 1)
   await spawn($)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ ...PANE, surface })
-    const rows = await ui.findAll({ type: 'Text', text: /Wave/ })
-    expect(rows.map(row => row.text)).toEqual([
+  for (const surface of SURFACES) {
+    expect(await headerTexts($, surface)).toEqual([
       expect.stringContaining('Wave 1'),
       expect.stringContaining('Wave 2'),
     ])
-    await ui.unmount()
   }
 })
 
-test('a spawn made inside a subagent forms no wave of its own', async ($, on) => {
+test('agent tool spawns made in one step render under one wave', async ($, on) => {
   stubWorld(on)
 
   await takeStep($, 0)
   await spawn($)
-  await spawn($, { parentAgentId: 'agent-1' })
+  await spawn($)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect(await rowTexts($, surface)).toEqual([expect.stringContaining('Wave 1')])
+  for (const surface of SURFACES) {
+    expect(await headerTexts($, surface)).toEqual([expect.stringContaining('0/2 done')])
   }
 })
 
-test('a spawn made inside a subagent does not count in the wave of its parent', async ($, on) => {
+test('the tree renders the header, the task line and the model and time line', async ($, on) => {
+  stubWorld(on)
+
+  await takeStep($, 0)
+  await spawn($, { model: 'sonnet', description: 'Add parser tests' })
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toEqual([
+      '[ ] Wave 1   0/1 done',
+      '    [ ] Add parser tests',
+      '        sonnet  0m 00s',
+    ])
+  }
+})
+
+test('a spawn made inside a subagent forms no wave and no task of its own', async ($, on) => {
   stubWorld(on)
 
   await takeStep($, 0)
   await spawn($)
-  await spawn($, { parentAgentId: 'agent-1' })
+  await spawn($, { parentAgentId: 'agent-1', description: 'nested' })
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toMatch(/\b1 agent\b(?!s)/)
+  for (const surface of SURFACES) {
+    const lines = await lineTexts($, surface)
+    expect(lines.some(line => line.includes('nested'))).toBe(false)
+    expect(await headerTexts($, surface)).toEqual([expect.stringContaining('Wave 1')])
   }
 })
 
@@ -164,54 +213,97 @@ test('a step taken by a subagent does not start a new wave', async ($, on) => {
   await takeStep($, 0, 'agent-1')
   await spawn($)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const rows = await rowTexts($, surface)
-    expect(rows).toEqual([expect.stringContaining('Wave 1')])
-    expect(rows[0]).toContain('2 agents')
+  for (const surface of SURFACES) {
+    expect(await headerTexts($, surface)).toEqual([expect.stringContaining('0/2 done')])
   }
 })
 
-async function rowTexts($: Engine, surface: 'terminal' | 'desktop'): Promise<string[]> {
-  const ui = await $.ui.mount({ ...PANE, surface })
-  const rows = await ui.findAll({ type: 'Text', text: /Wave/ })
-  await ui.unmount()
-
-  return rows.map(row => row.text ?? '')
-}
-
-test('an agent with an explicit model shows that model', async ($, on) => {
-  stubWorld(on)
-
-  await takeStep($, 0)
-  await spawn($, { model: 'sonnet' })
-  await spawn($, { model: 'sonnet' })
-
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('sonnet x2')
-  }
-})
-
-test('an agent with no model shows the parent model it inherits', async ($, on) => {
-  stubWorld(on)
+test('the resolved model of the answer renders instead of an inherited label', async ($, on) => {
+  const world = newWorld()
+  world.resolvedModel = 'claude-opus-5-5'
+  stubWorld(on, world)
 
   await takeStep($, 0)
   await spawn($)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('inherits opus x1')
+  for (const surface of SURFACES) {
+    const lines = await lineTexts($, surface)
+    expect(lines.some(line => line.includes('claude-opus-5-5'))).toBe(true)
+    expect(lines.some(line => line.includes('inherits'))).toBe(false)
   }
 })
 
-test('a running agent shows the wave as in progress and unchecked', async ($, on) => {
+test('turn complete with reason answer marks the task as done', async ($, on) => {
   stubWorld(on)
 
   await takeStep($, 0)
-  await spawn($)
+  await spawn($, { runId: 'wf_1', description: 'Write it' })
+  await completeTurn($, 'agent-1', 'answer')
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const row = (await rowTexts($, surface))[0]
-    expect(row).toContain('[ ] Wave 1')
-    expect(row).toContain('1 running')
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [x] Write it')
+  }
+})
+
+test('turn complete with reason error marks the task as failed', async ($, on) => {
+  stubWorld(on)
+
+  await takeStep($, 0)
+  await spawn($, { runId: 'wf_1', description: 'Write it' })
+  await completeTurn($, 'agent-1', 'error')
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [!] Write it')
+  }
+})
+
+test('turn complete with reason aborted marks the task as failed', async ($, on) => {
+  stubWorld(on)
+
+  await takeStep($, 0)
+  await spawn($, { runId: 'wf_1', description: 'Write it' })
+  await completeTurn($, 'agent-1', 'aborted')
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [!] Write it')
+  }
+})
+
+test('a workflow agent absent from the agent list still renders as running after a poll', async ($, on) => {
+  const clock = stubWorld(on)
+
+  await takeStep($, 0)
+  await spawn($, { runId: 'wf_1', description: 'Write it' })
+  await clock.advance(5000)
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [ ] Write it')
+  }
+})
+
+test('a finished task renders the time between its spawn and its finish', async ($, on) => {
+  const clock = stubWorld(on)
+
+  await takeStep($, 0)
+  await spawn($, { runId: 'wf_1', model: 'sonnet' })
+  await clock.advance(72000)
+  await completeTurn($, 'agent-1', 'answer')
+  await clock.advance(30000)
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('        sonnet  1m 12s')
+  }
+})
+
+test('a running task renders the time between its spawn and the render', async ($, on) => {
+  const clock = stubWorld(on)
+
+  await takeStep($, 0)
+  await spawn($, { runId: 'wf_1', model: 'sonnet' })
+  await clock.advance(8000)
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('        sonnet  0m 08s')
   }
 })
 
@@ -232,77 +324,28 @@ test('a wave whose agents all finished is checked', async ($, on) => {
   roster.current = finishAllAgentsOfOneWave()
   await clock.advance(5000)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('[x] Wave 1')
+  for (const surface of SURFACES) {
+    expect(await headerTexts($, surface)).toEqual(['[x] Wave 1   2/2 done'])
   }
 })
 
-test('a wave whose agents all finished shows finished', async ($, on) => {
+test('a failed agent renders as failed while its wave counts as done', async ($, on) => {
   const roster = newWorld()
   const clock = stubWorld(on, roster)
 
   await takeStep($, 0)
-  await spawn($)
-  await spawn($)
-  roster.current = finishAllAgentsOfOneWave()
-  await clock.advance(5000)
-
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('finished')
-  }
-})
-
-test('a failed agent shows failed in the summary', async ($, on) => {
-  const roster = newWorld()
-  const clock = stubWorld(on, roster)
-
-  await takeStep($, 0)
-  await spawn($)
-  await spawn($)
+  await spawn($, { description: 'first' })
+  await spawn($, { description: 'second' })
   roster.current = [
     { id: 'agent-1', status: 'completed' },
     { id: 'agent-2', status: 'failed' },
   ]
   await clock.advance(5000)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('1 failed')
-  }
-})
-
-test('two failed agents show 2 failed in the summary', async ($, on) => {
-  const roster = newWorld()
-  const clock = stubWorld(on, roster)
-
-  await takeStep($, 0)
-  await spawn($)
-  await spawn($)
-  roster.current = [
-    { id: 'agent-1', status: 'failed' },
-    { id: 'agent-2', status: 'killed' },
-  ]
-  await clock.advance(5000)
-
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('2 failed')
-  }
-})
-
-test('a wave whose agents all ended and one failed is checked', async ($, on) => {
-  const roster = newWorld()
-  const clock = stubWorld(on, roster)
-
-  await takeStep($, 0)
-  await spawn($)
-  await spawn($)
-  roster.current = [
-    { id: 'agent-1', status: 'completed' },
-    { id: 'agent-2', status: 'failed' },
-  ]
-  await clock.advance(5000)
-
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('[x] Wave 1')
+  for (const surface of SURFACES) {
+    const lines = await lineTexts($, surface)
+    expect(lines).toContain('    [!] second')
+    expect(lines).toContain('[x] Wave 1   2/2 done')
   }
 })
 
@@ -336,18 +379,20 @@ test('polling stops once the list no longer shows an agent', async ($, on) => {
   expect(roster.listCalls).toBe(callsWhenAbsent)
 })
 
-test('an agent that the list no longer shows counts as finished', async ($, on) => {
+test('an agent tool agent that the list no longer shows counts as finished', async ($, on) => {
   const roster = newWorld([{ id: 'agent-1', status: 'running' }])
   const clock = stubWorld(on, roster)
 
   await takeStep($, 0)
-  await spawn($)
+  await spawn($, { description: 'work' })
   await clock.advance(5000)
   roster.current = []
   await clock.advance(5000)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('[x] Wave 1')
+  for (const surface of SURFACES) {
+    const lines = await lineTexts($, surface)
+    expect(lines).toContain('    [x] work')
+    expect(lines).toContain('[x] Wave 1   1/1 done')
   }
 })
 
@@ -359,8 +404,8 @@ test('a failed agent that the list later drops still shows failed', async ($, on
   const clock = stubWorld(on, roster)
 
   await takeStep($, 0)
-  await spawn($)
-  await spawn($)
+  await spawn($, { description: 'first' })
+  await spawn($, { description: 'second' })
   roster.current = [
     { id: 'agent-1', status: 'failed' },
     { id: 'agent-2', status: 'running' },
@@ -369,8 +414,8 @@ test('a failed agent that the list later drops still shows failed', async ($, on
   roster.current = [{ id: 'agent-2', status: 'running' }]
   await clock.advance(3000)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect((await rowTexts($, surface))[0]).toContain('1 failed')
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [!] first')
   }
 })
 
@@ -437,7 +482,7 @@ test('clearing the conversation resets the list of waves', async ($, on) => {
   await spawn($)
   await $.session.end({ reason: 'clear', sessionId: 'session-1', resume: { id: 'session-1' } })
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    expect(await rowTexts($, surface)).toEqual([])
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toEqual([])
   }
 })
