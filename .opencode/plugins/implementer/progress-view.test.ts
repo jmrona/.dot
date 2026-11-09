@@ -13,9 +13,26 @@ import {
   startStep,
   startWave,
 } from './progress.ts'
-import type { ProgressPhase, StepKey, StepStart, WaveProgress } from './progress.ts'
+import type { GateState, ProgressPhase, StepKey, StepStart, StepState, WaveProgress } from './progress.ts'
+import {
+  BAR_EMPTY,
+  BAR_FILLED,
+  BAR_ICON,
+  GATE_STATE_GLYPHS,
+  PHASE_GLYPHS,
+  SELECTED_GLYPH,
+  STEP_STATE_GLYPHS,
+  UNSELECTED_GLYPH,
+} from './glyphs.ts'
+import { GATE_STATE_TONES, STEP_STATE_TONES } from './tone.ts'
+import type { Segment } from './tone.ts'
 import {
   barLabel,
+  barSegments,
+  cardStepLineSegments,
+  gateLineSegments,
+  phaseLineSegments,
+  stepLineSegments,
   collectSessionTokens,
   formatDuration,
   formatTokens,
@@ -26,7 +43,7 @@ import {
   sessionTokens,
   stepRows,
 } from './progress-view.ts'
-import type { ProgressData } from './progress-view.ts'
+import type { GateRow, PhaseRow, ProgressData, StepRow } from './progress-view.ts'
 
 let directory = ''
 
@@ -372,5 +389,180 @@ describe('gateRow', () => {
   it('measures a finished gate up to its end time', () => {
     const progress = finishGate(startGate(startWave('root', 0), 1_000), 'passed', 3_000)
     assert.deepEqual(gateRow(progress, 99_000), { label: 'gate', state: 'passed', duration: '2s' })
+  })
+})
+
+function joined(segments: readonly Segment[]): string {
+  return segments.map((segment) => segment.text).join('')
+}
+
+function toneOfText(segments: readonly Segment[], text: string): string | undefined {
+  return segments.find((segment) => segment.text === text)?.tone
+}
+
+function stepRowIn(state: StepState): StepRow {
+  return {
+    key: { taskID: 'task-a', phase: 'implement', attempt: 1 },
+    label: 'implement:task-a',
+    model: 'model-one',
+    tokens: '1.5k tok',
+    duration: '2s',
+    state,
+    sessionID: null,
+  }
+}
+
+function gateRowIn(state: GateState): GateRow {
+  return { label: 'gate', state, duration: '3s' }
+}
+
+const REVIEW_ROW: PhaseRow = { phase: 'review', label: 'Review', done: 1, total: 2 }
+const STEP_STATES_UNDER_TEST: readonly StepState[] = ['running', 'done', 'failed']
+const GATE_STATES_UNDER_TEST: readonly GateState[] = ['pending', 'running', 'passed', 'failed', 'skipped']
+
+describe('barSegments', () => {
+  const progress = waveWithSteps(4, 1)
+
+  it('joins to the icon, the title, the bar, the counts, the elapsed time and the tokens', () => {
+    const tokens = new Map([['session-0', 1500]])
+    const expected = `${BAR_ICON} implementation-wave ${BAR_FILLED.repeat(3)}${BAR_EMPTY.repeat(7)} 1/4 5s 1.5k tok`
+    assert.equal(joined(barSegments(progress, tokens, 5_000)), expected)
+  })
+
+  it('tones the icon as info', () => {
+    assert.equal(toneOfText(barSegments(progress, new Map(), 0), BAR_ICON), 'info')
+  })
+
+  it('tones the title as base', () => {
+    assert.equal(toneOfText(barSegments(progress, new Map(), 0), ' implementation-wave '), 'base')
+  })
+
+  it('tones the filled cells as success', () => {
+    assert.equal(toneOfText(barSegments(progress, new Map(), 0), BAR_FILLED.repeat(3)), 'success')
+  })
+
+  it('tones the empty cells as muted', () => {
+    assert.equal(toneOfText(barSegments(progress, new Map(), 0), BAR_EMPTY.repeat(7)), 'muted')
+  })
+
+  it('tones the counts, elapsed time and tokens as muted', () => {
+    assert.equal(toneOfText(barSegments(progress, new Map(), 5_000), ' 1/4 5s - tok'), 'muted')
+  })
+
+  it('draws only empty cells when no step has finished', () => {
+    const segments = barSegments(waveWithSteps(2, 0), new Map(), 0)
+    assert.equal(joined(segments).includes(BAR_FILLED), false)
+    assert.equal(toneOfText(segments, BAR_EMPTY.repeat(10)), 'muted')
+  })
+
+  it('draws only filled cells when every step has finished', () => {
+    const segments = barSegments(waveWithSteps(2, 2), new Map(), 0)
+    assert.equal(joined(segments).includes(BAR_EMPTY), false)
+    assert.equal(toneOfText(segments, BAR_FILLED.repeat(10)), 'success')
+  })
+
+  it('draws half the cells filled when half of the steps have finished', () => {
+    const expected = `${BAR_FILLED.repeat(5)}${BAR_EMPTY.repeat(5)}`
+    assert.equal(joined(barSegments(waveWithSteps(2, 1), new Map(), 0)).includes(expected), true)
+  })
+})
+
+describe('phaseLineSegments', () => {
+  it('joins to the marker, the phase glyph, the label and the counts', () => {
+    const expected = `${UNSELECTED_GLYPH} ${PHASE_GLYPHS.review} Review 1/2`
+    assert.equal(joined(phaseLineSegments(REVIEW_ROW, false)), expected)
+  })
+
+  it('starts with the selected glyph in base tone when the row is selected', () => {
+    const [marker] = phaseLineSegments(REVIEW_ROW, true)
+    assert.deepEqual(marker, { text: SELECTED_GLYPH, tone: 'base' })
+  })
+
+  it('starts with the unselected glyph in base tone when the row is not selected', () => {
+    const [marker] = phaseLineSegments(REVIEW_ROW, false)
+    assert.deepEqual(marker, { text: UNSELECTED_GLYPH, tone: 'base' })
+  })
+
+  it('tones the phase glyph and the label as base', () => {
+    assert.equal(toneOfText(phaseLineSegments(REVIEW_ROW, false), ` ${PHASE_GLYPHS.review} Review`), 'base')
+  })
+
+  it('tones the counts as muted', () => {
+    assert.equal(toneOfText(phaseLineSegments(REVIEW_ROW, false), ' 1/2'), 'muted')
+  })
+})
+
+describe('stepLineSegments', () => {
+  it('joins to the marker, the state glyph, the label, the model, the tokens and the duration', () => {
+    const expected = `${SELECTED_GLYPH} ${STEP_STATE_GLYPHS.done} implement:task-a  model-one - 1.5k tok  2s`
+    assert.equal(joined(stepLineSegments(stepRowIn('done'), true)), expected)
+  })
+
+  it('starts with the marker in base tone', () => {
+    assert.deepEqual(stepLineSegments(stepRowIn('done'), false)[0], { text: UNSELECTED_GLYPH, tone: 'base' })
+  })
+
+  for (const state of STEP_STATES_UNDER_TEST) {
+    it(`tones the glyph of a ${state} step with the tone of that state`, () => {
+      const segments = stepLineSegments(stepRowIn(state), false)
+      assert.equal(toneOfText(segments, ` ${STEP_STATE_GLYPHS[state]}`), STEP_STATE_TONES[state])
+    })
+  }
+
+  it('tones the label as base', () => {
+    assert.equal(toneOfText(stepLineSegments(stepRowIn('done'), false), ' implement:task-a'), 'base')
+  })
+
+  it('tones the model, tokens and duration as muted', () => {
+    const mutedText = stepLineSegments(stepRowIn('done'), false)
+      .filter((segment) => segment.tone === 'muted')
+      .map((segment) => segment.text)
+      .join('')
+    assert.equal(mutedText, '  model-one - 1.5k tok  2s')
+  })
+})
+
+describe('cardStepLineSegments', () => {
+  it('joins to the marker and the label', () => {
+    assert.equal(joined(cardStepLineSegments(stepRowIn('done'), true)), `${SELECTED_GLYPH} implement:task-a`)
+  })
+
+  it('uses the unselected glyph when the row is not selected', () => {
+    assert.equal(joined(cardStepLineSegments(stepRowIn('done'), false)), `${UNSELECTED_GLYPH} implement:task-a`)
+  })
+
+  it('tones every segment as base', () => {
+    const tones = cardStepLineSegments(stepRowIn('failed'), true).map((segment) => segment.tone)
+    assert.equal(tones.every((tone) => tone === 'base'), true)
+  })
+})
+
+describe('gateLineSegments', () => {
+  it('joins to the marker, the state glyph, the label, the state and the duration', () => {
+    const expected = `${SELECTED_GLYPH} ${GATE_STATE_GLYPHS.passed} gate  passed  3s`
+    assert.equal(joined(gateLineSegments(gateRowIn('passed'), true)), expected)
+  })
+
+  it('starts with the unselected glyph in base tone when the row is not selected', () => {
+    assert.deepEqual(gateLineSegments(gateRowIn('passed'), false)[0], { text: UNSELECTED_GLYPH, tone: 'base' })
+  })
+
+  for (const state of GATE_STATES_UNDER_TEST) {
+    it(`tones the glyph of a ${state} gate with the tone of that state`, () => {
+      const segments = gateLineSegments(gateRowIn(state), false)
+      assert.equal(toneOfText(segments, ` ${GATE_STATE_GLYPHS[state]}`), GATE_STATE_TONES[state])
+    })
+
+    it(`tones the state text of a ${state} gate with the tone of that state`, () => {
+      assert.equal(toneOfText(gateLineSegments(gateRowIn(state), false), `  ${state}`), GATE_STATE_TONES[state])
+    })
+  }
+
+  it('tones the label as base', () => {
+    assert.equal(toneOfText(gateLineSegments(gateRowIn('passed'), false), ' gate'), 'base')
+  })
+
+  it('tones the duration as muted', () => {
+    assert.equal(toneOfText(gateLineSegments(gateRowIn('passed'), false), '  3s'), 'muted')
   })
 })

@@ -2,6 +2,16 @@ import { readFile } from 'node:fs/promises'
 
 import { contextTokensOf } from '../auto-compact/context-usage.ts'
 import type { StepTokens } from '../auto-compact/context-usage.ts'
+import {
+  BAR_EMPTY,
+  BAR_FILLED,
+  BAR_ICON,
+  GATE_STATE_GLYPHS,
+  PHASE_GLYPHS,
+  SELECTED_GLYPH,
+  STEP_STATE_GLYPHS,
+  UNSELECTED_GLYPH,
+} from './glyphs.ts'
 import { PROGRESS_VERSION } from './progress.ts'
 import type {
   GateProgress,
@@ -12,6 +22,8 @@ import type {
   StepState,
   WaveProgress,
 } from './progress.ts'
+import { GATE_STATE_TONES, STEP_STATE_TONES } from './tone.ts'
+import type { Segment } from './tone.ts'
 
 export interface ProgressData {
   readonly session: { get(sessionID: string): unknown; message: { list(sessionID: string): unknown } }
@@ -135,6 +147,57 @@ export function barLabel(progress: WaveProgress, tokensBySession: ReadonlyMap<st
   return `implementation-wave ${progressBar(done, started)} ${done}/${started} ${elapsed} ${total}`
 }
 
+export function barSegments(
+  progress: WaveProgress,
+  tokensBySession: ReadonlyMap<string, number>,
+  now: number,
+): readonly Segment[] {
+  const started = progress.steps.length
+  const done = progress.steps.filter(isFinishedStep).length
+  const elapsed = formatDuration(now - progress.startedAt)
+  const total = formatTokens(totalTokens(progress, tokensBySession))
+  const filled = filledCells(done, started)
+  return withoutEmptySegments([
+    { text: BAR_ICON, tone: 'info' },
+    { text: ' implementation-wave ', tone: 'base' },
+    { text: BAR_FILLED.repeat(filled), tone: 'success' },
+    { text: BAR_EMPTY.repeat(BAR_WIDTH - filled), tone: 'muted' },
+    { text: ` ${done}/${started} ${elapsed} ${total}`, tone: 'muted' },
+  ])
+}
+
+export function phaseLineSegments(row: PhaseRow, isSelected: boolean): readonly Segment[] {
+  return [
+    markerSegment(isSelected),
+    { text: ` ${PHASE_GLYPHS[row.phase]} ${row.label}`, tone: 'base' },
+    { text: ` ${row.done}/${row.total}`, tone: 'muted' },
+  ]
+}
+
+export function stepLineSegments(row: StepRow, isSelected: boolean): readonly Segment[] {
+  return [
+    markerSegment(isSelected),
+    { text: ` ${STEP_STATE_GLYPHS[row.state]}`, tone: STEP_STATE_TONES[row.state] },
+    { text: ` ${row.label}`, tone: 'base' },
+    { text: `  ${row.model} - ${row.tokens}  ${row.duration}`, tone: 'muted' },
+  ]
+}
+
+export function cardStepLineSegments(row: StepRow, isSelected: boolean): readonly Segment[] {
+  return [markerSegment(isSelected), { text: ` ${row.label}`, tone: 'base' }]
+}
+
+export function gateLineSegments(row: GateRow, isSelected: boolean): readonly Segment[] {
+  const stateTone = GATE_STATE_TONES[row.state]
+  return [
+    markerSegment(isSelected),
+    { text: ` ${GATE_STATE_GLYPHS[row.state]}`, tone: stateTone },
+    { text: ` ${row.label}`, tone: 'base' },
+    { text: `  ${row.state}`, tone: stateTone },
+    { text: `  ${row.duration}`, tone: 'muted' },
+  ]
+}
+
 export function phaseRows(progress: WaveProgress): readonly PhaseRow[] {
   return [...STEP_PHASES.map((phase) => stepPhaseRow(progress, phase)), gatePhaseRow(progress)]
 }
@@ -254,9 +317,20 @@ function isFinishedStep(step: ProgressStep): boolean {
   return step.state !== 'running'
 }
 
+function filledCells(done: number, started: number): number {
+  return started === 0 ? 0 : Math.round((BAR_WIDTH * done) / started)
+}
+
 function progressBar(done: number, started: number): string {
-  const filled = started === 0 ? 0 : Math.round((BAR_WIDTH * done) / started)
-  return '='.repeat(filled).padEnd(BAR_WIDTH, '-')
+  return '='.repeat(filledCells(done, started)).padEnd(BAR_WIDTH, '-')
+}
+
+function markerSegment(isSelected: boolean): Segment {
+  return { text: isSelected ? SELECTED_GLYPH : UNSELECTED_GLYPH, tone: 'base' }
+}
+
+function withoutEmptySegments(segments: readonly Segment[]): readonly Segment[] {
+  return segments.filter((segment) => segment.text !== '')
 }
 
 function tokensOfStep(step: ProgressStep, tokensBySession: ReadonlyMap<string, number>): number | undefined {
