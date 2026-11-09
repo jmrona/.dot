@@ -24,7 +24,7 @@ If the approved design was saved to a plan file under `/Users/jose.romero/.openc
 1. Settle the commit preference and record the prune base (once, at the start of the session)
 2. Run `complexity-triage` against the design
 3. If SIMPLE: hand off to `fast-path-implementation` and stop
-4. If COMPLEX: decompose into tasks, group them into waves, and execute the per-wave pipeline for each wave
+4. If COMPLEX: decompose into tasks, group them into waves, and run each wave with one call to `implement_wave`. If that tool is not available, execute the per-wave pipeline for each wave
 5. When all waves are complete, run the feature test prune, then the final feature-level review and verification, then report completion
 
 A wave is a set of independent tasks that run together in the same working tree. A sequential run is waves of one task. Worktrees stay forbidden.
@@ -126,6 +126,42 @@ Mark each task child `in_progress` when its implementer is dispatched. Mark it `
 
 If `todowrite` is not available, keep the same layout as a numbered checklist in your replies.
 
+## Running a Wave with implement_wave
+
+If the `implement_wave` tool is in your tool list, you **MUST** call the `implement_wave` tool for each wave. One call runs one wave of at most 4 tasks and blocks until the wave ends. Set the arguments to an actual JSON object:
+
+- `baseSha`: the output of `git rev-parse HEAD`.
+- `dirtyAtBase`: the bare paths from `git status --porcelain -uall`, without the status prefix.
+- `models`: each tier name that a task uses, mapped to an opencode model id of the form `provider/id`, for example `openai/routine`, `openai/easy` and `openai/hard`.
+- `proofCommands`: the whole-project checks of the wave gate.
+- `completed` and `stopped`: the task ids from earlier waves.
+- `tasks`: the decomposition. Each task needs `id`, `title`, `brief`, `writes`, `dependsOn`, `acceptance`, `tier` and `agentType`. The `agentType` is an opencode agent name. The `brief` holds the full task text and its context.
+- `proofTimeoutSeconds` and `childTimeoutSeconds`: optional, with defaults of 1200 and 1800.
+
+Every other field of the arguments must be present, with an empty array where nothing applies. Do not pass the prompt templates: `implement_wave` reads `./implementer-prompt.md` and `./reviewer-prompt.md` itself.
+
+On entry, the tool switches the root session to the `build` agent. It runs the implementer and reviewer child sessions, with up to 2 correction rounds. Then it runs the proof commands in its own code and reads the git HEAD and the git status. The tool owns dispatch, review, correction rounds, the gate and task states. You **MUST NOT** dispatch implementers or reviewers yourself for a wave that the tool runs. You **MUST NOT** change a state that the tool returned.
+
+The result is JSON with `status`, `wave`, `tasks`, `gate`, `held`, `remaining` and `rootAgentSwitch`. Each task has a state of `verified`, `reviewed`, `blocked` or `stopped`, with `rounds`, `reviews`, `report` and `reason`. The `gate` holds `passed`, `headMoved`, `headSha`, `commands`, `changedPaths` and `unattributed`. It is `null` when no task reached review. Each entry of `gate.commands` has `command`, `exitCode`, `outputTail` and an optional `reason`.
+
+Because the proof commands run in the tool's own code, you do not re-run them through a subagent. At the checkpoint, show the user `gate.commands` with the exit codes and output tails. Check that `gate.changedPaths` match the `writes` of the wave. If `rootAgentSwitch` reports a failure, show it to the user.
+
+After every call, whatever the result, compare `git rev-parse HEAD` with `baseSha`. If they differ, a subagent committed, so stop and tell the user.
+
+Act on the result as follows:
+
+- `invalid-args`: read the reason, fix the arguments and call the tool again.
+- `completed` with `verified` tasks: go to the User Checkpoint, then commit them, even in a mixed wave. At the checkpoint, show the user the `concerns` and `environmentFailures` in the `report` of each `verified` task. Add the tasks to `completed` before the next call.
+- `completed` with no `verified` task, `gate` is `null`: run no checkpoint. Act on the `blocked` and `stopped` tasks.
+- After any `completed` result, call the tool again for the tasks in `remaining`, and report the `held` tasks to the user.
+- `blocked` task: no live agent exists, so edit the arguments of the task and call the tool again. Answer a `NEEDS_CONTEXT` in its `brief`. Raise its `tier` for a reasoning-capacity `BLOCKED`. Treat `BLOCKED_BY_SIBLING` as an ordinary `BLOCKED`, and call again once the sibling is verified and in `completed`.
+- `stopped` task: show the user the reviews. The user decides whether to add it to `stopped` or adjust it.
+- `gate-failed`: the partial edits of a `stopped` or `blocked` task in the same wave stay in the tree while the gate runs. Before you go to the user, check whether the failure comes from them. Show the user the gate output and say which task the failing output points at.
+- `aborted`: stop the work and show the user the reason.
+- `nothing-to-run`: report the `held` tasks to the user.
+
+If the `implement_wave` tool is not available, run the Per-Wave Pipeline below with the native `subagent` tool in the foreground. Run one task per wave, in plan order.
+
 ## Per-Wave Pipeline
 
 Execute waves in order. Each wave follows the same pipeline.
@@ -135,7 +171,7 @@ digraph per_wave_pipeline {
     rankdir=TB;
 
     "Record the wave base" [shape=box, style=bold];
-    "Dispatch every implementer of the wave\n(./implementer-prompt.md, background: true)" [shape=box];
+    "Dispatch every implementer of the wave\n(./implementer-prompt.md, foreground)" [shape=box];
     "Implementer returns" [shape=box];
     "Dispatch that task's hard reviewer\n(code-reviewer / openai/hard, ./reviewer-prompt.md)" [shape=box];
     "Reviewer passes?" [shape=diamond];
@@ -148,8 +184,8 @@ digraph per_wave_pipeline {
     "User checkpoint, then commits" [shape=box, style=bold];
     "Mark the wave complete in todowrite" [style=bold];
 
-    "Record the wave base" -> "Dispatch every implementer of the wave\n(./implementer-prompt.md, background: true)";
-    "Dispatch every implementer of the wave\n(./implementer-prompt.md, background: true)" -> "Implementer returns";
+    "Record the wave base" -> "Dispatch every implementer of the wave\n(./implementer-prompt.md, foreground)";
+    "Dispatch every implementer of the wave\n(./implementer-prompt.md, foreground)" -> "Implementer returns";
     "Implementer returns" -> "Dispatch that task's hard reviewer\n(code-reviewer / openai/hard, ./reviewer-prompt.md)";
     "Dispatch that task's hard reviewer\n(code-reviewer / openai/hard, ./reviewer-prompt.md)" -> "Reviewer passes?";
     "Reviewer passes?" -> "Continue the implementer with the findings" [label="no"];
@@ -169,8 +205,8 @@ digraph per_wave_pipeline {
 ```
 
 1. **Record the wave base** before dispatch. Record `git rev-parse HEAD` and the `git status --porcelain -uall` list. Record the `git hash-object` of each already-dirty path. Copy each already-dirty file into the scratch directory. The copies let reviewers diff files that an earlier wave left dirty.
-2. **Dispatch** every implementer of the wave in one message with `background: true`. Wait for the completion notices without polling. A wave of one follows the same rule.
-3. **Review as each returns.** When an implementer returns `DONE` or `DONE_WITH_CONCERNS`, dispatch that task's `code-reviewer` on `openai/hard` in the background without waiting for siblings. Give the reviewer the inputs listed in `./reviewer-prompt.md`. On `[FAIL]`, continue the same implementer through `sessionID`, then review the task again. On `[PASS]`, record the `git hash-object` of every path in the task's `writes` as its approval stamp.
+2. **Dispatch** every implementer of the wave in one message as foreground calls and omit `background`. Background children die when `opencode run` exits. Wait for the results. A wave of one follows the same rule.
+3. **Review as each returns.** When an implementer returns `DONE` or `DONE_WITH_CONCERNS`, dispatch that task's `code-reviewer` on `openai/hard` in the foreground, with `background` omitted. Give the reviewer the inputs listed in `./reviewer-prompt.md`. On `[FAIL]`, continue the same implementer through `sessionID`, then review the task again. On `[PASS]`, record the `git hash-object` of every path in the task's `writes` as its approval stamp.
 4. **Re-review rule.** Before the checkpoint, review a task again only if the hash of any path in its `writes` differs from its approval stamp. A gate fix, an "Adjust first" round or a sibling-unblock re-run can cause the change. The re-review receives the full task diff. A task in `BLOCKED_BY_SIBLING` is not reviewed until it reaches `DONE`.
 5. **Run the wave gate** once every task that is not parked has a reviewer `[PASS]` or is a stopped task. Park a task in `BLOCKED_BY_SIBLING` and leave it for gate step 1. If a task cannot pass review, surface it to the user. It becomes a stopped task when the user chooses to leave it uncommitted. Otherwise, continue the task through its implementer.
 6. **Checkpoint** once per wave, then commits.
@@ -214,7 +250,7 @@ Implementer subagents report one of five statuses:
 
 - **DONE**: proceed to review
 - **DONE_WITH_CONCERNS**: read the concerns. If they are about correctness or scope, address them before review. If they are observations ("this file is getting large"), note them and proceed to review. If the implementer reports a duplicate that it must extract outside its `writes`, schedule an extraction task in a later wave. If no later wave exists, run it in a new final wave after the integration wave.
-- **NEEDS_CONTEXT**: answer as each notice arrives and continue the child through `sessionID` in the background. Siblings keep running. If the answer needs the user, ask one question while siblings run. If the answer adds a path to `writes`, check that the path is disjoint from every sibling's `writes`. If it is not disjoint, surface the plan change to the user.
+- **NEEDS_CONTEXT**: answer as each notice arrives and continue the child through `sessionID` in the foreground. Answer each notice as it arrives. If the answer needs the user, ask one question while siblings run. If the answer adds a path to `writes`, check that the path is disjoint from every sibling's `writes`. If it is not disjoint, surface the plan change to the user.
 - **BLOCKED_BY_SIBLING**: the report names the command, quotes the error line that names a file, and states that the file is outside the task's `writes`. Do not review the task yet. Resolve it at the wave gate. If the file is in no sibling's `writes`, or the wave has one task, treat the status as an ordinary `BLOCKED`.
 - **BLOCKED**: assess the blocker. If it is context, provide the missing context. If the approved task is genuinely difficult, narrow it or route it to `complex-worker` on `openai/hard`. Do not retry on a cheaper role first. If the task is too large, break it into smaller pieces. If the plan itself is wrong, stop and surface to the human per `../../rules/common/workflow.md`.
 
@@ -272,28 +308,17 @@ Wave 1: Task 1 (install-hook command) and Task 2 (verify/repair modes)
   writes are disjoint, neither consumes the other, both stack-specialist / openai/easy
 Wave 2: Task 3 (register both commands in the CLI entry point), integration wave of one
 
-[Wave 1: record base, dispatch both implementers in one message with background: true]
-Implementer 2 returns DONE first.
-[Dispatch code-reviewer / openai/hard for Task 2 without waiting]
-Reviewer: [FAIL] missing progress reporting.
-[Continue implementer 2 through sessionID]
-Implementer 1 returns DONE.
-[Dispatch code-reviewer for Task 1]
-Reviewer: [PASS]
-[Task 2 fixed, reviewed again] Reviewer: [PASS]
+[Wave 1: git rev-parse HEAD and git status as baseSha and dirtyAtBase, then one implement_wave call with both tasks]
+Tool result: completed, both tasks verified, task 2 after one correction round, gate.passed true
+[Compare git rev-parse HEAD with baseSha: equal]
+gate.commands: just cli check exit 0, just cli test exit 0 (78 passed)
 
-[Wave gate: touched list matches both tasks' writes]
-$ just cli check
-exit 0
-$ just cli test
-exit 0 (78 passed)
-
-[Checkpoint: both summaries, verdicts, TDD evidence, diffs, gate output]
+[Checkpoint: both summaries, verdicts, TDD evidence, diffs, gate.commands with exit codes and output tails]
 [Ask: Commit all tasks / Adjust first / Skip commit]
 User: Commit all tasks
 [Commit Task 1, then Task 2, each limited to its own paths]
 
-[Wave 2: record base, dispatch implementer 3, review, gate, checkpoint, commit]
+[Wave 2: one implement_wave call for task 3, checkpoint, commit]
 
 [Feature test prune: the audit has no REMOVE and no MERGE, so nothing is asked]
 

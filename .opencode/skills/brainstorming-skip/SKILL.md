@@ -7,7 +7,7 @@ description: "Lightweight design capture for cases where structured brainstormin
 
 The escape hatch for the brainstorming router. The user has indicated they already have a clear design and do not want to go through structured dialogue, walkthrough, or committee deliberation. This skill captures the user's design as a brief statement, gets explicit approval via plan mode, and hands off to implementation.
 
-For the rule that no implementation may begin until the user has approved a design, see `../../rules/common/workflow.md`. The skip path satisfies that rule by capturing a brief design statement and getting explicit approval through `exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)`.
+For the rule that no implementation may begin until the user has approved a design, see `../../rules/common/workflow.md`. The skip path satisfies that rule by capturing a brief design statement and getting explicit approval through `exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads)`.
 
 ## Preconditions
 
@@ -25,7 +25,7 @@ For the rule that no implementation may begin until the user has approved a desi
 
    Copy the user's statement verbatim into **Requirements (verbatim)**, one `S#` per requirement sentence, without paraphrasing. Any acceptance criterion that the user's words do not state goes under **Derived criteria**, each with its reason. A derived criterion **MUST NOT** appear among the requirements. Every bullet under **Design** ends with `[S#]` (one or more) or `[derived: <reason>]`. A derived design element also appears under **Derived criteria**.
 
-4. **Present the captured design via plan mode.** The parent uses `exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)` to present the user's statement, or the faithful summary when judgement was needed, as the plan content. The parent checks that no unapproved requirement was added. Format:
+4. **Present the captured design via plan mode.** The parent uses `exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads)` to present the user's statement, or the faithful summary when judgement was needed, as the plan content. The parent checks that no unapproved requirement was added. Format:
 
    ```
    ## Approved Design (skip mode)
@@ -44,9 +44,9 @@ For the rule that no implementation may begin until the user has approved a desi
    **Out of scope:** [anything the user explicitly excluded, or "nothing flagged"]
    ```
 
-   The `exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)` call IS the explicit approval step. The user accepts or rejects the design by approving or rejecting the plan.
+   Presenting the design and receiving the user's explicit approval, given before you presented it or in reply to it, is the explicit approval step.
 
-5. **Decide the next step.** After the design is approved, save it once with `write` to `/Users/jose.romero/.opencode/plan/<ticket>-<short-topic>.md`. Use the ticket key, or `no-ticket` if there is none. Use a new short topic for each design, so that an earlier plan is never overwritten. Do not write or edit that file before final approval, and do not edit it afterwards. The auto-compact plugin then compacts the session and posts a notice after the compaction that carries the plan path. If the design input has `Source: work-on-ticket`, invoke `subagent-driven-development` without asking. If the user asks for more tickets at final approval in a ticket run, invoke `create-tickets` instead. If the design input does not have `Source: work-on-ticket`, use `question` to ask whether to create tickets or start implementation:
+5. **Decide the next step.** After the design is approved, save it once with `write` to `/Users/jose.romero/.opencode/plan/<ticket>-<short-topic>.md`. Use the ticket key, or `no-ticket` if there is none. Use a new short topic for each design, so that an earlier plan is never overwritten. Do not write or edit that file before final approval, and do not edit it afterwards. The auto-compact plugin then compacts the session and posts a notice after the compaction that carries the plan path. If the design input has `Source: work-on-ticket`, invoke `subagent-driven-development` without asking. If the user asks for more tickets at final approval in a ticket run, invoke `create-tickets` instead. If the user's approval already asks for implementation (for example 'apply the fix'), that answers the question, so do not ask it and invoke `subagent-driven-development`. If the design input does not have `Source: work-on-ticket`, use `question` to ask whether to create tickets or start implementation:
 
    ```
    question:
@@ -78,7 +78,7 @@ The user and the agent already discussed a design earlier in the conversation ("
 ```
 [No re-prompt for a design statement, it is already in context.]
 
-[Use exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit) with:]
+[Use exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads) with:]
 ## Approved Design (skip mode)
 
 **What to build:** Add a `--dry-run` flag to the deploy script that prints the actions it would take without executing them.
@@ -95,7 +95,7 @@ The user and the agent already discussed a design earlier in the conversation ("
 
 **Out of scope:** Nothing flagged.
 
-[User approves via exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)]
+[User approves via exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads)]
 ```
 
 ## Worked Example (no design yet in context)
@@ -107,7 +107,7 @@ You: What would you like to build? A 1-3 sentence description is enough.
 
 User: Add a --dry-run flag to the deploy script that prints what it would do without actually doing it.
 
-[Use exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit) with:]
+[Use exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads) with:]
 ## Approved Design (skip mode)
 
 **What to build:** Add a `--dry-run` flag to the deploy script that prints the actions it would take without executing them.
@@ -128,7 +128,7 @@ User: Add a --dry-run flag to the deploy script that prints what it would do wit
 
 **Out of scope:** Nothing flagged.
 
-[User approves via exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)]
+[User approves via exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads)]
 
 [Ask via question: Implement directly or Create tickets first?]
 User picks: Implement directly
@@ -141,8 +141,8 @@ User picks: Implement directly
 You **MUST NOT** invoke `create-tickets` or `subagent-driven-development` until all of these are true:
 
 - The user provided a brief design statement
-- You presented it via `exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)` and the user approved
-- Without a `Source: work-on-ticket` line, the user picked an implementation next step via `question`
+- You presented it via `exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads)` and the user approved
+- Without a `Source: work-on-ticket` line, the user picked an implementation next step via `question` or the user's approval already asked for implementation
 
 If any one of these is false, the gate has not been crossed, and you **MUST NOT** hand off.
 
@@ -152,7 +152,7 @@ If any one of these is false, the gate has not been crossed, and you **MUST NOT*
 |------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | Treating skip as "no design needed"                              | Skip is "lightweight design", not "no design". The brief statement IS the design.                                                              |
 | Stacking multiple clarifying questions                           | Skip is the lightweight path. If you need a dialogue, the user should be in standard or committee mode instead.                                   |
-| Skipping the `exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)` step                           | `exiting plan mode (in OpenCode, the user toggles out of plan mode with Tab after approving the design; present the design and wait for explicit approval before any code edit)` is how the user approves. Without it, you have not satisfied the workflow.md "explicit approval" requirement.             |
+| Skipping the `exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads)` step                           | `exiting plan mode (in OpenCode, present the design as the plan content; the user's explicit approval, given before you presented it or in reply to it, is the exit: once you have it, continue to the next step without waiting, and the mode-switch plugin moves the session to Build when the implementation skill loads)` is how the user approves. Without it, you have not satisfied the workflow.md "explicit approval" requirement.             |
 | Running `design-review`                                          | The user explicitly chose a lightweight path. Running design-review defeats the purpose. The reviewer is the user.                             |
 | Inventing requirements not in the user's statement               | YAGNI per `../../rules/common/coding-style.md`. The design covers what the user asked for, not what you would also build.                     |
 | Routing to skip yourself instead of letting the user pick        | The router asks; the user picks. You **MUST NOT** invoke this skill except as a hand-off from the router after the user explicitly picks skip. |

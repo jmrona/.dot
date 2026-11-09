@@ -4,7 +4,7 @@ Use this template when dispatching an implementer subagent.
 
 **Role selection:** Use the agent role and required alias already assigned to this approved task. Bounded implementation normally uses `stack-specialist` on `openai/easy`; genuinely difficult approved work uses `complex-worker` on `openai/hard`. If the difficulty of a task is unsure, assign it `complex-worker` on `openai/hard`. A COMPLEX feature does not force every task to use a hard role. If the required role is unavailable, return `BLOCKED` to the parent rather than substituting.
 
-**Native dispatch:** The parent supplies this prompt through the native OpenCode V2 subagent interface with `agent`, `description`, and `prompt`; omit `sessionID` for a new child. Use `background: true`. The parent dispatches every implementer of a wave in one message, and a wave of one follows the same rule. Use the configured role model; do not omit it or override it unless the user explicitly requested an override.
+**Native dispatch:** The parent supplies this prompt through the native OpenCode V2 subagent interface with `agent`, `description`, and `prompt`; omit `sessionID` for a new child. In autonomous runs the `implement_wave` tool dispatches the implementers, as `SKILL.md` describes. In the fallback pipeline the parent dispatches in the foreground and omits `background`, because background children die when `opencode run` exits. Use the configured role model; do not omit it or override it unless the user explicitly requested an override.
 
 The parent dispatches with this native subagent call:
 
@@ -12,8 +12,7 @@ The parent dispatches with this native subagent call:
 subagent({
   agent: "[APPROVED_AGENT_ROLE]",
   description: "Implement Task N: [task name]",
-  prompt: "[complete prompt below]",
-  background: true
+  prompt: "[complete prompt below]"
 })
 ```
 

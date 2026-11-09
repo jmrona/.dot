@@ -35,8 +35,9 @@ test('implementer prompt explains that the parent proves the whole suite at the 
   assert.match(implementer(), /parent proves the whole suite at the wave gate/)
 })
 
-test('implementer prompt dispatches in the background', () => {
-  assert.match(implementer(), /background: true/)
+test('implementer prompt dispatches in the foreground without background', () => {
+  assert.match(implementer(), /foreground and omits `background`/)
+  assert.doesNotMatch(implementer(), /background: true/)
 })
 
 test('implementer prompt asks for an Environment failures field in the report', () => {
@@ -75,8 +76,9 @@ test('implementer prompt keeps the no-git rule', () => {
   assert.match(implementer(), /MUST NOT commit, push, merge/)
 })
 
-test('reviewer prompt dispatches in the background', () => {
-  assert.match(reviewer(), /background: true/)
+test('reviewer prompt dispatches in the foreground without background', () => {
+  assert.match(reviewer(), /foreground and omits `background`/)
+  assert.doesNotMatch(reviewer(), /background: true/)
 })
 
 test('reviewer prompt receives the diff against the wave base limited to writes', () => {

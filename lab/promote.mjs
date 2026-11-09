@@ -43,7 +43,12 @@ const EXPECTED_SECOND_LINE = 'NO'
 function resultLines(events) {
   const resultEvent = events.find((event) => event.type === 'result')
   if (typeof resultEvent?.result !== 'string') return []
-  return resultEvent.result.split('\n').map((line) => line.trim()).filter((line) => line !== '')
+  return resultEvent.result.split('\n').map((line) => unwrapDoubleQuotes(line.trim())).filter((line) => line !== '')
+}
+
+function unwrapDoubleQuotes(line) {
+  const isWrapped = line.length >= 2 && line.startsWith('"') && line.endsWith('"')
+  return isWrapped ? line.slice(1, -1) : line
 }
 
 function describeLineMismatch([firstLine, secondLine]) {
