@@ -33,7 +33,7 @@ A tree with one header per wave. Waves are numbered from 1 in the order of their
 ## What it hooks
 
 - `turn.step`: counts the steps of the main loop. A spawn belongs to the step in which it happens.
-- `agent.spawn`: records a spawn of the main loop. It records the description, the resolved model, the start time and the wave key. Spawns made inside a subagent form no wave and are ignored.
+- `agent.spawn`: records a spawn of the main loop. It records the description, the resolved model, the start time and the wave key. Spawns made inside a subagent form no wave and are ignored. A resumed agent reopens its existing row as running and keeps its start time, wave and description.
 - `turn.complete`: marks a recorded agent finished when its turn ends. An `answer` gives completed, `error` and `refusal` give failed, and `aborted` gives killed.
 - `session.start`: registers the `/waves` command.
 - `session.end`: with reason `clear`, it empties the list.
@@ -47,7 +47,7 @@ The pane opens by itself on the first recorded spawn of a session.
 
 ## State
 
-Kept in `$.state` under `waves`: the recorded agents (wave key, agent id, description, model, status, start time, finish time) and the step counter.
+Kept in `$.state` under `waves`: the recorded agents (wave key, agent id, description, model, status, start time, finish time) and the step counter. State saved in the previous shape is discarded.
 
 ## Status polling
 
@@ -63,7 +63,7 @@ Each tick also redraws the pane while any agent runs, so that the elapsed time a
 - A spawn that a hook denies, or that returns no agent id, is not recorded.
 - A task that has not been spawned yet cannot be shown, because the mod only learns of an agent at spawn.
 - The elapsed time of a running task advances in three-second steps.
-- A workflow agent that never sends `turn.complete`, such as a remote agent, shows as running until the conversation is cleared.
+- A workflow agent that never sends `turn.complete`, such as a remote agent, shows as running until the conversation is cleared. The mod keeps calling the agent list every three seconds until then.
 - A fork ignores the requested model. The model line can show a model that the fork did not use.
 - A teammate is `idle` between turns. A wave of teammates can read finished while a teammate is still alive.
 - The polling timer is lost if the mod reloads while agents run. The next spawn starts it again.

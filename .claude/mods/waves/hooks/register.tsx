@@ -27,7 +27,7 @@ function groupByWave(list: readonly WaveAgent[]): WaveAgent[][] {
 }
 
 function markOf(agent: WaveAgent): string {
-  if (RUNNING.includes(agent.status)) {
+  if (isRunning(agent)) {
     return ' '
   }
 
@@ -95,6 +95,21 @@ const FINAL_STATUS = {
   aborted: 'killed',
 } as const satisfies Record<'answer' | 'error' | 'refusal' | 'aborted', AgentStatus>
 
+function reopenAgent(agent: WaveAgent): WaveAgent {
+  const { finishedAt: _finishedAt, ...rest } = agent
+
+  return { ...rest, status: 'running' }
+}
+
+function recordSpawn(list: readonly WaveAgent[], record: WaveAgent, isResume: boolean): WaveAgent[] {
+  const hasRow = list.some(agent => agent.agentId === record.agentId)
+  if (!isResume || !hasRow) {
+    return [...list, record]
+  }
+
+  return list.map(agent => (agent.agentId === record.agentId ? reopenAgent(agent) : agent))
+}
+
 const polling: { timer: Timer | null } = { timer: null }
 
 function stopPolling(): void {
@@ -158,15 +173,16 @@ export const register: Register = on => {
     const currentStep = await read($, step)
     const answer = await next(e)
     if (answer.agentId !== undefined) {
+      const startedAt = await $.clock.now()
       const record: WaveAgent = {
         waveKey: waveKeyOf(e.workflow, currentStep),
         agentId: answer.agentId,
         description: e.description,
         model: answer.model || (e.model ?? e.parentModel),
         status: 'running',
-        startedAt: await $.clock.now(),
+        startedAt,
       }
-      const recorded = await update($, agents, list => [...list, record])
+      const recorded = await update($, agents, list => recordSpawn(list, record, e.resume !== undefined))
       startPolling($)
       if (recorded.length === 1) {
         await $.ui.open({ id: PANE, title: 'Waves' })

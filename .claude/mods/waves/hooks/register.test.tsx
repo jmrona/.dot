@@ -28,10 +28,11 @@ type World = {
   closed: string[]
   openPanes: string[]
   resolvedModel?: string
+  invalidated: string[]
 }
 
 function newWorld(roster: Roster = []): World {
-  return { current: roster, listCalls: 0, opened: [], closed: [], openPanes: [] }
+  return { current: roster, listCalls: 0, opened: [], closed: [], openPanes: [], invalidated: [] }
 }
 
 function stubWorld(on: On, roster: World = newWorld()) {
@@ -45,6 +46,11 @@ function stubWorld(on: On, roster: World = newWorld()) {
   on('command.register', () => ({ value: { command: 'waves' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
+  on('ui.invalidate', (_, e) => {
+    roster.invalidated.push(e.event)
+
+    return { value: undefined }
+  })
   on('ui.close', (_, e) => {
     roster.closed.push(e.id)
 
@@ -73,7 +79,7 @@ function stubWorld(on: On, roster: World = newWorld()) {
   on('agent.spawn', (_, e) => {
     spawned += 1
 
-    return { model: roster.resolvedModel ?? e.model ?? e.parentModel, agentId: `agent-${spawned}` }
+    return { model: roster.resolvedModel ?? e.model ?? e.parentModel, agentId: e.resume?.agentId ?? `agent-${spawned}` }
   })
   on('turn.step', async function* (_, e) {
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'tool_use', usage: null }
@@ -91,10 +97,16 @@ async function takeStep($: Engine, index: number, agentId?: string): Promise<voi
   }
 }
 
-type SpawnOverrides = { model?: string; parentAgentId?: string; description?: string; runId?: string }
+type SpawnOverrides = {
+  model?: string
+  parentAgentId?: string
+  description?: string
+  runId?: string
+  resumeAgentId?: string
+}
 
 async function spawn($: Engine, overrides: SpawnOverrides = {}) {
-  const { runId, ...rest } = overrides
+  const { runId, resumeAgentId, ...rest } = overrides
 
   return $.agent.spawn({
     tool_use_id: 'toolu-1',
@@ -106,11 +118,12 @@ async function spawn($: Engine, overrides: SpawnOverrides = {}) {
     background: true,
     fork: false,
     ...(runId === undefined ? {} : { workflow: { runId, agentIndex: 0 } }),
+    ...(resumeAgentId === undefined ? {} : { resume: { agentId: resumeAgentId } }),
     ...rest,
   })
 }
 
-function completeTurn($: Engine, agentId: string, reason: 'answer' | 'error' | 'aborted') {
+function completeTurn($: Engine, agentId: string, reason: 'answer' | 'error' | 'refusal' | 'aborted') {
   return $.turn.complete({
     answer: '',
     durationMs: 1,
@@ -257,12 +270,24 @@ test('turn complete with reason error marks the task as failed', async ($, on) =
   }
 })
 
-test('turn complete with reason aborted marks the task as failed', async ($, on) => {
+test('turn complete with reason aborted marks the task as killed', async ($, on) => {
   stubWorld(on)
 
   await takeStep($, 0)
   await spawn($, { runId: 'wf_1', description: 'Write it' })
   await completeTurn($, 'agent-1', 'aborted')
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [!] Write it')
+  }
+})
+
+test('turn complete with reason refusal marks the task as failed', async ($, on) => {
+  stubWorld(on)
+
+  await takeStep($, 0)
+  await spawn($, { runId: 'wf_1', description: 'Write it' })
+  await completeTurn($, 'agent-1', 'refusal')
 
   for (const surface of SURFACES) {
     expect(await lineTexts($, surface)).toContain('    [!] Write it')
@@ -292,6 +317,64 @@ test('a finished task renders the time between its spawn and its finish', async 
 
   for (const surface of SURFACES) {
     expect(await lineTexts($, surface)).toContain('        sonnet  1m 12s')
+  }
+})
+
+test('a poll that moves an agent out of running freezes its elapsed time at the poll moment', async ($, on) => {
+  const roster = newWorld()
+  const clock = stubWorld(on, roster)
+
+  await takeStep($, 0)
+  await spawn($, { model: 'sonnet' })
+  await clock.advance(1000)
+  roster.current = [{ id: 'agent-1', status: 'completed' }]
+  await clock.advance(2000)
+  await clock.advance(30000)
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('        sonnet  0m 03s')
+  }
+})
+
+test('a poll tick with a running agent invalidates the pane render', async ($, on) => {
+  const roster = newWorld([{ id: 'agent-1', status: 'running' }])
+  const clock = stubWorld(on, roster)
+
+  await takeStep($, 0)
+  await spawn($)
+  await clock.advance(3000)
+
+  expect(roster.invalidated).toContain('ui.render')
+})
+
+test('a resumed agent reopens its existing row instead of adding a second one', async ($, on) => {
+  const roster = newWorld()
+  const clock = stubWorld(on, roster)
+
+  await takeStep($, 0)
+  await spawn($, { runId: 'wf_1', model: 'sonnet', description: 'Write it' })
+  await clock.advance(10000)
+  await completeTurn($, 'agent-1', 'answer')
+  await spawn($, { runId: 'wf_1', model: 'haiku', description: 'Write it again', resumeAgentId: 'agent-1' })
+  await clock.advance(5000)
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toEqual([
+      '[ ] Wave 1   0/1 done',
+      '    [ ] Write it',
+      '        sonnet  0m 15s',
+    ])
+  }
+})
+
+test('a resumed agent without an existing row is recorded as a new row', async ($, on) => {
+  stubWorld(on)
+
+  await takeStep($, 0)
+  await spawn($, { runId: 'wf_1', description: 'Write it', resumeAgentId: 'agent-9' })
+
+  for (const surface of SURFACES) {
+    expect(await lineTexts($, surface)).toContain('    [ ] Write it')
   }
 })
 
@@ -379,7 +462,7 @@ test('polling stops once the list no longer shows an agent', async ($, on) => {
   expect(roster.listCalls).toBe(callsWhenAbsent)
 })
 
-test('an agent tool agent that the list no longer shows counts as finished', async ($, on) => {
+test('an agent spawned outside a workflow counts as finished once the list no longer shows it', async ($, on) => {
   const roster = newWorld([{ id: 'agent-1', status: 'running' }])
   const clock = stubWorld(on, roster)
 
