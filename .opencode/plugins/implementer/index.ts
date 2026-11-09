@@ -7,12 +7,14 @@ import { loadHardLimit } from '../rate-guard/config.ts'
 import { createSlotSemaphore, type SlotSemaphore } from '../rate-guard/semaphore.ts'
 import { createChildSessionRunner, type ChildSessionApi } from './child-session.ts'
 import { runGate, type GateInput, type GateResult } from './gate.ts'
+import { clearProgressFiles, createProgressRecorder, progressFilePath, startWave, type ProgressRecorder } from './progress.ts'
 import { planWave, type WavePlan } from './wave-plan.ts'
 import { runWave, type PromptTemplates } from './wave-runner.ts'
 
 export const HARD_MODEL = 'openai/hard'
 export const DEFAULT_CHILD_TIMEOUT_SECONDS = 1800
 export const PROMPT_TEMPLATE_DIRECTORY = fileURLToPath(new URL('../../skills/subagent-driven-development/', import.meta.url))
+export const PROGRESS_DIRECTORY = fileURLToPath(new URL('./progress/', import.meta.url))
 
 const TEXT_BLOCK_OPENING = '```text\n'
 const BLOCK_INDENT = /^ {4}/
@@ -78,6 +80,7 @@ export interface ImplementWaveDependencies {
   readonly semaphore: SlotSemaphore
   readonly prompts: PromptTemplates
   readonly runGate: (input: GateInput) => Promise<GateResult>
+  readonly progressDirectory: string
 }
 
 type WaveKind = Extract<WavePlan, { kind: 'wave' }>
@@ -119,6 +122,14 @@ async function rootDirectory(api: ImplementerApi, sessionID: string): Promise<st
 const MISSING_DIRECTORY_REASON =
   'The root session reports no working directory in session.get location.directory. Start the wave from a session that has a project directory.'
 
+function createWaveProgressRecorder(dependencies: ImplementWaveDependencies, context: ImplementWaveContext): ProgressRecorder {
+  return createProgressRecorder(
+    progressFilePath(dependencies.progressDirectory, context.sessionID),
+    startWave(context.sessionID, Date.now()),
+    console.warn,
+  )
+}
+
 async function runPlannedWave(
   dependencies: ImplementWaveDependencies,
   plan: WaveKind,
@@ -138,6 +149,7 @@ async function runPlannedWave(
     directory,
     rootSessionID: context.sessionID,
     signal: context.signal,
+    progress: createWaveProgressRecorder(dependencies, context),
   })
 }
 
@@ -232,8 +244,12 @@ async function setup(api: ImplementerApi): Promise<void> {
   const limit = await loadHardLimit(configPath, console.warn)
   const semaphore = createSlotSemaphore(limit, (sessionID) => isSessionAlive(api, sessionID))
   const prompts = await readPromptTemplates(PROMPT_TEMPLATE_DIRECTORY)
+  await clearProgressFiles(PROGRESS_DIRECTORY, console.warn)
   const { Schema } = await import('effect')
-  await registerImplementWave({ api, semaphore, prompts, runGate }, buildImplementWaveSchemas(Schema as unknown as SchemaModule))
+  await registerImplementWave(
+    { api, semaphore, prompts, runGate, progressDirectory: PROGRESS_DIRECTORY },
+    buildImplementWaveSchemas(Schema as unknown as SchemaModule),
+  )
 }
 
 export default { id: 'implementer', setup }
