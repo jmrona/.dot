@@ -301,8 +301,8 @@
       "executable": false
     },
     "mods/waves/README.md": {
-      "sha256": "5c8cebd7e3a2d73f875767a87d2e2c6309ad70a2197a9288db2e7655d40ce3a3",
-      "words": 477,
+      "sha256": "75d8527dee56e55f472e31cdc2a8edf05fe87259671c37d9b3c1393c0eb2705b",
+      "words": 995,
       "alwaysLoaded": false,
       "executable": false
     },
@@ -313,20 +313,20 @@
       "executable": false
     },
     "mods/waves/hooks/register.test.tsx": {
-      "sha256": "bb3355e8a97f963d4e72e4686ce73a140fa19bc110e4673c8ef13e741131bb40",
-      "words": 1537,
+      "sha256": "f10a0178396c9c76764c5b35f95fe450f72d18c5650eccc7e7be5a3d26b6f4d9",
+      "words": 3204,
       "alwaysLoaded": false,
       "executable": false
     },
     "mods/waves/hooks/register.tsx": {
-      "sha256": "7bf6ed71e488b89fd10e6a343b36ec0cdbd75dc486d012d39387218cb14eeed0",
-      "words": 619,
+      "sha256": "6006ed1e5c5260636c32791b16807d10ec2d01d9f3122bfa6fdee4de10f183e1",
+      "words": 1180,
       "alwaysLoaded": false,
       "executable": false
     },
     "mods/waves/types/index.d.ts": {
-      "sha256": "2d2556bf17f333b4cb7880d18c68cfbd8e4458795ed9e41f310680864baa0c38",
-      "words": 49,
+      "sha256": "4bff9bae7dea13b40df32fd1523096be01c55d985c68cd80e831f3c22c518933",
+      "words": 58,
       "alwaysLoaded": false,
       "executable": false
     },
