@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { buildStepDetail, visibleBlocks } from './step-detail.ts'
+import { buildStepDetail, countsSegments, headerSegments, visibleBlocks } from './step-detail.ts'
+import { formatDuration, formatTokens } from './progress-view.ts'
 import { finishStep, startStep, startWave } from './progress.ts'
 import type { ProgressStep, StepKey, StepStart } from './progress.ts'
 
@@ -213,7 +214,10 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter(null), promptMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, false).prompt, {
-      heading: 'Prompt - 3 lines',
+      heading: [
+        { text: 'Prompt', tone: 'info' },
+        { text: ' - 3 lines', tone: 'muted' },
+      ],
       lines: ['Read the plan'],
       hidden: 2,
     })
@@ -223,7 +227,10 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter(null), promptMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, true).prompt, {
-      heading: 'Prompt - 3 lines',
+      heading: [
+        { text: 'Prompt', tone: 'info' },
+        { text: ' - 3 lines', tone: 'muted' },
+      ],
       lines: ['Read the plan', 'Then edit the file', 'Run the tests'],
       hidden: 0,
     })
@@ -233,7 +240,10 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter(null), fiveCallMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, false).activity, {
-      heading: 'Activity - last 3 of 5 tool calls',
+      heading: [
+        { text: 'Activity', tone: 'info' },
+        { text: ' - last 3 of 5 tool calls', tone: 'muted' },
+      ],
       lines: ['grep(grep.ts)', 'edit(edit.ts)', 'bash(bash.ts)'],
       hidden: 2,
     })
@@ -243,7 +253,10 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter(null), fiveCallMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, true).activity, {
-      heading: 'Activity - 5 tool calls',
+      heading: [
+        { text: 'Activity', tone: 'info' },
+        { text: ' - 5 tool calls', tone: 'muted' },
+      ],
       lines: ['read(read.ts)', 'glob(glob.ts)', 'grep(grep.ts)', 'edit(edit.ts)', 'bash(bash.ts)'],
       hidden: 0,
     })
@@ -253,7 +266,7 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter(null), fourOutcomeMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, false).outcome, {
-      heading: 'Outcome',
+      heading: [{ text: 'Outcome', tone: 'info' }],
       lines: ['pending'],
       hidden: 0,
     })
@@ -263,7 +276,10 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter('done'), fourOutcomeMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, false).outcome, {
-      heading: 'Outcome - 4 lines',
+      heading: [
+        { text: 'Outcome', tone: 'info' },
+        { text: ' - 4 lines', tone: 'muted' },
+      ],
       lines: ['One', 'Two', 'Three'],
       hidden: 1,
     })
@@ -273,9 +289,63 @@ describe('visibleBlocks', () => {
     const detail = buildStepDetail(stepAfter('done'), fourOutcomeMessages, 'a')
 
     assert.deepEqual(visibleBlocks(detail, true).outcome, {
-      heading: 'Outcome - 4 lines',
+      heading: [
+        { text: 'Outcome', tone: 'info' },
+        { text: ' - 4 lines', tone: 'muted' },
+      ],
       lines: ['One', 'Two', 'Three', 'Four'],
       hidden: 0,
     })
+  })
+})
+
+describe('statusTone', () => {
+  it('uses the warning tone while the step runs', () => {
+    assert.equal(buildStepDetail(stepAfter(null), [], 'a').statusTone, 'warning')
+  })
+
+  it('uses the success tone when the step is done', () => {
+    assert.equal(buildStepDetail(stepAfter('done'), [], 'a').statusTone, 'success')
+  })
+
+  it('uses the error tone when the step failed', () => {
+    assert.equal(buildStepDetail(stepAfter('failed'), [], 'a').statusTone, 'error')
+  })
+})
+
+describe('headerSegments', () => {
+  const detail = buildStepDetail(stepAfter('done'), [], 'reviewer')
+
+  it('joins status, model and agent with separators', () => {
+    const text = headerSegments(detail).map((segment) => segment.text).join('')
+
+    assert.equal(text, 'Completed - model-one - reviewer')
+  })
+
+  it('tones the status with the status tone', () => {
+    assert.deepEqual(headerSegments(detail)[0], { text: 'Completed', tone: 'success' })
+  })
+
+  it('tones the model and agent as muted', () => {
+    assert.deepEqual(
+      headerSegments(detail).slice(1).map((segment) => segment.tone),
+      ['muted', 'muted'],
+    )
+  })
+})
+
+describe('countsSegments', () => {
+  const detail = buildStepDetail(stepAfter('done'), [toolCallsMessage(['read', 'edit'])], 'a')
+
+  it('joins tokens, tool call count and duration with separators', () => {
+    const text = countsSegments(detail, 1234, 65000).map((segment) => segment.text).join('')
+
+    assert.equal(text, `${formatTokens(1234)} - 2 tool calls - ${formatDuration(65000)}`)
+  })
+
+  it('tones every counts segment as muted', () => {
+    const tones = countsSegments(detail, undefined, 1000).map((segment) => segment.tone)
+
+    assert.deepEqual(tones, tones.map(() => 'muted'))
   })
 })

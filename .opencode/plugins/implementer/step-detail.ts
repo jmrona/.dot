@@ -1,8 +1,11 @@
 import type { ProgressStep, StepState } from './progress.ts'
+import { formatDuration, formatTokens } from './progress-view.ts'
+import { STEP_STATE_TONES } from './tone.ts'
+import type { Segment, Tone } from './tone.ts'
 
 export interface ToolCall { readonly name: string; readonly summary: string }
-export interface StepDetail { readonly status: 'Running' | 'Completed' | 'Failed'; readonly model: string; readonly agent: string; readonly toolCallCount: number; readonly promptLines: readonly string[]; readonly toolCalls: readonly ToolCall[]; readonly outcomeLines: readonly string[] | null }
-export interface BlockView { readonly heading: string; readonly lines: readonly string[]; readonly hidden: number }
+export interface StepDetail { readonly status: 'Running' | 'Completed' | 'Failed'; readonly model: string; readonly agent: string; readonly statusTone: Tone; readonly toolCallCount: number; readonly promptLines: readonly string[]; readonly toolCalls: readonly ToolCall[]; readonly outcomeLines: readonly string[] | null }
+export interface BlockView { readonly heading: readonly Segment[]; readonly lines: readonly string[]; readonly hidden: number }
 export interface CardBlocks { readonly prompt: BlockView; readonly activity: BlockView; readonly outcome: BlockView }
 
 interface UserMessage { readonly type: 'user'; readonly text: string }
@@ -29,6 +32,7 @@ export function buildStepDetail(step: ProgressStep, messages: readonly unknown[]
     status: STATUS_BY_STATE[step.state],
     model: step.model,
     agent: agent === undefined || agent.length === 0 ? '-' : agent,
+    statusTone: STEP_STATE_TONES[step.state],
     toolCallCount: toolCalls.length,
     promptLines: findPromptLines(messages),
     toolCalls,
@@ -104,17 +108,17 @@ function findOutcomeLines(messages: readonly unknown[]): readonly string[] {
 }
 
 function promptBlock(lines: readonly string[], expanded: boolean): BlockView {
-  return viewBlock(`Prompt${SEPARATOR}${lines.length} lines`, lines, visibleLines(lines, PROMPT_VISIBLE_COUNT, expanded))
+  return viewBlock(blockHeading('Prompt', `${lines.length} lines`), lines, visibleLines(lines, PROMPT_VISIBLE_COUNT, expanded))
 }
 
 function activityBlock(toolCalls: readonly ToolCall[], expanded: boolean): BlockView {
   const summaries = toolCalls.map((call) => call.summary)
   if (expanded) {
-    return viewBlock(`Activity${SEPARATOR}${summaries.length} tool calls`, summaries, summaries)
+    return viewBlock(blockHeading('Activity', `${summaries.length} tool calls`), summaries, summaries)
   }
   const lastSummaries = summaries.slice(-ACTIVITY_VISIBLE_COUNT)
   return viewBlock(
-    `Activity${SEPARATOR}last ${lastSummaries.length} of ${summaries.length} tool calls`,
+    blockHeading('Activity', `last ${lastSummaries.length} of ${summaries.length} tool calls`),
     summaries,
     lastSummaries,
   )
@@ -122,10 +126,10 @@ function activityBlock(toolCalls: readonly ToolCall[], expanded: boolean): Block
 
 function outcomeBlock(outcomeLines: readonly string[] | null, expanded: boolean): BlockView {
   if (outcomeLines === null) {
-    return { heading: 'Outcome', lines: [PENDING_LINE], hidden: 0 }
+    return { heading: [{ text: 'Outcome', tone: 'info' }], lines: [PENDING_LINE], hidden: 0 }
   }
   return viewBlock(
-    `Outcome${SEPARATOR}${outcomeLines.length} lines`,
+    blockHeading('Outcome', `${outcomeLines.length} lines`),
     outcomeLines,
     visibleLines(outcomeLines, OUTCOME_VISIBLE_COUNT, expanded),
   )
@@ -135,6 +139,26 @@ function visibleLines(lines: readonly string[], limit: number, expanded: boolean
   return expanded ? lines : lines.slice(0, limit)
 }
 
-function viewBlock(heading: string, lines: readonly string[], visible: readonly string[]): BlockView {
+function blockHeading(title: string, detail: string): readonly Segment[] {
+  return [
+    { text: title, tone: 'info' },
+    { text: `${SEPARATOR}${detail}`, tone: 'muted' },
+  ]
+}
+
+function viewBlock(heading: readonly Segment[], lines: readonly string[], visible: readonly string[]): BlockView {
   return { heading, lines: visible, hidden: lines.length - visible.length }
+}
+
+export function headerSegments(detail: StepDetail): readonly Segment[] {
+  return [
+    { text: detail.status, tone: detail.statusTone },
+    { text: `${SEPARATOR}${detail.model}`, tone: 'muted' },
+    { text: `${SEPARATOR}${detail.agent}`, tone: 'muted' },
+  ]
+}
+
+export function countsSegments(detail: StepDetail, tokens: number | undefined, durationMilliseconds: number): readonly Segment[] {
+  const parts = [formatTokens(tokens), `${detail.toolCallCount} tool calls`, formatDuration(durationMilliseconds)]
+  return [{ text: parts.join(SEPARATOR), tone: 'muted' }]
 }
