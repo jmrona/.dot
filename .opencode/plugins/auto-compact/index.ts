@@ -23,7 +23,7 @@ const EXECUTION_PROGRESS_EVENTS: ReadonlySet<string> = new Set([
   'session.execution.interrupted',
 ])
 
-const PLAN_DIRECTORY = '/Users/jose.romero/.opencode/plan'
+const PLAN_DIRECTORY = '/Users/jose.romero/.config/opencode/plans'
 
 export interface AutoCompactSession {
   readonly id: string

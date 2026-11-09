@@ -392,7 +392,7 @@ test('brainstorming modes save the approved design once to a plan file before th
   ]) {
     const skill = read(path)
     const step = skill.match(/\*\*Decide the next step\.\*\*([\s\S]*?)(?=\n\d+\. \*\*|\n## |$)/)?.[1] ?? ''
-    const saveIndex = step.indexOf('/Users/jose.romero/.opencode/plan/')
+    const saveIndex = step.indexOf('/Users/jose.romero/.config/opencode/plans/')
 
     assert.ok(saveIndex >= 0, `${path} names the plan directory in the next-step step`)
     assert.ok(step.indexOf('`write`') >= 0 && step.indexOf('`write`') < step.indexOf('question'), path)
@@ -413,10 +413,10 @@ test('implementation skills pass the plan file path to subagents instead of the 
   const fastPath = read('skills/fast-path-implementation/SKILL.md')
   const dispatchParagraph = fastPath.split('\n').find((line) => line.startsWith('Dispatch one bounded `stack-specialist` implementer')) ?? ''
 
-  assert.match(planSection, /\/Users\/jose\.romero\/\.opencode\/plan\//)
+  assert.match(planSection, /\/Users\/jose\.romero\/\.config\/opencode\/plans\//)
   assert.match(planSection, /read the design from (that|the) file/i)
   assert.match(planSection, /instead of pasting/)
-  assert.match(dispatchParagraph, /\/Users\/jose\.romero\/\.opencode\/plan\//)
+  assert.match(dispatchParagraph, /\/Users\/jose\.romero\/\.config\/opencode\/plans\//)
   assert.match(dispatchParagraph, /paste only the task scope/)
 })
 
@@ -601,4 +601,9 @@ test('git rule keeps the full list of destructive commands', () => {
 
   assert.match(git, /`git stash drop` \/ `git stash clear`/)
   assert.match(git, /`git tag -d` of pushed tags/)
+})
+
+test('opencode config allows the plans folder for external access and edits', () => {
+  assert.equal(config.permission.external_directory['~/.config/opencode/plans/**'], 'allow')
+  assert.equal(config.permission.edit['~/.config/opencode/plans/**'], 'allow')
 })

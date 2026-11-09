@@ -17,7 +17,7 @@ You need an approved design (from the `brainstorming` router via any of its mode
 
 ## Plan File
 
-If the approved design was saved to a plan file under `/Users/jose.romero/.opencode/plan/`, read the design from that file. Give every subagent that path. Tell it to read the design from the file instead of pasting the design into the prompt. Still paste each task's own scope, context and acceptance criteria into its prompt.
+If the approved design was saved to a plan file under `/Users/jose.romero/.config/opencode/plans/`, read the design from that file. Give every subagent that path. Tell it to read the design from the file instead of pasting the design into the prompt. Still paste each task's own scope, context and acceptance criteria into its prompt.
 
 ## Process Overview
 
