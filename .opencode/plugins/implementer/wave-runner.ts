@@ -89,8 +89,8 @@ function stepKeyFor(task: WaveTask, phase: ProgressPhase, attempt: number): Step
   return { taskID: task.id, phase, attempt }
 }
 
-async function recordStepStart(context: RunContext, task: WaveTask, key: StepKey): Promise<void> {
-  const step = { ...key, title: task.title, model: context.args.models[task.tier] }
+async function recordStepStart(context: RunContext, task: WaveTask, key: StepKey, model: string): Promise<void> {
+  const step = { ...key, title: task.title, model }
   await context.dependencies.progress?.update((current) => startStep(current, step, Date.now()))
 }
 
@@ -103,8 +103,8 @@ function childSpec(context: RunContext, task: WaveTask, text: string, requiredFi
   const progress = context.dependencies.progress
   return {
     parentID: context.dependencies.rootSessionID,
-    agent: task.agentType,
-    model: context.args.models[task.tier],
+    agent: key.phase === 'review' ? 'code-reviewer' : task.agentType,
+    model: key.phase === 'review' ? 'openai/hard' : context.args.models[task.tier],
     text,
     requiredFields,
     slotKey,
@@ -119,7 +119,7 @@ async function implement(context: RunContext, task: WaveTask, findings: readonly
   const text = buildImplementPrompt(context.args, context.dependencies.prompts, task, findings)
   const key = stepKeyFor(task, attempt === 0 ? 'implement' : 'correct', attempt)
   const spec = childSpec(context, task, text, IMPLEMENTER_FIELDS, `${task.id}:implement:${attempt}`, key)
-  await recordStepStart(context, task, key)
+  await recordStepStart(context, task, key, spec.model)
   const result = await context.dependencies.runChild(spec)
   await recordStepEnd(context, key, !result.ok || !IMPLEMENTATION_STATUSES.includes(result.value.status))
   if (!result.ok) return { report: null, failure: result.reason }
@@ -132,8 +132,9 @@ async function implement(context: RunContext, task: WaveTask, findings: readonly
 async function review(context: RunContext, task: WaveTask, report: Report, round: number): Promise<ReviewStep> {
   const text = buildReviewPrompt(context.args, context.dependencies.prompts, task, report)
   const key = stepKeyFor(task, 'review', round)
-  await recordStepStart(context, task, key)
-  const result = await context.dependencies.runChild(childSpec(context, task, text, REVIEWER_FIELDS, `${task.id}:review:${round}`, key))
+  const spec = childSpec(context, task, text, REVIEWER_FIELDS, `${task.id}:review:${round}`, key)
+  await recordStepStart(context, task, key, spec.model)
+  const result = await context.dependencies.runChild(spec)
   await recordStepEnd(context, key, !result.ok)
   if (result.ok) return { verdict: result.value as unknown as ReviewVerdict }
   if (result.reason === 'invalid-report') return { verdict: NO_VALID_VERDICT }

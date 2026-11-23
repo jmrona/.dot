@@ -70,6 +70,36 @@ function dependenciesFor(script: readonly ChildRunResult[], gateResult?: GateRes
 }
 
 describe('runWave', () => {
+  it('routes easy implementations and corrections separately from both reviews', async () => {
+    const plan = buildPlan()
+    const task = { ...plan.wave[0], tier: 'easy', agentType: 'stack-specialist' }
+    const args = { ...plan.args, models: { easy: 'openai/easy' }, tasks: [task] }
+    const { dependencies, runner } = dependenciesFor([DONE, failVerdict('fix it'), DONE, PASS])
+    await runWave({ ...plan, args, wave: [task] }, dependencies)
+    assert.deepEqual(runner.specs.map(({ agent, model }) => ({ agent, model })), [
+      { agent: 'stack-specialist', model: 'openai/easy' },
+      { agent: 'code-reviewer', model: 'openai/hard' },
+      { agent: 'stack-specialist', model: 'openai/easy' },
+      { agent: 'code-reviewer', model: 'openai/hard' },
+    ])
+  })
+
+  it('routes hard implementations and corrections independently of the reviewer model', async () => {
+    for (const hardModel of ['openai/hard', 'other/hard']) {
+      const plan = buildPlan()
+      const task = { ...plan.wave[0], tier: 'hard', agentType: 'complex-worker' }
+      const args = { ...plan.args, models: { hard: hardModel }, tasks: [task] }
+      const { dependencies, runner } = dependenciesFor([DONE, failVerdict('fix it'), DONE, PASS])
+      await runWave({ ...plan, args, wave: [task] }, dependencies)
+      assert.deepEqual(runner.specs.map(({ agent, model }) => ({ agent, model })), [
+        { agent: 'complex-worker', model: hardModel },
+        { agent: 'code-reviewer', model: 'openai/hard' },
+        { agent: 'complex-worker', model: hardModel },
+        { agent: 'code-reviewer', model: 'openai/hard' },
+      ])
+    }
+  })
+
   it('verifies a task whose implementer reports DONE and whose reviewer passes first time', async () => {
     const { dependencies, gate } = dependenciesFor([DONE, PASS])
     const result = await runWave(buildPlan(), dependencies)
@@ -229,6 +259,19 @@ describe('child prompts', () => {
 })
 
 describe('runWave progress', () => {
+  it('records the actual model for each review and implementer step without a hard tier', async () => {
+    const plan = buildPlan()
+    const task = { ...plan.wave[0], tier: 'easy', agentType: 'stack-specialist' }
+    const args = { ...plan.args, models: { easy: 'openai/easy' }, tasks: [task] }
+    const { dependencies, runner } = dependenciesFor([DONE, failVerdict('fix it'), DONE, PASS])
+    const progress = progressRecorder()
+    await runWave({ ...plan, args, wave: [task] }, { ...dependencies, progress: progress.recorder })
+    assert.deepEqual(progress.state().steps.map((step) => step.model), [
+      'openai/easy', 'openai/hard', 'openai/easy', 'openai/hard',
+    ])
+    assert.deepEqual(progress.state().steps.map((step) => step.model), runner.specs.map((spec) => spec.model))
+  })
+
   const stepSummary = (progress: WaveProgress) =>
     progress.steps.map((step) => `${step.phase}:${step.attempt}:${step.state}:${step.sessionID}`)
 
