@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { createSlotSemaphore } from '../rate-guard/semaphore.ts'
+import { createSlotSemaphore, type SlotSemaphore } from '../rate-guard/semaphore.ts'
 import {
   createChildSessionRunner,
   extractLastJsonBlock,
@@ -147,6 +147,48 @@ test('run holds a semaphore slot while a hard model child runs', async () => {
   semaphore.release()
   await pending
   assert.equal(started, false)
+})
+
+test('run returns cancelled without creating a child or releasing a slot when aborted while queued', async (context) => {
+  const { api, calls } = createFakeApi()
+  const semaphore = createSlotSemaphore(1, async () => true)
+  const release = context.mock.method(semaphore, 'release')
+  const runner = createChildSessionRunner({ api, semaphore, hardModel: HARD_MODEL, timeoutSeconds: 5 })
+  const controller = new AbortController()
+  await semaphore.acquire('holder', 'holder-call')
+
+  const running = runner.run(specFor({ model: HARD_MODEL, signal: controller.signal }))
+  controller.abort()
+  const checkpoint = new Promise<undefined>((resolve) => setImmediate(resolve, undefined))
+  const result = await Promise.race([running, checkpoint])
+
+  assert.deepEqual(result, { ok: false, reason: 'cancelled' }, 'run must return cancelled before the holder releases')
+  assert.deepEqual(calls, [])
+  assert.equal(release.mock.callCount(), 0)
+})
+
+test('run returns cancelled before creating a child when abort follows a grant', async (context) => {
+  const { api, calls } = createFakeApi()
+  const slots = createSlotSemaphore(1, async () => true)
+  const controller = new AbortController()
+  const semaphore: SlotSemaphore = {
+    ...slots,
+    acquire(sessionID, callID, signal) {
+      const grant = slots.acquire(sessionID, callID, signal)
+      void grant.then((granted) => {
+        if (granted) controller.abort()
+      })
+      return grant
+    },
+  }
+  const release = context.mock.method(semaphore, 'release')
+  const runner = createChildSessionRunner({ api, semaphore, hardModel: HARD_MODEL, timeoutSeconds: 5 })
+
+  const result = await runner.run(specFor({ model: HARD_MODEL, signal: controller.signal }))
+
+  assert.deepEqual(result, { ok: false, reason: 'cancelled' }, 'run must return cancelled after an aborted handoff')
+  assert.deepEqual(calls, [])
+  assert.equal(release.mock.callCount(), 1)
 })
 
 test('run does not acquire a slot for a routine model', async () => {

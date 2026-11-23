@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { getEventListeners } from 'node:events'
 import { test } from 'node:test'
 
 import { createSlotSemaphore } from './semaphore.ts'
@@ -106,6 +107,148 @@ test('a waiter whose session has gone is dropped when its turn comes', async () 
   await settle()
   assert.deepEqual([gone.outcome, alive.outcome], [false, true])
 })
+
+test('a pre-aborted acquire never joins the queue', async () => {
+  const checkedSessions: string[] = []
+  const semaphore = createSlotSemaphore(1, async (sessionID) => {
+    checkedSessions.push(sessionID)
+    return true
+  })
+  await semaphore.acquire('holder', 'holder-call')
+
+  const aborted = track(semaphore.acquire('aborted', 'aborted-call', AbortSignal.abort()))
+  await settle()
+  assert.equal(aborted.outcome, false, 'a pre-aborted acquire must settle before release')
+
+  semaphore.release()
+  await settle()
+  assert.deepEqual(checkedSessions, ['holder'])
+})
+
+test('queued abort settles only its waiter before release and keeps the remaining FIFO order', async () => {
+  const semaphore = createSlotSemaphore(1, alwaysAlive)
+  const controller = new AbortController()
+  await semaphore.acquire('holder', 'holder-call')
+  const first = track(semaphore.acquire('root', 'shared-call'))
+  const aborted = track(semaphore.acquire('root', 'shared-call', controller.signal))
+  const last = track(semaphore.acquire('root', 'shared-call'))
+
+  controller.abort()
+  await settle()
+  assert.deepEqual([first.outcome, aborted.outcome, last.outcome], [undefined, false, undefined],
+    'only the aborted waiter must settle before release')
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0)
+
+  semaphore.release()
+  await settle()
+  assert.deepEqual([first.outcome, last.outcome], [true, undefined])
+  semaphore.release()
+  await settle()
+  assert.equal(last.outcome, true)
+})
+
+for (const lateCheck of ['success', 'rejection'] as const) {
+  test(`abort reclaims a reservation without a second release on late liveness ${lateCheck}`, async () => {
+    const liveness = Promise.withResolvers<boolean>()
+    const semaphore = createSlotSemaphore(1, (sessionID) => sessionID === 'first-root' ? liveness.promise : alwaysAlive())
+    const controller = new AbortController()
+    const aborted = track(semaphore.acquire('first-root', 'shared-call', controller.signal))
+    const successor = track(semaphore.acquire('second-root', 'shared-call'))
+    const third = track(semaphore.acquire('third-root', 'third-call'))
+    await settle()
+    assert.deepEqual([aborted.outcome, successor.outcome, third.outcome], [undefined, undefined, undefined])
+
+    controller.abort()
+    await settle()
+    assert.deepEqual([aborted.outcome, successor.outcome, third.outcome], [false, true, undefined],
+      'abort must admit the successor before the old liveness check settles')
+    assert.equal(getEventListeners(controller.signal, 'abort').length, 0)
+
+    if (lateCheck === 'success') liveness.resolve(true)
+    else liveness.reject(new Error('session unavailable'))
+    await settle()
+    assert.deepEqual([aborted.outcome, third.outcome], [false, undefined],
+      'a late liveness result must leave the successor holding the slot')
+
+    semaphore.release()
+    await settle()
+    assert.equal(third.outcome, true)
+  })
+}
+
+test('abort hands off a reserved slot despite an earlier listener stopping propagation', async () => {
+  const liveness = Promise.withResolvers<boolean>()
+  const semaphore = createSlotSemaphore(1, (sessionID) => sessionID === 'first-root' ? liveness.promise : alwaysAlive())
+  const controller = new AbortController()
+  let propagationStopped = false
+  controller.signal.addEventListener('abort', (event) => {
+    event.stopImmediatePropagation()
+    propagationStopped = true
+  }, { once: true })
+  const aborted = track(semaphore.acquire('first-root', 'first-call', controller.signal))
+  const successor = track(semaphore.acquire('second-root', 'second-call'))
+
+  controller.abort()
+  await settle()
+
+  assert.equal(propagationStopped, true)
+  assert.deepEqual(
+    [aborted.outcome, successor.outcome],
+    [false, true],
+    'abort must settle the reserved waiter and admit the successor before the liveness check finishes',
+  )
+})
+
+for (const method of ['cancelSession', 'cancelCall'] as const) {
+  test(`${method} drops only the queued waiter when both waiters match`, async () => {
+    const liveness = Promise.withResolvers<boolean>()
+    const semaphore = createSlotSemaphore(1, () => liveness.promise)
+    const reserved = track(semaphore.acquire('reserved-root', 'reserved-call'))
+    const bySession = method === 'cancelSession'
+    const queued = track(semaphore.acquire(
+      bySession ? 'reserved-root' : 'queued-root',
+      bySession ? 'queued-call' : 'reserved-call',
+    ))
+
+    semaphore[method](bySession ? 'reserved-root' : 'reserved-call')
+    await settle()
+    assert.deepEqual([reserved.outcome, queued.outcome], [undefined, false])
+
+    liveness.resolve(true)
+    await settle()
+    assert.equal(reserved.outcome, true)
+  })
+
+  test(`${method} detaches the abort listener of a queued waiter`, async () => {
+    const semaphore = createSlotSemaphore(0, alwaysAlive)
+    const { signal } = new AbortController()
+    const waiting = track(semaphore.acquire('root', 'call', signal))
+    const attached = getEventListeners(signal, 'abort').length
+
+    semaphore[method](method === 'cancelSession' ? 'root' : 'call')
+    await settle()
+    assert.equal(waiting.outcome, false)
+    assert.deepEqual([attached, getEventListeners(signal, 'abort').length], [1, 0],
+      'the abort listener must exist only while queued')
+  })
+}
+
+for (const outcome of ['grant', 'denial', 'rejection'] as const) {
+  test(`a liveness ${outcome} detaches the abort listener`, async () => {
+    const liveness = Promise.withResolvers<boolean>()
+    const semaphore = createSlotSemaphore(1, () => liveness.promise)
+    const { signal } = new AbortController()
+    const waiting = track(semaphore.acquire('root', 'call', signal))
+    const attached = getEventListeners(signal, 'abort').length
+
+    if (outcome === 'rejection') liveness.reject(new Error('session unavailable'))
+    else liveness.resolve(outcome === 'grant')
+    await settle()
+    assert.equal(waiting.outcome, outcome === 'grant')
+    assert.deepEqual([attached, getEventListeners(signal, 'abort').length], [1, 0],
+      'the abort listener must exist only while the slot is reserved')
+  })
+}
 
 test('the current limit can be read back', () => {
   const semaphore = createSlotSemaphore(2, alwaysAlive)

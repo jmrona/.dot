@@ -153,10 +153,11 @@ export function createChildSessionRunner(dependencies: ChildSessionDependencies)
     async run(spec) {
       if (spec.signal?.aborted) return CANCELLED
       const needsSlot = spec.model === hardModel
-      if (needsSlot && !(await semaphore.acquire(spec.parentID, spec.slotKey))) {
-        return failure('session-error: no hard slot')
+      if (needsSlot && !(await semaphore.acquire(spec.parentID, spec.slotKey, spec.signal))) {
+        return spec.signal?.aborted ? CANCELLED : failure('session-error: no hard slot')
       }
       try {
+        if (spec.signal?.aborted) return CANCELLED
         return await runWithSlot(dependencies, spec)
       } finally {
         if (needsSlot) semaphore.release()
